@@ -1,0 +1,39 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate release artifacts
+        shell: bash
+        run: |
+          manifest_version="$(python -c "import json; print(json.load(open('manifest.json', encoding='utf-8'))['version'])")"
+          if [ "$manifest_version" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match manifest version $manifest_version"
+            exit 1
+          fi
+          python -m json.tool manifest.json >/dev/null
+          test -f main.js
+          test -f styles.css
+          node --check main.js
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: RELEASE_NOTES.md
+          files: |
+            manifest.json
+            main.js
+            styles.css
+

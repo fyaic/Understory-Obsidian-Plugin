@@ -1,0 +1,191 @@
+.workspace-leaf-content[data-type="understory-sidebar"] .view-content {
+    padding: 0;
+    overflow: hidden;
+}
+
+.understory-sidebar {
+    box-sizing: border-box;
+    height: 100%;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 12px;
+    font-size: var(--font-ui-small);
+    color: var(--text-normal);
+}
+
+.understory-sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.understory-sidebar-header h3 {
+    margin: 0;
+    font-size: var(--font-ui-medium);
+    font-weight: 600;
+}
+
+.understory-sidebar-actions,
+.understory-sidebar-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.understory-sidebar-actions button,
+.understory-sidebar-item-actions button,
+.understory-sidebar-conflicts button {
+    font-size: var(--font-ui-smaller);
+    padding: 2px 7px;
+    min-height: 24px;
+}
+
+.understory-sidebar-current,
+.understory-sidebar-empty {
+    color: var(--text-muted);
+    line-height: 1.45;
+    margin: 8px 0;
+    overflow-wrap: anywhere;
+}
+
+.understory-sidebar-refresh-prompt {
+    border: 1px solid var(--background-modifier-border);
+    border-left: 3px solid var(--text-warning);
+    border-radius: 6px;
+    background: var(--background-secondary);
+    color: var(--text-normal);
+    line-height: 1.45;
+    margin: 10px 0 12px;
+    padding: 9px 10px;
+    overflow-wrap: anywhere;
+}
+
+.understory-sidebar-refresh-prompt--missing {
+    border-left-color: var(--interactive-accent);
+}
+
+.understory-sidebar-refresh-title {
+    color: var(--text-normal);
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.understory-sidebar-refresh-body,
+.understory-sidebar-refresh-hint {
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+}
+
+.understory-sidebar-refresh-hint {
+    margin-top: 4px;
+}
+
+.understory-sidebar-refresh-actions {
+    display: flex;
+    justify-content: flex-start;
+    margin-top: 8px;
+}
+
+.understory-sidebar-refresh-actions button {
+    font-size: var(--font-ui-smaller);
+    min-height: 24px;
+    padding: 2px 8px;
+}
+
+.understory-sidebar-section {
+    margin-top: 14px;
+}
+
+.understory-sidebar-section-title {
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: var(--font-ui-smaller);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+}
+
+.understory-sidebar-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: start;
+    padding: 7px 0;
+    border-top: 1px solid var(--background-modifier-border);
+}
+
+.understory-sidebar-item-main {
+    min-width: 0;
+}
+
+.understory-sidebar-item-main a {
+    color: var(--link-color);
+    cursor: pointer;
+    overflow-wrap: anywhere;
+    text-decoration: none;
+}
+
+.understory-sidebar-item-main a:hover {
+    text-decoration: underline;
+}
+
+.understory-sidebar-item-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 3px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+}
+
+.understory-sidebar-score {
+    color: var(--text-accent);
+}
+
+.understory-sidebar-item--accepted .understory-sidebar-item-main a {
+    color: var(--text-success);
+}
+
+.understory-sidebar-conflict {
+    padding: 8px 0;
+    border-top: 1px solid var(--background-modifier-border);
+}
+
+.understory-sidebar-conflict-main {
+    font-weight: 600;
+}
+
+.understory-sidebar-conflict-desc {
+    color: var(--text-muted);
+    line-height: 1.4;
+    margin-top: 3px;
+    overflow-wrap: anywhere;
+}
+
+.understory-sidebar-conflict--high .understory-sidebar-conflict-main {
+    color: var(--text-error);
+}
+
+.understory-sidebar-conflict--medium .understory-sidebar-conflict-main {
+    color: var(--text-warning);
+}
+
+.understory-privacy-summary {
+    padding: 8px 10px;
+    border-left: 3px solid var(--interactive-accent);
+    background: var(--background-secondary);
+}
+
+@media (max-width: 420px) {
+    .understory-sidebar-item {
+        grid-template-columns: 1fr;
+    }
+
+    .understory-sidebar-item-actions {
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+}
