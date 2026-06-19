@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.7.2
+
+- Add `package-lock.json` for Obsidian build verification reproducibility.
+- No functional plugin changes from 1.7.1.
+
 ## 1.7.1
 
 - Add a local Agent API for automation through a JSON CLI and MCP stdio server.

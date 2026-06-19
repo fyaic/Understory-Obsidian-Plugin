@@ -148,7 +148,7 @@ npm run check
 - `main.js`
 - `styles.css`
 
-release tag 必须和 `manifest.json` 中的 version 完全一致，例如 `1.7.1`。
+release tag 必须和 `manifest.json` 中的 version 完全一致，例如 `1.7.2`。
 
 ## 链接
 

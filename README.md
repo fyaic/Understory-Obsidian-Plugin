@@ -148,7 +148,7 @@ Each GitHub release must attach:
 - `main.js`
 - `styles.css`
 
-The release tag must match `manifest.json` version exactly, for example `1.7.1`.
+The release tag must match `manifest.json` version exactly, for example `1.7.2`.
 
 ## Links
 

@@ -34,6 +34,10 @@ def main() -> None:
         if not (ROOT / filename).exists():
             raise SystemExit(f"Missing required release file: {filename}")
 
+    lockfiles = ["package-lock.json", "pnpm-lock.yaml", "yarn.lock", "bun.lock"]
+    if not any((ROOT / filename).exists() for filename in lockfiles):
+        raise SystemExit("Missing JavaScript lockfile for reproducible build verification")
+
     versions = json.loads((ROOT / "versions.json").read_text(encoding="utf-8"))
     if version not in versions:
         raise SystemExit(f"versions.json missing current version: {version}")

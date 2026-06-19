@@ -24,6 +24,8 @@ jobs:
             exit 1
           fi
           python -m json.tool manifest.json >/dev/null
+          test -f package-lock.json
+          npm ci --ignore-scripts
           test -f main.js
           test -f styles.css
           node --check main.js
@@ -36,4 +38,3 @@ jobs:
             manifest.json
             main.js
             styles.css
-
