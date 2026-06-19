@@ -11,7 +11,8 @@ In Local only mode:
 - Notes are read from your local vault.
 - Reports and caches are written locally under `.understory`.
 - No cloud model request is made.
-- No webhook request is made unless you explicitly configure and enable one.
+- Provider API keys are not passed to the local engine process.
+- No webhook request is made, even if a webhook URL remains in saved settings.
 
 ## Optional Cloud Model Modes
 
@@ -25,15 +26,23 @@ Provider accounts, API keys, pricing, quotas, privacy terms, data retention, and
 
 You can leave API key fields blank and use environment variables instead. If you enter API keys in the plugin settings page, they are stored in your local Obsidian plugin configuration.
 
-Understory should not print API keys in logs or diagnostics. Do not share screenshots, logs, or diagnostic output that include secrets.
+Understory redacts known API keys, bearer tokens, webhook URLs, and similar secrets from plugin logs and short diagnostics. Raw process stdout is not stored in plugin logs by default. Do not share screenshots, logs, or diagnostic output that include secrets.
 
 ## Local Files
 
 Understory may write local cache, report, and relationship data under `.understory` in your vault. These files are intended to support relation discovery, graph analysis, status reports, and refresh behavior.
 
+## Local Agent API
+
+The Agent API is local-only by design. It is exposed through a JSON command-line entry point and an MCP stdio server. It does not start an HTTP server, does not open a local network port, and does not send data to Bondie Labs.
+
+Agent API calls require an explicit vault path. Note paths are normalized and rejected if they try to leave that vault. Read operations return relationship metadata, graph summary counts, status fields, and file paths. They do not return full note bodies by default. Write operations such as accepting, rejecting, or inserting a relation modify local vault files only.
+
+The Agent API reuses Understory redaction for API keys, bearer tokens, webhook URLs, and similar secrets in JSON error details. As with any local automation, review MCP/Agent client logs before sharing them.
+
 ## Webhooks
 
-Webhook features are off by default. If enabled, a summary payload may be sent to the URL you configure. Webhook provider behavior is governed by that provider and the URL owner.
+Webhook features are off by default and are blocked in Local only mode. If enabled in a cloud-capable mode, a summary payload may be sent to the URL you configure. Webhook provider behavior is governed by that provider and the URL owner.
 
 ## Data Flow Summary
 
@@ -44,6 +53,7 @@ Webhook features are off by default. If enabled, a summary payload may be sent t
 | Full AI analysis | Off unless selected | Reports/cache metadata | Selected snippets, prompts, or extracted facts to your provider | Enable only with consent and provider key |
 | Webhooks | Off | Notification/log metadata | Summary payload to configured URL | Explicit opt-in and URL |
 | Diagnostics | Manual | Local report/output | None unless you share it | Review and redact before sharing |
+| Agent API CLI/MCP | Off unless launched locally | Relationship metadata and note edits when requested | None | Launch with an explicit vault path and review client logs |
 
 ## 中文摘要
 
@@ -53,3 +63,4 @@ Understory 默认本地优先。Bondie Labs 不会接收你的 vault 内容、AP
 
 如果你在设置页填写 API key，密钥会保存在本机 Obsidian 插件配置中。也可以留空并改用环境变量。
 
+在 **完全本地** 模式下，插件不会把模型服务密钥传给本地引擎进程，也不会发送 Webhook。插件日志和短诊断会尽量脱敏 API key、Bearer token、Webhook URL 等敏感信息，默认不会把 raw stdout 存入插件日志。

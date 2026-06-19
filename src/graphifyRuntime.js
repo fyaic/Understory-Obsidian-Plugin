@@ -1,6 +1,32 @@
 const { Notice, TFile } = require('obsidian');
-const { GraphifyContentModal } = require('./utils');
+const { GraphifyContentModal, MAX_LOG_ENTRIES } = require('./utils');
 const { t } = require('./i18n');
+const {
+    REQUIRED_ENGINE_SCRIPTS,
+    REQUIRED_PYTHON_MODULES,
+    addCheck,
+    buildEngineDiagnosticText,
+    checkPathAccess,
+    createEngineHealthIssue,
+    emptyChecks,
+    readEngineVersion,
+    statusFromIssues,
+    summarizeIssue,
+} = require('./engineHealth');
+const { normalizeLogEntry, redactSensitiveText, safeErrorDetail, safeNetworkMode } = require('./safety');
+
+const MANAGED_ENV_KEYS = [
+    'UNDERSTORY_EMBEDDING_PROVIDER',
+    'UNDERSTORY_LLM_PROVIDER',
+    'UNDERSTORY_EMBEDDING_BASE_URL',
+    'UNDERSTORY_EMBEDDING_MODEL',
+    'UNDERSTORY_EMBEDDING_DIMENSIONS',
+    'UNDERSTORY_EMBEDDING_API_KEY',
+    'UNDERSTORY_LLM_BASE_URL',
+    'UNDERSTORY_LLM_MODEL',
+    'UNDERSTORY_LLM_API_KEY',
+    'UNDERSTORY_WEBHOOK_ENABLED',
+];
 
 class GraphifyRuntimeMethods {
     _openOrphansView() {
@@ -43,28 +69,41 @@ class GraphifyRuntimeMethods {
 
     _pythonEnv(extra = {}) {
         const vaultBase = this._vaultBasePath ? this._vaultBasePath() : null;
+        const networkMode = safeNetworkMode(this.settings?.networkMode);
+        const webhookEnabled = networkMode !== 'local'
+            && !!this.settings?.webhookEnabled
+            && !!String(this.settings?.webhookUrl || '').trim();
         const env = {
             ...process.env,
             UNDERSTORY_ENGINE_DIR: this._engineDir(),
             OBSIDIAN_VAULT_PATH: vaultBase || process.env.OBSIDIAN_VAULT_PATH || '',
-            UNDERSTORY_NETWORK_MODE: this.settings?.networkMode || 'local',
-            UNDERSTORY_WEBHOOK_ENABLED: this.settings?.webhookEnabled ? '1' : '0',
+            UNDERSTORY_NETWORK_MODE: networkMode,
+            UNDERSTORY_UI_LANGUAGE: this.settings?.uiLanguage || 'en',
+            UNDERSTORY_WEBHOOK_ENABLED: webhookEnabled ? '1' : '0',
             PYTHONIOENCODING: 'utf-8',
             ...extra,
         };
+        for (const key of MANAGED_ENV_KEYS) {
+            delete env[key];
+        }
+        env.UNDERSTORY_WEBHOOK_ENABLED = webhookEnabled ? '1' : '0';
         const setIfPresent = (key, value) => {
             const text = String(value || '').trim();
             if (text) env[key] = text;
         };
-        setIfPresent('UNDERSTORY_EMBEDDING_PROVIDER', this.settings?.embeddingProvider);
-        setIfPresent('UNDERSTORY_LLM_PROVIDER', this.settings?.llmProvider);
-        setIfPresent('UNDERSTORY_EMBEDDING_BASE_URL', this.settings?.embeddingBaseUrl);
-        setIfPresent('UNDERSTORY_EMBEDDING_MODEL', this.settings?.embeddingModel);
-        setIfPresent('UNDERSTORY_EMBEDDING_DIMENSIONS', this.settings?.embeddingDimensions);
-        setIfPresent('UNDERSTORY_EMBEDDING_API_KEY', this.settings?.embeddingApiKey);
-        setIfPresent('UNDERSTORY_LLM_BASE_URL', this.settings?.llmBaseUrl);
-        setIfPresent('UNDERSTORY_LLM_MODEL', this.settings?.llmModel);
-        setIfPresent('UNDERSTORY_LLM_API_KEY', this.settings?.llmApiKey);
+        if (networkMode === 'embedding' || networkMode === 'full') {
+            setIfPresent('UNDERSTORY_EMBEDDING_PROVIDER', this.settings?.embeddingProvider);
+            setIfPresent('UNDERSTORY_EMBEDDING_BASE_URL', this.settings?.embeddingBaseUrl);
+            setIfPresent('UNDERSTORY_EMBEDDING_MODEL', this.settings?.embeddingModel);
+            setIfPresent('UNDERSTORY_EMBEDDING_DIMENSIONS', this.settings?.embeddingDimensions);
+            setIfPresent('UNDERSTORY_EMBEDDING_API_KEY', this.settings?.embeddingApiKey);
+        }
+        if (networkMode === 'full') {
+            setIfPresent('UNDERSTORY_LLM_PROVIDER', this.settings?.llmProvider);
+            setIfPresent('UNDERSTORY_LLM_BASE_URL', this.settings?.llmBaseUrl);
+            setIfPresent('UNDERSTORY_LLM_MODEL', this.settings?.llmModel);
+            setIfPresent('UNDERSTORY_LLM_API_KEY', this.settings?.llmApiKey);
+        }
         return env;
     }
 
@@ -78,6 +117,10 @@ class GraphifyRuntimeMethods {
 
     _checkPythonModules(timeoutMs = 5000) {
         return this._runPythonProbe(['-c', 'import requests, dotenv, yaml; print("dependencies ok")'], timeoutMs);
+    }
+
+    _checkPythonModule(moduleName, timeoutMs = 5000) {
+        return this._runPythonProbe(['-c', `import ${moduleName}; print("${moduleName} ok")`], timeoutMs);
     }
 
     _runPythonProbe(args, timeoutMs = 5000) {
@@ -114,7 +157,7 @@ class GraphifyRuntimeMethods {
         const key = this._engineHealthKey();
         if (!force && this.engineHealth && this.engineHealth.key === key && Date.now() - this.engineHealth.checkedAt < 60000) {
             if (showNotice) {
-                new Notice(this.engineHealth.ok
+                new Notice(this.engineHealth.status === 'ready'
                     ? t(this, 'engine_health_ok_notice')
                     : t(this, 'engine_health_problem_notice', { message: this.engineHealth.message }));
             }
@@ -122,48 +165,299 @@ class GraphifyRuntimeMethods {
         }
 
         const issues = [];
+        const checks = emptyChecks();
         const engineDir = this._engineDir();
+        const pythonPath = this._pythonExe();
+        const vaultBase = this._vaultBasePath ? this._vaultBasePath() : null;
+        const vaultUnderstoryPath = vaultBase ? this._joinPath(vaultBase, '.understory') : '';
         let pythonVersion = '';
+        let engineVersion = 'unknown';
+        let engineCommit = 'unknown';
+
+        const pipInstallCommand = engineDir
+            ? `${pythonPath} -m pip install -r "${this._joinPath(engineDir, 'requirements.txt')}"`
+            : `${pythonPath} -m pip install -r "<engineDir>/requirements.txt"`;
+        const addIssue = (input) => {
+            const issue = createEngineHealthIssue(input);
+            issues.push(issue);
+            return issue;
+        };
 
         if (!engineDir) {
-            issues.push(t(this, 'engine_missing_dir'));
-        } else if (!fs.existsSync(engineDir)) {
-            issues.push(t(this, 'engine_dir_not_found', { path: engineDir }));
+            addCheck(checks, 'paths', {
+                id: 'engine.dir',
+                label: t(this, 'engine_check_engine_dir_label'),
+                status: 'error',
+                severity: 'error',
+                detail: t(this, 'engine_missing_dir'),
+            });
+            addIssue({
+                id: 'engine.dir_missing',
+                severity: 'error',
+                group: 'paths',
+                title: t(this, 'engine_issue_dir_missing_title'),
+                detail: t(this, 'engine_missing_dir'),
+                fix: t(this, 'engine_issue_dir_missing_fix'),
+                command: '$env:UNDERSTORY_ENGINE_DIR="C:\\path\\to\\Understory-graphify-engine"',
+            });
         } else {
-            const apiPath = this._enginePath('api.py');
-            const scriptsPath = this._enginePath('scripts');
-            if (!fs.existsSync(apiPath)) issues.push(t(this, 'engine_api_missing', { path: apiPath }));
-            if (!fs.existsSync(scriptsPath)) issues.push(t(this, 'engine_scripts_missing', { path: scriptsPath }));
+            const engineAccess = checkPathAccess(engineDir, 'read', fs);
+            addCheck(checks, 'paths', {
+                id: 'engine.dir',
+                label: t(this, 'engine_check_engine_dir_label'),
+                status: engineAccess.ok ? 'ok' : 'error',
+                severity: engineAccess.ok ? 'info' : 'error',
+                detail: engineAccess.ok
+                    ? t(this, 'engine_check_ok')
+                    : t(this, engineAccess.exists ? 'engine_permission_read_failed' : 'engine_dir_not_found', { path: engineDir, message: engineAccess.errorMessage }),
+                path: engineDir,
+            });
+
+            if (!engineAccess.exists) {
+                addIssue({
+                    id: 'engine.dir_not_found',
+                    severity: 'error',
+                    group: 'paths',
+                    title: t(this, 'engine_issue_dir_not_found_title'),
+                    detail: t(this, 'engine_dir_not_found', { path: engineDir }),
+                    fix: t(this, 'engine_issue_dir_not_found_fix'),
+                    command: 'git clone https://github.com/fyaic/Understory-graphify-engine.git',
+                    path: engineDir,
+                });
+            } else if (!engineAccess.ok) {
+                addIssue({
+                    id: 'engine.dir_unreadable',
+                    severity: 'error',
+                    group: 'permissions',
+                    title: t(this, 'engine_issue_permission_title'),
+                    detail: t(this, 'engine_permission_read_failed', { path: engineDir, message: engineAccess.errorMessage }),
+                    fix: t(this, 'engine_issue_permission_fix'),
+                    path: engineDir,
+                });
+            } else {
+                const versionInfo = readEngineVersion(engineDir);
+                engineVersion = versionInfo.version;
+                engineCommit = versionInfo.commit;
+
+                for (const script of REQUIRED_ENGINE_SCRIPTS) {
+                    const scriptPath = this._joinPath(engineDir, ...script.pathParts);
+                    const access = checkPathAccess(scriptPath, 'read', fs);
+                    addCheck(checks, script.group, {
+                        id: script.id,
+                        label: script.label,
+                        status: access.ok ? 'ok' : (script.severity === 'error' ? 'error' : 'warning'),
+                        severity: access.ok ? 'info' : script.severity,
+                        detail: access.ok
+                            ? t(this, 'engine_check_ok')
+                            : t(this, 'engine_script_missing_detail', { script: script.label, path: scriptPath }),
+                        path: scriptPath,
+                    });
+                    if (!access.ok) {
+                        addIssue({
+                            id: script.id,
+                            severity: script.severity,
+                            group: script.group,
+                            title: t(this, script.id === 'engine.api_missing' ? 'engine_issue_api_missing_title' : 'engine_issue_script_missing_title', { script: script.label }),
+                            detail: t(this, 'engine_script_missing_detail', { script: script.label, path: scriptPath }),
+                            fix: t(this, script.severity === 'error' ? 'engine_issue_script_missing_fix_error' : 'engine_issue_script_missing_fix_warning'),
+                            command: script.severity === 'error' ? 'git clone https://github.com/fyaic/Understory-graphify-engine.git' : '',
+                            path: scriptPath,
+                        });
+                    }
+                }
+            }
         }
 
         try {
             pythonVersion = await this._checkPythonVersion();
         } catch (error) {
-            issues.push(t(this, 'engine_python_failed', { message: String(error.message || error) }));
+            const message = redactSensitiveText(String(error.message || error), this.settings);
+            addIssue({
+                id: 'engine.python_failed',
+                severity: 'error',
+                group: 'dependencies',
+                title: t(this, 'engine_issue_python_failed_title'),
+                detail: t(this, 'engine_python_failed', { message }),
+                fix: t(this, 'engine_issue_python_failed_fix'),
+                command: `${pythonPath} --version`,
+            });
         }
 
         if (pythonVersion) {
-            try {
-                await this._checkPythonModules();
-            } catch (error) {
-                issues.push(t(this, 'engine_deps_failed', { message: String(error.message || error) }));
+            addCheck(checks, 'dependencies', {
+                id: 'engine.python',
+                label: t(this, 'engine_check_python_label'),
+                status: 'ok',
+                severity: 'info',
+                detail: pythonVersion,
+                path: pythonPath,
+            });
+            if (force) {
+                for (const moduleInfo of REQUIRED_PYTHON_MODULES) {
+                    try {
+                        await this._checkPythonModule(moduleInfo.importName);
+                        addCheck(checks, 'dependencies', {
+                            id: moduleInfo.id,
+                            label: moduleInfo.packageName,
+                            status: 'ok',
+                            severity: 'info',
+                            detail: t(this, 'engine_check_ok'),
+                        });
+                    } catch (error) {
+                        const message = redactSensitiveText(String(error.message || error), this.settings);
+                        addCheck(checks, 'dependencies', {
+                            id: moduleInfo.id,
+                            label: moduleInfo.packageName,
+                            status: 'warning',
+                            severity: 'warning',
+                            detail: message,
+                        });
+                        addIssue({
+                            id: moduleInfo.id,
+                            severity: 'warning',
+                            group: 'dependencies',
+                            title: t(this, 'engine_issue_dependency_missing_title', { name: moduleInfo.packageName }),
+                            detail: t(this, 'engine_issue_dependency_missing_detail', { name: moduleInfo.packageName, module: moduleInfo.importName, message }),
+                            fix: t(this, 'engine_issue_dependency_missing_fix'),
+                            command: pipInstallCommand,
+                        });
+                    }
+                }
+            } else {
+                addCheck(checks, 'dependencies', {
+                    id: 'engine.dependencies',
+                    label: t(this, 'engine_check_dependencies_label'),
+                    status: 'skipped',
+                    severity: 'info',
+                    detail: t(this, 'engine_check_dependencies_skipped'),
+                });
+            }
+        } else {
+            addCheck(checks, 'dependencies', {
+                id: 'engine.python',
+                label: t(this, 'engine_check_python_label'),
+                status: 'error',
+                severity: 'error',
+                detail: t(this, 'engine_python_failed', { message: pythonPath }),
+                path: pythonPath,
+            });
+        }
+
+        if (!vaultBase) {
+            addCheck(checks, 'vault', {
+                id: 'engine.vault_base',
+                label: t(this, 'engine_check_vault_label'),
+                status: 'skipped',
+                severity: 'info',
+                detail: t(this, 'engine_vault_base_skipped'),
+            });
+        } else {
+            const vaultDirExists = fs.existsSync(vaultUnderstoryPath);
+            addCheck(checks, 'vault', {
+                id: 'engine.vault_understory',
+                label: t(this, 'engine_check_vault_understory_label'),
+                status: vaultDirExists ? 'ok' : 'warning',
+                severity: vaultDirExists ? 'info' : 'warning',
+                detail: vaultDirExists ? t(this, 'engine_check_ok') : t(this, 'engine_vault_understory_missing', { path: vaultUnderstoryPath }),
+                path: vaultUnderstoryPath,
+            });
+            if (!vaultDirExists) {
+                addIssue({
+                    id: 'engine.vault_understory_missing',
+                    severity: 'warning',
+                    group: 'vault',
+                    title: t(this, 'engine_issue_vault_missing_title'),
+                    detail: t(this, 'engine_vault_understory_missing', { path: vaultUnderstoryPath }),
+                    fix: t(this, 'engine_issue_vault_missing_fix'),
+                    command: engineDir ? `${pythonPath} "${this._joinPath(engineDir, 'scripts', 'deploy_graphify.py')}" --vault "${vaultBase}"` : '',
+                    path: vaultUnderstoryPath,
+                });
+                const vaultRootAccess = checkPathAccess(vaultBase, 'write', fs);
+                if (!vaultRootAccess.ok) {
+                    addIssue({
+                        id: 'engine.vault_root_not_writable',
+                        severity: 'warning',
+                        group: 'permissions',
+                        title: t(this, 'engine_issue_vault_permission_title'),
+                        detail: t(this, 'engine_permission_write_failed', { path: vaultBase, message: vaultRootAccess.errorMessage }),
+                        fix: t(this, 'engine_issue_vault_permission_fix'),
+                        path: vaultBase,
+                    });
+                }
+            } else {
+                const vaultWriteAccess = checkPathAccess(vaultUnderstoryPath, 'write', fs);
+                addCheck(checks, 'permissions', {
+                    id: 'engine.vault_understory_write',
+                    label: t(this, 'engine_check_vault_write_label'),
+                    status: vaultWriteAccess.ok ? 'ok' : 'error',
+                    severity: vaultWriteAccess.ok ? 'info' : 'error',
+                    detail: vaultWriteAccess.ok
+                        ? t(this, 'engine_check_ok')
+                        : t(this, 'engine_permission_write_failed', { path: vaultUnderstoryPath, message: vaultWriteAccess.errorMessage }),
+                    path: vaultUnderstoryPath,
+                });
+                if (!vaultWriteAccess.ok) {
+                    addIssue({
+                        id: 'engine.vault_understory_not_writable',
+                        severity: 'error',
+                        group: 'permissions',
+                        title: t(this, 'engine_issue_vault_permission_title'),
+                        detail: t(this, 'engine_permission_write_failed', { path: vaultUnderstoryPath, message: vaultWriteAccess.errorMessage }),
+                        fix: t(this, 'engine_issue_vault_permission_fix'),
+                        path: vaultUnderstoryPath,
+                    });
+                }
+
+                const vaultScriptsPath = this._joinPath(vaultUnderstoryPath, 'scripts');
+                const vaultScriptsExist = fs.existsSync(vaultScriptsPath);
+                addCheck(checks, 'vault', {
+                    id: 'engine.vault_scripts',
+                    label: t(this, 'engine_check_vault_scripts_label'),
+                    status: vaultScriptsExist ? 'ok' : 'warning',
+                    severity: vaultScriptsExist ? 'info' : 'warning',
+                    detail: vaultScriptsExist ? t(this, 'engine_check_ok') : t(this, 'engine_vault_scripts_missing', { path: vaultScriptsPath }),
+                    path: vaultScriptsPath,
+                });
+                if (!vaultScriptsExist) {
+                    addIssue({
+                        id: 'engine.vault_scripts_missing',
+                        severity: 'warning',
+                        group: 'vault',
+                        title: t(this, 'engine_issue_vault_scripts_missing_title'),
+                        detail: t(this, 'engine_vault_scripts_missing', { path: vaultScriptsPath }),
+                        fix: t(this, 'engine_issue_vault_missing_fix'),
+                        command: engineDir ? `${pythonPath} "${this._joinPath(engineDir, 'scripts', 'deploy_graphify.py')}" --vault "${vaultBase}"` : '',
+                        path: vaultScriptsPath,
+                    });
+                }
             }
         }
 
-        const ok = issues.length === 0;
+        const status = statusFromIssues(issues);
+        const ok = status !== 'error';
+        const message = issues.length ? summarizeIssue(issues[0]) : '';
         this.engineHealth = {
             ok,
+            status,
             key,
+            pluginVersion: this.manifest?.version || this.app?.plugins?.manifests?.understory?.version || 'unknown',
             engineDir,
-            pythonPath: this._pythonExe(),
+            engineVersion,
+            engineCommit,
+            pythonPath,
             pythonVersion,
+            vaultBase,
+            vaultUnderstoryPath,
+            checks,
             issues,
-            message: issues[0] || '',
+            fixes: issues.filter((issue) => issue.fix || issue.command),
+            message,
             checkedAt: Date.now(),
         };
+        this.engineHealth.diagnosticText = buildEngineDiagnosticText(this.engineHealth, this.settings);
 
         if (showNotice) {
-            new Notice(ok
+            new Notice(this.engineHealth.status === 'ready'
                 ? t(this, 'engine_health_ok_notice')
                 : t(this, 'engine_health_problem_notice', { message: this.engineHealth.message }), 7000);
         }
@@ -209,14 +503,14 @@ class GraphifyRuntimeMethods {
             proc.on('close', (code) => {
                 if (timer) clearTimeout(timer);
                 if (code === 0) resolve(stdout);
-                else reject(new Error(`Script failed (${code}): ${stderr.slice(0, 300)}`));
+                else reject(new Error(`Script failed (${code}): ${safeErrorDetail({ stderr, settings: this.settings })}`));
             });
         });
     }
 
     async _addLogEntry(entry) {
         if (!this.settings.linkLog) this.settings.linkLog = [];
-        this.settings.linkLog.unshift(entry);
+        this.settings.linkLog.unshift(normalizeLogEntry(entry, this.settings));
         if (this.settings.linkLog.length > MAX_LOG_ENTRIES) {
             this.settings.linkLog = this.settings.linkLog.slice(0, MAX_LOG_ENTRIES);
         }
@@ -248,7 +542,7 @@ class GraphifyRuntimeMethods {
                 relations: [],
                 message: errorInfo.desc,
                 errorCategory: errorInfo.category,
-                errorDetail: stderr.slice(0, 300)
+                errorDetail: safeErrorDetail({ stderr, settings: this.settings })
             });
             return;
         }
@@ -267,7 +561,7 @@ class GraphifyRuntimeMethods {
         if (!raw) {
             // stdout 为空 = Python 异常崩溃且未输出 JSON（旧版本或极端情况）
             const errorInfo = this._classifyError(stderr);
-            console.error('[Understory] Empty stdout, Python likely crashed:', stderr);
+            console.error('[Understory] Empty stdout, Python likely crashed:', safeErrorDetail({ stderr, settings: this.settings }));
             await this._addLogEntry({
                 time: this._formatTime(new Date()),
                 file: file.basename,
@@ -277,7 +571,11 @@ class GraphifyRuntimeMethods {
                 relations: [],
                 message: t(this, 'log_python_crash', { message: errorInfo.desc }),
                 errorCategory: errorInfo.category,
-                errorDetail: stderr.slice(0, 300) || t(this, 'process_empty_stdout_detail')
+                errorDetail: safeErrorDetail({
+                    stderr,
+                    message: t(this, 'process_empty_stdout_detail'),
+                    settings: this.settings,
+                })
             });
             return;
         }
@@ -319,7 +617,7 @@ class GraphifyRuntimeMethods {
                 });
             } else if (result.status === 'error') {
                 // Python 端已捕获的异常（新版）
-                console.error(`[Understory] Python error: ${result.message}`);
+                console.error(`[Understory] Python error: ${redactSensitiveText(result.message, this.settings)}`);
                 const errorInfo = this._classifyError(result.message + ' ' + (result.error_detail || ''));
                 await this._addLogEntry({
                     time: this._formatTime(new Date()),
@@ -330,7 +628,11 @@ class GraphifyRuntimeMethods {
                     relations: [],
                     message: errorInfo.desc,
                     errorCategory: errorInfo.category,
-                    errorDetail: result.error_detail || result.message
+                    errorDetail: safeErrorDetail({
+                        stderr: result.error_detail,
+                        message: result.message,
+                        settings: this.settings,
+                    })
                 });
             } else {
                 await this._addLogEntry({
@@ -345,7 +647,7 @@ class GraphifyRuntimeMethods {
             }
         } catch (e) {
             // JSON 解析失败（输出损坏或不完整）
-            console.error('[Understory] JSON parse error:', e, 'raw:', raw.slice(0, 200));
+            console.error('[Understory] JSON parse error:', e && e.message ? e.message : e);
             const errorInfo = this._classifyError(stderr);
             await this._addLogEntry({
                 time: this._formatTime(new Date()),
@@ -356,7 +658,7 @@ class GraphifyRuntimeMethods {
                 relations: [],
                 message: t(this, 'parse_failed_message'),
                 errorCategory: errorInfo.category !== t(this, 'error_unknown_category') ? errorInfo.category : t(this, 'parse_error_category'),
-                errorDetail: `stdout: ${raw.slice(0, 200)}\nstderr: ${stderr.slice(0, 200)}`
+                errorDetail: safeErrorDetail({ stdout: raw, stderr, settings: this.settings })
             });
         }
     }
@@ -392,7 +694,7 @@ class GraphifyRuntimeMethods {
             return { category: t(this, 'error_env_category'), desc: t(this, 'error_python_desc') };
         }
 
-        return { category: t(this, 'error_unknown_category'), desc: stderr.slice(0, 100) || t(this, 'error_unknown_desc') };
+        return { category: t(this, 'error_unknown_category'), desc: redactSensitiveText(stderr, this.settings).slice(0, 100) || t(this, 'error_unknown_desc') };
     }
 
     _showClickableNotice(message, filePath, duration = 6000) {

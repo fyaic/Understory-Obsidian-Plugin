@@ -132,7 +132,7 @@ class UnderstorySettingTab extends PluginSettingTab {
         this._injectStyles(containerEl);
 
         const header = containerEl.createDiv({ cls: 'understory-settings-header' });
-        header.createEl('h2', { text: t(this.plugin, 'settings_title') });
+        header.createDiv({ text: t(this.plugin, 'settings_title'), cls: 'understory-settings-title' });
         this._renderLanguageToggle(header);
 
         new Setting(containerEl)
@@ -710,18 +710,38 @@ class UnderstorySettingTab extends PluginSettingTab {
 
     _renderEngineStatus(containerEl) {
         const health = this.plugin.engineHealth;
-        const statusText = health
-            ? (health.ok
-                ? t(this.plugin, 'engine_status_ok', { python: health.pythonVersion || this.plugin.settings.pythonPath || 'python' })
-                : t(this.plugin, 'engine_status_problem', { message: health.message || t(this.plugin, 'engine_status_unknown') }))
-            : t(this.plugin, 'engine_status_unknown');
+        const status = health ? (health.status || (health.ok ? 'ready' : 'error')) : 'unchecked';
+        const panel = containerEl.createDiv({ cls: 'understory-engine-panel' });
 
-        containerEl.createEl('div', {
-            text: statusText,
-            cls: `setting-item-description understory-engine-status ${health && health.ok ? 'is-ok' : 'is-warning'}`
-        }).style.marginBottom = '8px';
+        const summary = panel.createDiv({ cls: 'understory-engine-summary' });
+        summary.createEl('span', {
+            text: t(this.plugin, `engine_status_badge_${status}`),
+            cls: `understory-engine-badge is-${status}`,
+        });
+        summary.createDiv({
+            text: health
+                ? (health.message || t(this.plugin, 'engine_status_message_ready'))
+                : t(this.plugin, 'engine_status_message_unchecked'),
+            cls: 'understory-engine-summary-text',
+        });
 
-        new Setting(containerEl)
+        this._appendEngineKeyValueGrid(panel, t(this.plugin, 'engine_versions_title'), [
+            [t(this.plugin, 'engine_value_plugin'), health?.pluginVersion || this.plugin.manifest?.version || t(this.plugin, 'engine_value_unknown')],
+            [t(this.plugin, 'engine_value_engine'), health?.engineVersion || t(this.plugin, 'engine_value_unknown')],
+            [t(this.plugin, 'engine_value_engine_commit'), health?.engineCommit || t(this.plugin, 'engine_value_unknown')],
+            [t(this.plugin, 'engine_value_python'), health?.pythonVersion || t(this.plugin, 'engine_value_unknown')],
+        ]);
+
+        this._appendEngineKeyValueGrid(panel, t(this.plugin, 'engine_paths_title'), [
+            [t(this.plugin, 'engine_value_engine_dir'), health?.engineDir || this.plugin.settings.graphifyDir || t(this.plugin, 'engine_value_not_set')],
+            [t(this.plugin, 'engine_value_python_path'), health?.pythonPath || this.plugin.settings.pythonPath || 'python'],
+            [t(this.plugin, 'engine_value_vault'), health?.vaultUnderstoryPath || t(this.plugin, 'engine_value_not_checked')],
+        ]);
+
+        this._appendEngineChecks(panel, health?.checks);
+        this._appendEngineFixes(panel, health?.fixes || health?.issues || []);
+
+        new Setting(panel)
             .setName(t(this.plugin, 'engine_check_name'))
             .setDesc(t(this.plugin, 'engine_check_desc'))
             .addButton((button) => button
@@ -743,7 +763,110 @@ class UnderstorySettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                     await this.plugin.checkEngineHealth?.(true, true);
                     this.display();
+                }))
+            .addButton((button) => button
+                .setButtonText(t(this.plugin, 'engine_copy_diagnostics_button'))
+                .setDisabled(!health?.diagnosticText)
+                .onClick(async () => {
+                    await this._copyText(health?.diagnosticText || '', t(this.plugin, 'engine_copy_diagnostics_notice'));
                 }));
+    }
+
+    _appendEngineKeyValueGrid(containerEl, title, rows) {
+        const section = containerEl.createDiv({ cls: 'understory-engine-section' });
+        section.createEl('div', { text: title, cls: 'understory-engine-section-title' });
+        const grid = section.createDiv({ cls: 'understory-engine-kv-grid' });
+        for (const [label, value] of rows) {
+            const row = grid.createDiv({ cls: 'understory-engine-kv' });
+            row.createDiv({ text: label, cls: 'understory-engine-kv-label' });
+            row.createDiv({ text: value || t(this.plugin, 'engine_value_unknown'), cls: 'understory-engine-kv-value' });
+        }
+    }
+
+    _appendEngineChecks(containerEl, checks = {}) {
+        const groups = ['paths', 'scripts', 'dependencies', 'permissions', 'vault'];
+        const section = containerEl.createDiv({ cls: 'understory-engine-section' });
+        section.createEl('div', { text: t(this.plugin, 'engine_checks_title'), cls: 'understory-engine-section-title' });
+        const matrix = section.createDiv({ cls: 'understory-engine-checks' });
+
+        for (const group of groups) {
+            const items = Array.isArray(checks[group]) ? checks[group] : [];
+            const state = this._engineGroupState(items);
+            const groupEl = matrix.createDiv({ cls: `understory-engine-check-group is-${state}` });
+            const head = groupEl.createDiv({ cls: 'understory-engine-check-group-head' });
+            head.createEl('span', { text: t(this.plugin, `engine_group_${group}`) });
+            head.createEl('span', {
+                text: t(this.plugin, `engine_check_status_${state}`),
+                cls: `understory-engine-check-pill is-${state}`,
+            });
+            if (!items.length) {
+                groupEl.createDiv({
+                    text: t(this.plugin, 'engine_check_not_run'),
+                    cls: 'understory-engine-check-empty',
+                });
+                continue;
+            }
+            for (const item of items) {
+                const row = groupEl.createDiv({ cls: 'understory-engine-check-row' });
+                row.createEl('span', {
+                    text: t(this.plugin, `engine_check_status_${item.status || 'unknown'}`),
+                    cls: `understory-engine-check-pill is-${item.status || 'unknown'}`,
+                });
+                const body = row.createDiv({ cls: 'understory-engine-check-body' });
+                body.createDiv({ text: item.label || item.id, cls: 'understory-engine-check-label' });
+                if (item.detail) body.createDiv({ text: item.detail, cls: 'understory-engine-check-detail' });
+                if (item.path) body.createEl('code', { text: item.path, cls: 'understory-engine-path' });
+            }
+        }
+    }
+
+    _appendEngineFixes(containerEl, fixes = []) {
+        const section = containerEl.createDiv({ cls: 'understory-engine-section' });
+        section.createEl('div', { text: t(this.plugin, 'engine_fixes_title'), cls: 'understory-engine-section-title' });
+        if (!fixes.length) {
+            section.createDiv({ text: t(this.plugin, 'engine_fixes_empty'), cls: 'setting-item-description' });
+            return;
+        }
+        const list = section.createDiv({ cls: 'understory-engine-fixes' });
+        for (const issue of fixes) {
+            const item = list.createDiv({ cls: `understory-engine-fix is-${issue.severity || 'info'}` });
+            item.createDiv({ text: issue.title || issue.id, cls: 'understory-engine-fix-title' });
+            if (issue.detail) item.createDiv({ text: issue.detail, cls: 'understory-engine-fix-detail' });
+            if (issue.fix) item.createDiv({ text: issue.fix, cls: 'understory-engine-fix-detail' });
+            if (issue.command) {
+                const commandRow = item.createDiv({ cls: 'understory-engine-command-row' });
+                commandRow.createEl('code', { text: issue.command, cls: 'understory-engine-command' });
+                commandRow.createEl('button', {
+                    text: t(this.plugin, 'engine_copy_command_button'),
+                    cls: 'mod-cta',
+                }).addEventListener('click', () => {
+                    this._copyText(issue.command, t(this.plugin, 'engine_copy_command_notice'));
+                });
+            }
+        }
+    }
+
+    _engineGroupState(items) {
+        if (!items || !items.length) return 'unknown';
+        if (items.some((item) => item.status === 'error')) return 'error';
+        if (items.some((item) => item.status === 'warning')) return 'warning';
+        if (items.every((item) => item.status === 'skipped')) return 'skipped';
+        return 'ok';
+    }
+
+    async _copyText(text, successMessage) {
+        try {
+            if (!text) return;
+            if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(text);
+            } else {
+                const { clipboard } = require('electron');
+                clipboard.writeText(text);
+            }
+            new Notice(successMessage);
+        } catch (error) {
+            new Notice(t(this.plugin, 'engine_copy_failed_notice'));
+        }
     }
 }
 

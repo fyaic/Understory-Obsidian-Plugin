@@ -9,6 +9,7 @@ const { registerCoreCommands } = require('./commands');
 const graphifyLayer = require('./graphifyLayer');
 const linkDiscoveryMethods = require('./linkDiscovery');
 const { RelationsStore } = require('./relationsStore');
+const { createAgentApi } = require('./agentApi');
 const { UnderstorySidebarView, VIEW_TYPE_UNDERSTORY_SIDEBAR, UNDERSTORY_ICON } = require('./sidebarView');
 const { t } = require('./i18n');
 
@@ -18,6 +19,12 @@ class UnderstoryPlugin extends Plugin {
 
         this.timers = new Map();
         this.relationsStore = new RelationsStore(this);
+        this.agentApi = createAgentApi({
+            app: this.app,
+            settings: this.settings,
+            relationsStore: this.relationsStore,
+            plugin: this,
+        });
 
         this.addSettingTab(new UnderstorySettingTab(this.app, this));
         this.registerView(
@@ -34,41 +41,45 @@ class UnderstoryPlugin extends Plugin {
         this.refreshTimer = null;
         this.daemonProcess = null;
 
-        this.registerEvent(this.app.vault.on('create', (file) => {
-            if (file.extension === 'md') this.scheduleLink(file);
-        }));
-        this.registerEvent(this.app.vault.on('delete', (file) => {
-            this._clearScheduledLink(file?.path);
-        }));
-        this.registerEvent(this.app.vault.on('rename', (file, oldPath) => {
-            this._clearScheduledLink(oldPath);
-            if (file?.extension === 'md') {
-                this._clearScheduledLink(file.path);
-            }
-        }));
-
-        if (this.settings.autoRefreshEnabled) {
-            this.checkAndStartRefresh();
-        }
-
-        if (this.settings.daemonEnabled) {
-            await this.startDaemon();
-        }
-
         this.ingestTimers = new Map();
         this.periodicTimer = null;
         this._initGraphifyAI();
 
-        const attachSidebar = () => this.ensureSidebarLeaf({ reveal: !!this.settings.openSidebarOnLoad })
-            .catch((error) => console.warn('[Understory] Failed to attach sidebar view:', error));
-        if (this.app.workspace.onLayoutReady) {
-            this.app.workspace.onLayoutReady(attachSidebar);
-        } else {
-            window.setTimeout(attachSidebar, 1000);
-        }
+        this._runWhenWorkspaceReady(() => {
+            this.registerEvent(this.app.vault.on('create', (file) => {
+                if (file.extension === 'md') this.scheduleLink(file);
+            }));
+            this.registerEvent(this.app.vault.on('delete', (file) => {
+                this._clearScheduledLink(file?.path);
+            }));
+            this.registerEvent(this.app.vault.on('rename', (file, oldPath) => {
+                this._clearScheduledLink(oldPath);
+                if (file?.extension === 'md') {
+                    this._clearScheduledLink(file.path);
+                }
+            }));
 
-        console.log('[Understory] Plugin loaded');
+            if (this.settings.autoRefreshEnabled) {
+                this.checkAndStartRefresh();
+            }
+
+            if (this.settings.daemonEnabled) {
+                this.startDaemon().catch((error) => console.warn('[Understory] Failed to start daemon:', error));
+            }
+
+            this.ensureSidebarLeaf({ reveal: !!this.settings.openSidebarOnLoad })
+                .catch((error) => console.warn('[Understory] Failed to attach sidebar view:', error));
+        });
+
         new Notice(t(this, 'plugin_enabled'));
+    }
+
+    _runWhenWorkspaceReady(callback) {
+        if (this.app.workspace.onLayoutReady) {
+            this.app.workspace.onLayoutReady(callback);
+        } else {
+            window.setTimeout(callback, 1000);
+        }
     }
 
     async ensureSidebarLeaf({ reveal = false } = {}) {
@@ -138,19 +149,91 @@ const STRINGS = {
         engine_health_ok_notice: 'Understory: 本地引擎可用',
         engine_health_problem_notice: 'Understory: 本地引擎还没准备好：{message}',
         engine_script_missing: '找不到脚本：{path}',
+        engine_status_badge_ready: '可用',
+        engine_status_badge_warning: '需要处理',
+        engine_status_badge_error: '未就绪',
+        engine_status_badge_unchecked: '未检查',
+        engine_status_message_ready: '本地引擎可用。',
+        engine_status_message_unchecked: '尚未运行本地引擎诊断。',
+        engine_versions_title: '版本',
+        engine_paths_title: '路径',
+        engine_checks_title: '检查矩阵',
+        engine_fixes_title: '修复建议',
+        engine_value_plugin: '插件',
+        engine_value_engine: '引擎',
+        engine_value_engine_commit: '引擎 commit',
+        engine_value_python: 'Python',
+        engine_value_engine_dir: '引擎文件夹',
+        engine_value_python_path: 'Python 路径',
+        engine_value_vault: 'Vault .understory',
+        engine_value_unknown: '未知',
+        engine_value_not_set: '未设置',
+        engine_value_not_checked: '未检查',
+        engine_group_paths: '路径',
+        engine_group_scripts: '脚本',
+        engine_group_dependencies: '依赖',
+        engine_group_permissions: '权限',
+        engine_group_vault: 'Vault',
+        engine_check_status_ok: '通过',
+        engine_check_status_error: '错误',
+        engine_check_status_warning: '提醒',
+        engine_check_status_skipped: '已跳过',
+        engine_check_status_unknown: '未知',
+        engine_check_not_run: '尚未运行这一组检查。',
+        engine_check_ok: '检查通过',
+        engine_check_engine_dir_label: '引擎文件夹',
+        engine_check_python_label: 'Python',
+        engine_check_dependencies_label: 'Python 依赖',
+        engine_check_dependencies_skipped: '自动启动检查已跳过依赖导入；点击「检查设置」执行完整检查。',
+        engine_check_vault_label: 'Vault 根目录',
+        engine_check_vault_understory_label: 'Vault .understory',
+        engine_check_vault_write_label: '.understory 写入权限',
+        engine_check_vault_scripts_label: 'Vault 脚本',
+        engine_permission_read_failed: '无法读取：{path}（{message}）',
+        engine_permission_write_failed: '无法写入：{path}（{message}）',
+        engine_script_missing_detail: '缺少 {script}：{path}',
+        engine_vault_base_skipped: '当前 adapter 没有提供 vault 本地路径，已跳过 vault 部署检查。',
+        engine_vault_understory_missing: '没有找到 vault 配置目录：{path}',
+        engine_vault_scripts_missing: '没有找到 vault 脚本目录：{path}',
+        engine_issue_dir_missing_title: '未选择本地引擎文件夹',
+        engine_issue_dir_missing_fix: '在设置页选择本地 Understory 引擎文件夹，或设置 UNDERSTORY_ENGINE_DIR 后重启 Obsidian。',
+        engine_issue_dir_not_found_title: '引擎文件夹不存在',
+        engine_issue_dir_not_found_fix: '确认路径是否正确；如果还没有引擎，请 clone 官方引擎仓库。',
+        engine_issue_permission_title: '路径权限不足',
+        engine_issue_permission_fix: '检查文件夹权限，确保 Obsidian 可以读取本地引擎。',
+        engine_issue_api_missing_title: '缺少 api.py',
+        engine_issue_script_missing_title: '缺少 {script}',
+        engine_issue_script_missing_fix_error: '重新选择正确的引擎根目录，或重新 clone / 更新引擎仓库。',
+        engine_issue_script_missing_fix_warning: '该脚本影响部分辅助功能；建议更新引擎后重新运行部署脚本。',
+        engine_issue_python_failed_title: 'Python 无法运行',
+        engine_issue_python_failed_fix: '确认 Python 已安装，并在设置中填写可执行的 Python 路径。',
+        engine_issue_dependency_missing_title: '缺少 Python 依赖：{name}',
+        engine_issue_dependency_missing_detail: '无法导入 {module}（{name}）：{message}',
+        engine_issue_dependency_missing_fix: '在引擎目录安装 requirements.txt 后重新检查。',
+        engine_issue_vault_missing_title: 'Vault .understory 尚未部署',
+        engine_issue_vault_missing_fix: '运行部署脚本生成 vault 的 .understory 目录和脚本。',
+        engine_issue_vault_permission_title: 'Vault 写入权限不足',
+        engine_issue_vault_permission_fix: '确认 Obsidian 可以写入 vault 目录，或调整系统权限后重试。',
+        engine_issue_vault_scripts_missing_title: 'Vault 脚本缺失',
+        engine_fixes_empty: '没有需要处理的修复建议。',
+        engine_copy_diagnostics_button: '复制诊断',
+        engine_copy_diagnostics_notice: 'Understory: 诊断摘要已复制',
+        engine_copy_command_button: '复制命令',
+        engine_copy_command_notice: 'Understory: 命令已复制',
+        engine_copy_failed_notice: 'Understory: 复制失败，请手动选择文本复制',
         privacy_title: '隐私与模型',
         privacy_desc: '选择 Understory 是否可以联网，以及联网时把内容发给哪个模型服务。开发团队不会接收你的笔记或密钥。',
         api_key_overview: '你可以自己选择 OpenAI、智谱或兼容服务，并填写自己的密钥。Understory 不会接收或代管这些密钥。',
-        api_key_local_notice: '完全本地模式不需要任何模型密钥，也不会把笔记内容发给模型服务。',
+        api_key_local_notice: '完全本地模式不需要任何模型密钥，也不会把模型服务密钥传给本地引擎或发送 Webhook。',
         provider_terms_notice: '如果启用云模型，请确认所选服务商的价格、账单、隐私条款和数据处理规则。',
         network_mode_name: '联网方式',
         network_mode_desc: '先决定隐私边界，再配置模型。新安装默认完全本地。',
         network_mode_local: '完全本地',
         network_mode_embedding: '只用向量模型',
         network_mode_full: '完整 AI 分析',
-        network_mode_local_summary: '不会请求云端模型或 Webhook。会使用本地文件、关键词、ER、已有缓存和基础报告。',
+        network_mode_local_summary: '不会请求云端模型或 Webhook，也不会把模型服务密钥传给本地引擎。会使用本地文件、关键词、ER、已有缓存和基础报告。',
         network_mode_embedding_summary: '只把用于相似度分析的文本片段发给向量模型。不会请求推理模型。',
-        network_mode_full_summary: '允许向量模型和推理模型。用于语义索引、原则提取、概念解释和冲突判断。',
+        network_mode_full_summary: '允许向量模型和推理模型。用于语义索引、主张提取、概念解释和冲突判断。',
         embedding_section_title: '向量模型',
         embedding_provider_name: '向量模型服务',
         embedding_provider_desc: '用于发现意思相近的笔记。完全本地模式下不会调用。',
@@ -186,6 +269,7 @@ const STRINGS = {
         excluded_selected: '已排除',
         relation_title: '关联建议',
         relation_desc: '告诉 Understory 关联建议应该出现在哪里，以及要不要提醒你潜在问题。',
+        related_section_heading: '## 🏷️关联文件',
         presentation_mode_name: '把建议放在哪里',
         presentation_mode_desc: '想安静查看就放右侧栏；想长期保留链接就写入正文。',
         presentation_sidebar: '只显示在右侧栏',
@@ -256,8 +340,8 @@ const STRINGS = {
         daemon_stopped: '当前状态：未运行',
         command_auto_link: '为当前笔记找关联',
         command_init_index: '准备本地搜索索引',
-        command_show_understory: 'Show Understory',
-        command_show_understory_sidebar: 'Show Understory Sidebar',
+        command_show_understory: '打开右侧栏',
+        command_show_understory_sidebar: '打开关联建议侧栏',
         command_toggle_daemon: '启动/停止后台索引',
         sidebar_title: 'Show Understory',
         sidebar_open_note: '打开一篇笔记后显示关联建议。',
@@ -433,17 +517,89 @@ const STRINGS = {
         engine_health_ok_notice: 'Understory: local engine is ready',
         engine_health_problem_notice: 'Understory: local engine is not ready: {message}',
         engine_script_missing: 'Script not found: {path}',
+        engine_status_badge_ready: 'Ready',
+        engine_status_badge_warning: 'Needs attention',
+        engine_status_badge_error: 'Not ready',
+        engine_status_badge_unchecked: 'Not checked',
+        engine_status_message_ready: 'Local engine is ready.',
+        engine_status_message_unchecked: 'Local engine diagnostics have not run yet.',
+        engine_versions_title: 'Versions',
+        engine_paths_title: 'Paths',
+        engine_checks_title: 'Check matrix',
+        engine_fixes_title: 'Fix suggestions',
+        engine_value_plugin: 'Plugin',
+        engine_value_engine: 'Engine',
+        engine_value_engine_commit: 'Engine commit',
+        engine_value_python: 'Python',
+        engine_value_engine_dir: 'Engine folder',
+        engine_value_python_path: 'Python path',
+        engine_value_vault: 'Vault .understory',
+        engine_value_unknown: 'unknown',
+        engine_value_not_set: 'Not set',
+        engine_value_not_checked: 'Not checked',
+        engine_group_paths: 'Paths',
+        engine_group_scripts: 'Scripts',
+        engine_group_dependencies: 'Dependencies',
+        engine_group_permissions: 'Permissions',
+        engine_group_vault: 'Vault',
+        engine_check_status_ok: 'OK',
+        engine_check_status_error: 'Error',
+        engine_check_status_warning: 'Warning',
+        engine_check_status_skipped: 'Skipped',
+        engine_check_status_unknown: 'Unknown',
+        engine_check_not_run: 'This check group has not run yet.',
+        engine_check_ok: 'Check passed',
+        engine_check_engine_dir_label: 'Engine folder',
+        engine_check_python_label: 'Python',
+        engine_check_dependencies_label: 'Python dependencies',
+        engine_check_dependencies_skipped: 'Startup check skipped dependency imports. Click Check setup to run the full check.',
+        engine_check_vault_label: 'Vault base path',
+        engine_check_vault_understory_label: 'Vault .understory',
+        engine_check_vault_write_label: '.understory write access',
+        engine_check_vault_scripts_label: 'Vault scripts',
+        engine_permission_read_failed: 'Cannot read: {path} ({message})',
+        engine_permission_write_failed: 'Cannot write: {path} ({message})',
+        engine_script_missing_detail: 'Missing {script}: {path}',
+        engine_vault_base_skipped: 'The current adapter did not provide a local vault path, so vault deployment checks were skipped.',
+        engine_vault_understory_missing: 'Vault config folder was not found: {path}',
+        engine_vault_scripts_missing: 'Vault scripts folder was not found: {path}',
+        engine_issue_dir_missing_title: 'No local engine folder selected',
+        engine_issue_dir_missing_fix: 'Select the local Understory engine folder in settings, or set UNDERSTORY_ENGINE_DIR and restart Obsidian.',
+        engine_issue_dir_not_found_title: 'Engine folder does not exist',
+        engine_issue_dir_not_found_fix: 'Check the path. If you do not have the engine yet, clone the official engine repository.',
+        engine_issue_permission_title: 'Path permission problem',
+        engine_issue_permission_fix: 'Check folder permissions and make sure Obsidian can read the local engine.',
+        engine_issue_api_missing_title: 'api.py is missing',
+        engine_issue_script_missing_title: '{script} is missing',
+        engine_issue_script_missing_fix_error: 'Select the correct engine root, or clone/update the engine repository again.',
+        engine_issue_script_missing_fix_warning: 'This script affects auxiliary features. Update the engine and rerun the deploy script.',
+        engine_issue_python_failed_title: 'Python could not run',
+        engine_issue_python_failed_fix: 'Make sure Python is installed and the configured Python path is executable.',
+        engine_issue_dependency_missing_title: 'Missing Python dependency: {name}',
+        engine_issue_dependency_missing_detail: 'Could not import {module} ({name}): {message}',
+        engine_issue_dependency_missing_fix: 'Install requirements.txt from the engine folder, then check again.',
+        engine_issue_vault_missing_title: 'Vault .understory is not deployed',
+        engine_issue_vault_missing_fix: 'Run the deploy script to create the vault .understory folder and scripts.',
+        engine_issue_vault_permission_title: 'Vault write permission problem',
+        engine_issue_vault_permission_fix: 'Make sure Obsidian can write to the vault folder, or adjust system permissions and retry.',
+        engine_issue_vault_scripts_missing_title: 'Vault scripts are missing',
+        engine_fixes_empty: 'No fix suggestions need attention.',
+        engine_copy_diagnostics_button: 'Copy diagnostics',
+        engine_copy_diagnostics_notice: 'Understory: diagnostics copied',
+        engine_copy_command_button: 'Copy command',
+        engine_copy_command_notice: 'Understory: command copied',
+        engine_copy_failed_notice: 'Understory: copy failed; select the text and copy it manually',
         privacy_title: 'Privacy and models',
         privacy_desc: 'Choose whether Understory may use the network, and which model service receives content. The Understory team does not receive your notes or keys.',
         api_key_overview: 'You choose the provider, such as OpenAI, Zhipu, or a compatible endpoint, and use your own API key. Understory does not receive or manage these keys.',
-        api_key_local_notice: 'Local only mode does not need any model key and does not send note content to model providers.',
+        api_key_local_notice: 'Local only mode does not need any model key, does not pass provider keys to the local engine, and does not send webhooks.',
         provider_terms_notice: 'If you enable cloud models, review the selected provider\'s pricing, billing, privacy terms, and data handling rules.',
         network_mode_name: 'Network mode',
         network_mode_desc: 'Set the privacy boundary first, then configure models. New installs stay local by default.',
         network_mode_local: 'Local only',
         network_mode_embedding: 'Vector model only',
         network_mode_full: 'Full AI analysis',
-        network_mode_local_summary: 'No cloud model or webhook requests. Understory uses local files, keywords, ER data, existing caches, and basic reports.',
+        network_mode_local_summary: 'No cloud model or webhook requests. Provider keys are not passed to the local engine. Understory uses local files, keywords, ER data, existing caches, and basic reports.',
         network_mode_embedding_summary: 'Only text snippets needed for similarity analysis are sent to the vector model. No reasoning model is used.',
         network_mode_full_summary: 'Allows both vector and reasoning models for semantic indexing, claim extraction, concept explanations, and conflict checks.',
         embedding_section_title: 'Vector model',
@@ -481,6 +637,7 @@ const STRINGS = {
         excluded_selected: 'Excluded',
         relation_title: 'Relation Suggestions',
         relation_desc: 'Choose where Understory shows related-note suggestions, and whether it should warn you about possible issues.',
+        related_section_heading: '## 🏷️ Related notes',
         presentation_mode_name: 'Show suggestions in',
         presentation_mode_desc: 'Use the right sidebar for a quiet workflow. Write into the note only if you want permanent links.',
         presentation_sidebar: 'Right sidebar only',
@@ -551,8 +708,8 @@ const STRINGS = {
         daemon_stopped: 'Current status: not running',
         command_auto_link: 'Find related notes for current note',
         command_init_index: 'Prepare local search index',
-        command_show_understory: 'Show Understory',
-        command_show_understory_sidebar: 'Show Understory Sidebar',
+        command_show_understory: 'Open sidebar',
+        command_show_understory_sidebar: 'Open related notes sidebar',
         command_toggle_daemon: 'Start/stop background index',
         sidebar_title: 'Show Understory',
         sidebar_open_note: 'Open a note to see related suggestions.',
@@ -727,6 +884,1280 @@ module.exports = { DEFAULT_LANGUAGE, STRINGS, getLanguage, t };
 
 },
 
+"./safety": function(module, exports, require) {
+const MAX_ERROR_DETAIL_LENGTH = 400;
+const MAX_LOG_STRING_LENGTH = 500;
+const VALID_NETWORK_MODES = new Set(['local', 'embedding', 'full']);
+const VALID_PROVIDERS = new Set(['none', 'openai', 'zhipu', 'custom']);
+
+function safeNetworkMode(mode) {
+    const value = String(mode || '').trim();
+    return VALID_NETWORK_MODES.has(value) ? value : 'local';
+}
+
+function safeProvider(provider, fallback = 'none') {
+    const value = String(provider || '').trim();
+    if (VALID_PROVIDERS.has(value)) return value;
+    return VALID_PROVIDERS.has(fallback) ? fallback : 'none';
+}
+
+function truncateText(text, maxLength = MAX_LOG_STRING_LENGTH) {
+    const value = String(text || '');
+    if (value.length <= maxLength) return value;
+    return `${value.slice(0, Math.max(0, maxLength - 14))}...[truncated]`;
+}
+
+function collectSecrets(source) {
+    if (!source) return [];
+    if (Array.isArray(source)) return source;
+    const settings = source.settings && typeof source.settings === 'object' ? source.settings : source;
+    return [
+        settings.embeddingApiKey,
+        settings.llmApiKey,
+        settings.webhookUrl,
+    ];
+}
+
+function escapeRegExp(value) {
+    return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function redactSensitiveText(text, source) {
+    if (text === null || text === undefined) return '';
+    let output = String(text);
+    const secrets = collectSecrets(source)
+        .map((secret) => String(secret || '').trim())
+        .filter((secret) => secret.length >= 4);
+
+    for (const secret of secrets) {
+        const marker = secret.startsWith('http') ? '[REDACTED_WEBHOOK_URL]' : '[REDACTED_SECRET]';
+        output = output.replace(new RegExp(escapeRegExp(secret), 'g'), marker);
+    }
+
+    output = output.replace(/(authorization\s*[:=]\s*)(bearer\s+)?[^\s,;'"`]+/gi, '$1[REDACTED_AUTH]');
+    output = output.replace(/\bbearer\s+[a-z0-9._~+/=-]{12,}/gi, 'Bearer [REDACTED_TOKEN]');
+    output = output.replace(/\bsk-[a-z0-9_-]{16,}/gi, '[REDACTED_SECRET]');
+    output = output.replace(/([?&](?:api[_-]?key|key|token|password|secret)=)[^&#\s]+/gi, '$1[REDACTED_SECRET]');
+    output = output.replace(/((?:api[_-]?key|key|token|password|secret)\s*[:=]\s*)("[^"]+"|'[^']+'|[^\s,;]+)/gi, '$1[REDACTED_SECRET]');
+    output = output.replace(/\b[A-Za-z0-9_-]{32,}\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}\b/g, '[REDACTED_TOKEN]');
+    output = output.replace(/\b[A-Za-z0-9_/-]{40,}\b/g, '[REDACTED_SECRET]');
+
+    return output;
+}
+
+function safeErrorDetail({ stdout = '', stderr = '', message = '', settings = null, includeStdout = false, maxLength = MAX_ERROR_DETAIL_LENGTH } = {}) {
+    const parts = [];
+    const redactedMessage = redactSensitiveText(message, settings).trim();
+    const redactedStderr = redactSensitiveText(stderr, settings).trim();
+
+    if (redactedMessage) parts.push(`message: ${redactedMessage}`);
+    if (redactedStderr) parts.push(`stderr: ${redactedStderr}`);
+    if (includeStdout && stdout) {
+        parts.push(`stdout: ${redactSensitiveText(stdout, settings).trim()}`);
+    } else if (stdout) {
+        parts.push('stdout: [omitted]');
+    }
+
+    const detail = parts.join('\n') || 'No diagnostic detail available.';
+    return truncateText(detail, maxLength);
+}
+
+function normalizeLogEntry(entry, settings) {
+    const input = entry && typeof entry === 'object' ? entry : {};
+    const normalized = { ...input };
+    for (const [key, value] of Object.entries(normalized)) {
+        if (typeof value === 'string') {
+            normalized[key] = truncateText(redactSensitiveText(value, settings));
+        } else if (Array.isArray(value)) {
+            normalized[key] = value.map((item) => (
+                typeof item === 'string' ? truncateText(redactSensitiveText(item, settings), 180) : item
+            ));
+        }
+    }
+    if (normalized.errorDetail) {
+        normalized.errorDetail = truncateText(redactSensitiveText(normalized.errorDetail, settings), MAX_ERROR_DETAIL_LENGTH);
+    }
+    return normalized;
+}
+
+function normalizeSettings(data, defaults = {}, options = {}) {
+    const settings = Object.assign({}, defaults, data || {});
+    settings.networkMode = safeNetworkMode(settings.networkMode);
+    settings.embeddingProvider = safeProvider(settings.embeddingProvider, defaults.embeddingProvider || 'none');
+    settings.llmProvider = safeProvider(settings.llmProvider, defaults.llmProvider || 'none');
+
+    if (settings.networkMode === 'local') {
+        settings.webhookEnabled = false;
+    } else {
+        settings.webhookEnabled = !!settings.webhookEnabled;
+    }
+
+    if (options.resetRuntimeState !== false) {
+        settings.lintInProgress = false;
+        settings.refreshInProgress = false;
+    }
+
+    if (!Array.isArray(settings.refreshQueue)) settings.refreshQueue = [];
+    if (!Number.isFinite(Number(settings.refreshQueueIndex))) settings.refreshQueueIndex = 0;
+    if (!settings.notificationCooldown || typeof settings.notificationCooldown !== 'object') settings.notificationCooldown = {};
+    if (!Array.isArray(settings.linkLog)) settings.linkLog = [];
+    settings.linkLog = settings.linkLog.slice(0, options.maxLogEntries || 200)
+        .map((entry) => normalizeLogEntry(entry, settings));
+
+    return settings;
+}
+
+function canUseWebhook(settings) {
+    return safeNetworkMode(settings && settings.networkMode) !== 'local'
+        && !!(settings && settings.webhookEnabled)
+        && !!String(settings && settings.webhookUrl || '').trim();
+}
+
+module.exports = {
+    canUseWebhook,
+    normalizeLogEntry,
+    normalizeSettings,
+    redactSensitiveText,
+    safeErrorDetail,
+    safeNetworkMode,
+};
+
+},
+
+"./agentApi": function(module, exports, require) {
+const crypto = require('crypto');
+const { spawn } = require('child_process');
+const fs = require('fs');
+const path = require('path');
+const {
+    redactSensitiveText,
+    safeErrorDetail,
+    safeNetworkMode,
+} = require('./safety');
+
+const API_VERSION = '1';
+const RELATIONS_PATH = '.understory/relations.json';
+const OVERRIDES_PATH = '.understory/link_overrides.json';
+const CONFLICTS_PATH = '.understory/conflicts.json';
+const INDEX_PATH = '.understory/index.md';
+
+const ERROR_MESSAGES = {
+    VAULT_NOT_FOUND: 'Vault path was not found.',
+    UNSAFE_PATH: 'Path must stay inside the vault.',
+    NOTE_NOT_FOUND: 'Note was not found in vault.',
+    RELATION_NOT_FOUND: 'Relation was not found.',
+    STORE_NOT_FOUND: 'Relations store was not found.',
+    ENGINE_NOT_READY: 'Understory engine is not ready.',
+    ENGINE_FAILED: 'Understory engine failed.',
+    PARSE_FAILED: 'Could not parse Understory data.',
+    INVALID_ARGUMENT: 'Required argument is missing or invalid.',
+    INTERNAL_ERROR: 'Internal Agent API error.',
+};
+
+class AgentApiError extends Error {
+    constructor(code, message, detail) {
+        super(message || ERROR_MESSAGES[code] || ERROR_MESSAGES.INTERNAL_ERROR);
+        this.name = 'AgentApiError';
+        this.code = ERROR_MESSAGES[code] ? code : 'INTERNAL_ERROR';
+        this.detail = detail || '';
+    }
+}
+
+function toPosixPath(value) {
+    return String(value || '').replace(/\\/g, '/');
+}
+
+function isObject(value) {
+    return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function hasPathTraversal(relativePath) {
+    return relativePath === '..' || relativePath.startsWith('../') || relativePath.includes('/../');
+}
+
+function isInsidePath(root, candidate) {
+    const relative = path.relative(root, candidate);
+    return relative === '' || (!!relative && !relative.startsWith('..') && !path.isAbsolute(relative));
+}
+
+function normalizeVaultRoot(vaultPath) {
+    if (!vaultPath) return '';
+    return path.resolve(String(vaultPath));
+}
+
+function hashContent(content) {
+    return crypto.createHash('sha256').update(String(content || '')).digest('hex').slice(0, 16);
+}
+
+function configuredSecrets(settings) {
+    if (!settings || typeof settings !== 'object') return [];
+    return [
+        settings.embeddingApiKey,
+        settings.llmApiKey,
+        settings.apiKey,
+        settings.webhookUrl,
+        settings.customEndpoint,
+    ].map((value) => String(value || '').trim()).filter((value) => value.length >= 4);
+}
+
+function redactConfiguredSecrets(text, settings) {
+    let output = String(text || '');
+    for (const secret of configuredSecrets(settings)) {
+        output = output.split(secret).join(secret.startsWith('http') ? '[REDACTED_WEBHOOK_URL]' : '[REDACTED_SECRET]');
+    }
+    return output;
+}
+
+function countLinesBefore(content, index) {
+    if (index <= 0) return 1;
+    return String(content).slice(0, index).split(/\r?\n/).length;
+}
+
+function createMeta(context, settings) {
+    const meta = {
+        apiVersion: API_VERSION,
+        timestamp: new Date().toISOString(),
+    };
+    const vaultPath = context && context.getVaultPath && context.getVaultPath();
+    if (vaultPath) meta.vaultPath = redactConfiguredSecrets(toPosixPath(vaultPath), settings);
+    return meta;
+}
+
+function ok(data, context, settings) {
+    return {
+        ok: true,
+        data,
+        error: null,
+        meta: createMeta(context, settings),
+    };
+}
+
+function errorEnvelope(error, context, settings) {
+    const apiError = error instanceof AgentApiError
+        ? error
+        : new AgentApiError('INTERNAL_ERROR', ERROR_MESSAGES.INTERNAL_ERROR, safeErrorDetail({
+            message: error && error.message ? error.message : String(error || ''),
+            settings,
+        }));
+
+    const detail = redactSensitiveText(apiError.detail || '', settings);
+    return {
+        ok: false,
+        data: null,
+        error: {
+            code: apiError.code,
+            message: apiError.message,
+            detail,
+        },
+        meta: createMeta(context, settings),
+    };
+}
+
+function cleanLinkTitle(value) {
+    return String(value || '')
+        .replace(/\[\[/g, '')
+        .replace(/\]\]/g, '')
+        .replace(/[\r\n]+/g, ' ')
+        .trim();
+}
+
+function titleFromTarget(target) {
+    const normalized = toPosixPath(target);
+    const base = normalized.split('/').filter(Boolean).pop() || normalized;
+    return cleanLinkTitle(base.replace(/\.md$/i, ''));
+}
+
+function relationSectionHeadings() {
+    return [
+        '## Related notes',
+        '## Related Notes',
+        '## Manually related notes',
+        '## Related',
+        '## 关联文件',
+        '## 相关笔记',
+        '## 🏷️ Related notes',
+        '## 🏷️关联文件',
+    ];
+}
+
+function findRelationSection(content) {
+    let best = null;
+    for (const heading of relationSectionHeadings()) {
+        const index = content.indexOf(heading);
+        if (index !== -1 && (!best || index < best.index)) {
+            best = { index, heading };
+        }
+    }
+    return best;
+}
+
+function insertLinkIntoContent(content, link) {
+    if (content.includes(link)) {
+        return {
+            content,
+            inserted: false,
+            alreadyExists: true,
+            sectionHeading: null,
+            line: null,
+        };
+    }
+
+    const section = findRelationSection(content);
+    let nextContent;
+    let insertIndex;
+    let sectionHeading;
+
+    if (!section) {
+        const trimmed = content.replace(/\s+$/, '');
+        const prefix = `${trimmed}\n\n## Related notes\n\n### Manually added\n\n`;
+        nextContent = `${prefix}${link}\n`;
+        insertIndex = prefix.length;
+        sectionHeading = '## Related notes';
+    } else {
+        const after = content.slice(section.index + section.heading.length);
+        const nextHeading = after.search(/\n## /);
+        sectionHeading = section.heading;
+        if (nextHeading === -1) {
+            const prefix = `${content.replace(/\s+$/, '')}\n`;
+            nextContent = `${prefix}${link}\n`;
+            insertIndex = prefix.length;
+        } else {
+            insertIndex = section.index + section.heading.length + nextHeading;
+            const prefix = `${content.slice(0, insertIndex).replace(/\s+$/, '')}\n`;
+            nextContent = `${prefix}${link}\n${content.slice(insertIndex)}`;
+            insertIndex = prefix.length;
+        }
+    }
+
+    return {
+        content: nextContent,
+        inserted: true,
+        alreadyExists: false,
+        sectionHeading,
+        line: countLinesBefore(nextContent, insertIndex),
+    };
+}
+
+function normalizeInputPath(input, context, label) {
+    if (typeof input !== 'string' || !input.trim()) {
+        throw new AgentApiError('INVALID_ARGUMENT', `${label} is required.`);
+    }
+    if (input.includes('\0')) {
+        throw new AgentApiError('UNSAFE_PATH', `${label} contains an unsafe null byte.`);
+    }
+
+    const raw = toPosixPath(input.trim());
+    const root = context.getVaultPath();
+
+    if (root && path.isAbsolute(raw)) {
+        const absolute = path.resolve(raw);
+        if (!isInsidePath(root, absolute)) {
+            throw new AgentApiError('UNSAFE_PATH', `${label} must stay inside the vault.`);
+        }
+        const relative = toPosixPath(path.relative(root, absolute));
+        if (!relative || hasPathTraversal(relative)) {
+            throw new AgentApiError('UNSAFE_PATH', `${label} must stay inside the vault.`);
+        }
+        return relative;
+    }
+
+    if (path.posix.isAbsolute(raw) || /^[A-Za-z]:\//.test(raw)) {
+        throw new AgentApiError('UNSAFE_PATH', `${label} must be relative to the vault.`);
+    }
+
+    const normalized = path.posix.normalize(raw).replace(/^\/+/, '');
+    if (!normalized || normalized === '.' || hasPathTraversal(normalized)) {
+        throw new AgentApiError('UNSAFE_PATH', `${label} must stay inside the vault.`);
+    }
+
+    if (root) {
+        const absolute = path.resolve(root, normalized);
+        if (!isInsidePath(root, absolute)) {
+            throw new AgentApiError('UNSAFE_PATH', `${label} must stay inside the vault.`);
+        }
+    }
+
+    return normalized;
+}
+
+function maybeNormalizeTargetPath(input, context) {
+    const raw = String(input || '').trim();
+    if (!raw) {
+        throw new AgentApiError('INVALID_ARGUMENT', 'target is required.');
+    }
+    if (/[\\/]/.test(raw) || /\.md$/i.test(raw) || path.isAbsolute(raw) || /^[A-Za-z]:[\\/]/.test(raw)) {
+        return normalizeInputPath(raw, context, 'target');
+    }
+    return raw;
+}
+
+function createFsAdapter(vaultPath) {
+    const vaultRoot = normalizeVaultRoot(vaultPath);
+    return {
+        getVaultPath() {
+            return vaultRoot;
+        },
+        async ensureVault() {
+            if (!vaultRoot) {
+                throw new AgentApiError('INVALID_ARGUMENT', 'vaultPath is required.');
+            }
+            try {
+                const stat = await fs.promises.stat(vaultRoot);
+                if (!stat.isDirectory()) {
+                    throw new AgentApiError('VAULT_NOT_FOUND', ERROR_MESSAGES.VAULT_NOT_FOUND);
+                }
+            } catch (error) {
+                if (error instanceof AgentApiError) throw error;
+                throw new AgentApiError('VAULT_NOT_FOUND', ERROR_MESSAGES.VAULT_NOT_FOUND, error.message);
+            }
+        },
+        resolve(relativePath) {
+            const normalized = normalizeInputPath(relativePath, this, 'path');
+            return path.resolve(vaultRoot, normalized);
+        },
+        getAbsolutePath(relativePath) {
+            return this.resolve(relativePath);
+        },
+        async exists(relativePath) {
+            await this.ensureVault();
+            try {
+                await fs.promises.access(this.resolve(relativePath));
+                return true;
+            } catch (error) {
+                return false;
+            }
+        },
+        async readText(relativePath) {
+            await this.ensureVault();
+            return fs.promises.readFile(this.resolve(relativePath), 'utf8');
+        },
+        async writeText(relativePath, content) {
+            await this.ensureVault();
+            const absolute = this.resolve(relativePath);
+            await fs.promises.mkdir(path.dirname(absolute), { recursive: true });
+            await fs.promises.writeFile(absolute, String(content), 'utf8');
+        },
+        async mkdir(relativePath) {
+            await this.ensureVault();
+            await fs.promises.mkdir(this.resolve(relativePath), { recursive: true });
+        },
+        async stat(relativePath) {
+            await this.ensureVault();
+            const stat = await fs.promises.stat(this.resolve(relativePath));
+            return { mtime: stat.mtimeMs };
+        },
+        trigger() {},
+    };
+}
+
+function createObsidianAdapter(app, vaultPath) {
+    const adapter = app && app.vault && app.vault.adapter;
+    const vaultRoot = normalizeVaultRoot(vaultPath || (adapter && adapter.getBasePath && adapter.getBasePath()) || '');
+    return {
+        getVaultPath() {
+            return vaultRoot;
+        },
+        async ensureVault() {
+            if (!app || !app.vault || !adapter) {
+                throw new AgentApiError('INVALID_ARGUMENT', 'Obsidian app/vault adapter is required.');
+            }
+        },
+        async exists(relativePath) {
+            await this.ensureVault();
+            const normalized = normalizeInputPath(relativePath, this, 'path');
+            if (adapter.exists) return !!(await adapter.exists(normalized));
+            if (app.vault.getAbstractFileByPath && app.vault.getAbstractFileByPath(normalized)) return true;
+            try {
+                await adapter.read(normalized);
+                return true;
+            } catch (error) {
+                return false;
+            }
+        },
+        async readText(relativePath) {
+            await this.ensureVault();
+            const normalized = normalizeInputPath(relativePath, this, 'path');
+            return adapter.read(normalized);
+        },
+        getAbsolutePath(relativePath) {
+            const normalized = normalizeInputPath(relativePath, this, 'path');
+            if (adapter.getFullPath) return adapter.getFullPath(normalized);
+            return vaultRoot ? path.resolve(vaultRoot, normalized) : normalized;
+        },
+        async writeText(relativePath, content) {
+            await this.ensureVault();
+            const normalized = normalizeInputPath(relativePath, this, 'path');
+            const file = app.vault.getAbstractFileByPath && app.vault.getAbstractFileByPath(normalized);
+            if (file && app.vault.modify) {
+                await app.vault.modify(file, String(content));
+                return;
+            }
+            if (adapter.write) {
+                await adapter.write(normalized, String(content));
+                return;
+            }
+            throw new AgentApiError('INTERNAL_ERROR', 'Vault adapter does not support writes.');
+        },
+        async mkdir(relativePath) {
+            await this.ensureVault();
+            const normalized = normalizeInputPath(relativePath, this, 'path');
+            if (adapter.exists && await adapter.exists(normalized)) return;
+            if (adapter.mkdir) await adapter.mkdir(normalized);
+        },
+        async stat(relativePath) {
+            await this.ensureVault();
+            const normalized = normalizeInputPath(relativePath, this, 'path');
+            const file = app.vault.getAbstractFileByPath && app.vault.getAbstractFileByPath(normalized);
+            if (file && file.stat) return { mtime: file.stat.mtime || 0 };
+            if (adapter.stat) {
+                const stat = await adapter.stat(normalized);
+                return { mtime: stat && (stat.mtime || stat.mtimeMs) || 0 };
+            }
+            return { mtime: 0 };
+        },
+        trigger(eventName, payload) {
+            if (app.workspace && app.workspace.trigger) {
+                app.workspace.trigger(eventName, payload);
+            }
+        },
+    };
+}
+
+function groupMap(grouped) {
+    const map = new Map();
+    for (const [group, titles] of Object.entries(grouped || {})) {
+        for (const title of Array.isArray(titles) ? titles : []) {
+            map.set(String(title), group);
+        }
+    }
+    return map;
+}
+
+function relationType(relation) {
+    if (relation.type) return relation.type;
+    if (relation.reason) return relation.reason;
+    if (relation.source === 'backlink') return 'backlink';
+    return 'semantic';
+}
+
+function relationSource(relation) {
+    if (relation.source) return relation.source;
+    if (relation.reason) return relation.reason;
+    return 'graphify';
+}
+
+function normalizeRelations(result) {
+    const grouped = groupMap(result && result.grouped || {});
+    const now = new Date().toISOString();
+    const relations = Array.isArray(result && result.relations) ? result.relations : [];
+    return relations.map((relation) => {
+        const target = toPosixPath(relation.target || relation.path || relation.file || relation.title).replace(/^\/+/, '');
+        const title = relation.title || target.split('/').pop().replace(/\.md$/i, '') || target;
+        return {
+            target,
+            title,
+            type: relationType(relation),
+            score: Number(relation.score ?? relation.similarity ?? 0),
+            group: relation.group || grouped.get(title) || grouped.get(target) || relationType(relation),
+            status: relation.status || 'suggested',
+            source: relationSource(relation),
+            createdAt: relation.createdAt || now,
+            updatedAt: now,
+        };
+    }).filter((relation) => relation.target && relation.title);
+}
+
+function parseProcessJson(stdout) {
+    const text = String(stdout || '').trim();
+    if (!text) {
+        throw new AgentApiError('PARSE_FAILED', ERROR_MESSAGES.PARSE_FAILED, 'Engine produced no JSON output.');
+    }
+    try {
+        return JSON.parse(text);
+    } catch (error) {
+        const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).reverse();
+        for (const line of lines) {
+            try {
+                return JSON.parse(line);
+            } catch (lineError) {
+                // Keep looking for a JSON line.
+            }
+        }
+        throw new AgentApiError('PARSE_FAILED', ERROR_MESSAGES.PARSE_FAILED, safeErrorDetail({
+            message: error.message,
+            stdout,
+        }));
+    }
+}
+
+function localEngineEnv(vaultPath) {
+    return {
+        ...process.env,
+        PYTHONIOENCODING: 'utf-8',
+        OBSIDIAN_VAULT_PATH: vaultPath || process.env.OBSIDIAN_VAULT_PATH || '',
+        UNDERSTORY_NETWORK_MODE: 'local',
+        UNDERSTORY_WEBHOOK_ENABLED: '0',
+        UNDERSTORY_WEBHOOK_URL: '',
+        UNDERSTORY_OPENAI_API_KEY: '',
+        UNDERSTORY_ZHIPU_API_KEY: '',
+        UNDERSTORY_LLM_API_KEY: '',
+        UNDERSTORY_EMBEDDING_API_KEY: '',
+        OPENAI_API_KEY: '',
+        ZHIPU_API_KEY: '',
+        ANTHROPIC_API_KEY: '',
+    };
+}
+
+function runPythonJson({ pythonPath, engineDir, apiPath, args, vaultPath, timeoutMs, settings }) {
+    return new Promise((resolve, reject) => {
+        const child = spawn(pythonPath, [apiPath, ...args], {
+            cwd: engineDir,
+            env: localEngineEnv(vaultPath),
+            windowsHide: true,
+        });
+        let stdout = '';
+        let stderr = '';
+        const timer = timeoutMs ? setTimeout(() => {
+            child.kill();
+            reject(new AgentApiError('ENGINE_FAILED', 'Understory engine timed out.', safeErrorDetail({
+                stdout,
+                stderr,
+                message: `Timed out after ${timeoutMs}ms`,
+                settings,
+            })));
+        }, timeoutMs) : null;
+
+        child.stdout.on('data', (chunk) => {
+            stdout += chunk.toString('utf8');
+        });
+        child.stderr.on('data', (chunk) => {
+            stderr += chunk.toString('utf8');
+        });
+        child.on('error', (error) => {
+            if (timer) clearTimeout(timer);
+            reject(new AgentApiError('ENGINE_FAILED', ERROR_MESSAGES.ENGINE_FAILED, safeErrorDetail({
+                message: error.message,
+                settings,
+            })));
+        });
+        child.on('close', (code) => {
+            if (timer) clearTimeout(timer);
+            if (code !== 0) {
+                reject(new AgentApiError('ENGINE_FAILED', ERROR_MESSAGES.ENGINE_FAILED, safeErrorDetail({
+                    stdout,
+                    stderr,
+                    message: `api.py exited with code ${code}`,
+                    settings,
+                })));
+                return;
+            }
+            try {
+                resolve(parseProcessJson(stdout));
+            } catch (error) {
+                reject(error);
+            }
+        });
+    });
+}
+
+function createAgentApi(options = {}) {
+    const settings = options.settings || {};
+    const adapter = options.adapter
+        || (options.app ? createObsidianAdapter(options.app, options.vaultPath) : createFsAdapter(options.vaultPath));
+    const plugin = options.plugin || null;
+    const engineDir = options.engineDir || process.env.UNDERSTORY_ENGINE_DIR || '';
+    const pythonPath = options.pythonPath || process.env.UNDERSTORY_PYTHON_PATH || 'python';
+    const refreshTimeoutMs = Number(options.refreshTimeoutMs || 120000);
+
+    async function readJson(relativePath, fallback) {
+        if (!(await adapter.exists(relativePath))) {
+            return { exists: false, value: fallback };
+        }
+        try {
+            const raw = await adapter.readText(relativePath);
+            return { exists: true, value: raw ? JSON.parse(raw) : fallback };
+        } catch (error) {
+            if (error instanceof SyntaxError) {
+                throw new AgentApiError('PARSE_FAILED', ERROR_MESSAGES.PARSE_FAILED, safeErrorDetail({
+                    message: error.message,
+                    settings,
+                }));
+            }
+            throw error;
+        }
+    }
+
+    async function writeJson(relativePath, data) {
+        await adapter.mkdir('.understory');
+        await adapter.writeText(relativePath, JSON.stringify(data, null, 2));
+    }
+
+    function emptyStore() {
+        return { version: 1, indexedAt: new Date().toISOString(), files: {} };
+    }
+
+    async function readStore() {
+        const result = await readJson(RELATIONS_PATH, emptyStore());
+        const store = isObject(result.value) ? result.value : emptyStore();
+        if (!isObject(store.files)) store.files = {};
+        if (!store.version) store.version = 1;
+        return { exists: result.exists, store };
+    }
+
+    async function writeStore(store) {
+        store.indexedAt = new Date().toISOString();
+        await writeJson(RELATIONS_PATH, store);
+    }
+
+    async function assertNoteExists(notePath) {
+        const normalized = normalizeInputPath(notePath, adapter, 'notePath');
+        if (!(await adapter.exists(normalized))) {
+            throw new AgentApiError('NOTE_NOT_FOUND', ERROR_MESSAGES.NOTE_NOT_FOUND);
+        }
+        return normalized;
+    }
+
+    function findRelation(entry, target) {
+        const relations = Array.isArray(entry && entry.relations) ? entry.relations : [];
+        return relations.find((relation) => relation && (
+            relation.title === target || relation.target === target
+        )) || null;
+    }
+
+    async function setRelationStatus(notePath, target, status) {
+        if (typeof target !== 'string' || !target.trim()) {
+            throw new AgentApiError('INVALID_ARGUMENT', 'target is required.');
+        }
+        const normalized = await assertNoteExists(notePath);
+        const { exists, store } = await readStore();
+        if (!exists) throw new AgentApiError('STORE_NOT_FOUND', ERROR_MESSAGES.STORE_NOT_FOUND);
+        const entry = store.files[normalized];
+        if (!entry) throw new AgentApiError('RELATION_NOT_FOUND', ERROR_MESSAGES.RELATION_NOT_FOUND);
+
+        const relation = findRelation(entry, target);
+        if (!relation) throw new AgentApiError('RELATION_NOT_FOUND', ERROR_MESSAGES.RELATION_NOT_FOUND);
+
+        const now = new Date().toISOString();
+        relation.status = status;
+        relation.updatedAt = now;
+        await writeStore(store);
+        adapter.trigger('understory:relations-updated', normalized);
+        return {
+            notePath: normalized,
+            target,
+            matchedTitle: relation.title,
+            matchedTarget: relation.target,
+            status,
+            updated: true,
+        };
+    }
+
+    async function trySetRelationStatus(notePath, target, status) {
+        try {
+            return await setRelationStatus(notePath, target, status);
+        } catch (error) {
+            if (error instanceof AgentApiError && (
+                error.code === 'STORE_NOT_FOUND' || error.code === 'RELATION_NOT_FOUND'
+            )) {
+                return null;
+            }
+            throw error;
+        }
+    }
+
+    async function refreshWithExternalEngine(normalized) {
+        if (!engineDir) {
+            throw new AgentApiError('ENGINE_NOT_READY', ERROR_MESSAGES.ENGINE_NOT_READY, 'No engineDir or UNDERSTORY_ENGINE_DIR configured.');
+        }
+        const absoluteEngineDir = path.resolve(String(engineDir));
+        const apiPath = path.join(absoluteEngineDir, 'api.py');
+        try {
+            await fs.promises.access(apiPath);
+        } catch (error) {
+            throw new AgentApiError('ENGINE_NOT_READY', ERROR_MESSAGES.ENGINE_NOT_READY, `api.py not found: ${apiPath}`);
+        }
+
+        const absoluteNotePath = adapter.getAbsolutePath
+            ? adapter.getAbsolutePath(normalized)
+            : path.resolve(adapter.getVaultPath(), normalized);
+        const result = await runPythonJson({
+            pythonPath,
+            engineDir: absoluteEngineDir,
+            apiPath,
+            args: ['refresh-link', absoluteNotePath, '--no-auto-write'],
+            vaultPath: adapter.getVaultPath(),
+            timeoutMs: refreshTimeoutMs,
+            settings,
+        });
+        if (!result || result.status !== 'ok') {
+            throw new AgentApiError('ENGINE_FAILED', ERROR_MESSAGES.ENGINE_FAILED, safeErrorDetail({
+                message: result && result.error || 'Engine did not return ok status.',
+                settings,
+            }));
+        }
+
+        const [content, stat] = await Promise.all([
+            adapter.readText(normalized),
+            adapter.stat(normalized),
+        ]);
+        const relations = normalizeRelations(result);
+        const { store } = await readStore();
+        const indexedAt = new Date().toISOString();
+        store.files[normalized] = {
+            hash: hashContent(content),
+            mtime: stat.mtime,
+            indexedAt,
+            relations,
+        };
+        await writeStore(store);
+        adapter.trigger('understory:relations-updated', normalized);
+        return {
+            notePath: normalized,
+            status: 'ok',
+            dryRun: false,
+            relationsCount: relations.length,
+            entry: store.files[normalized],
+        };
+    }
+
+    async function run(operation) {
+        try {
+            await adapter.ensureVault();
+            const data = await operation();
+            return ok(data, adapter, settings);
+        } catch (error) {
+            return errorEnvelope(error, adapter, settings);
+        }
+    }
+
+    function safeVaultPath() {
+        return adapter.getVaultPath()
+            ? redactConfiguredSecrets(toPosixPath(adapter.getVaultPath()), settings)
+            : '';
+    }
+
+    return {
+        async status() {
+            return run(async () => {
+                const { exists, store } = await readStore();
+                const files = isObject(store.files) ? Object.values(store.files) : [];
+                const relationCount = files.reduce((count, entry) => (
+                    count + (Array.isArray(entry && entry.relations) ? entry.relations.length : 0)
+                ), 0);
+                const engineHealth = plugin && plugin.engineHealth ? plugin.engineHealth : null;
+                return {
+                    status: 'ok',
+                    vaultPath: safeVaultPath(),
+                    networkMode: safeNetworkMode(settings.networkMode),
+                    relationsStore: {
+                        exists,
+                        fileCount: files.length,
+                        relationCount,
+                    },
+                    engine: engineHealth ? {
+                        status: engineHealth.status || (engineHealth.ok ? 'ready' : 'problem'),
+                        message: redactSensitiveText(engineHealth.message || '', settings),
+                    } : {
+                        status: 'not_checked',
+                    },
+                };
+            });
+        },
+
+        async getRelations({ notePath } = {}) {
+            return run(async () => {
+                const normalized = await assertNoteExists(notePath);
+                const { store } = await readStore();
+                const entry = store.files[normalized] || null;
+                if (!entry) {
+                    return {
+                        notePath: normalized,
+                        status: 'missing',
+                        stale: true,
+                        relations: [],
+                        entry: null,
+                    };
+                }
+                let stale = false;
+                try {
+                    const [content, stat] = await Promise.all([
+                        adapter.readText(normalized),
+                        adapter.stat(normalized),
+                    ]);
+                    stale = entry.hash !== hashContent(content)
+                        || Number(entry.mtime || 0) !== Number(stat.mtime || 0);
+                } catch (error) {
+                    stale = false;
+                }
+                return {
+                    notePath: normalized,
+                    status: 'ok',
+                    stale,
+                    relations: Array.isArray(entry.relations) ? entry.relations : [],
+                    entry,
+                };
+            });
+        },
+
+        async refreshRelations({ notePath, dryRun = false } = {}) {
+            return run(async () => {
+                const normalized = await assertNoteExists(notePath);
+                if (dryRun) {
+                    return {
+                        notePath: normalized,
+                        dryRun: true,
+                        status: 'skipped',
+                    };
+                }
+                if (options.relationsStore && options.app && options.app.vault && options.app.vault.getAbstractFileByPath) {
+                    const file = options.app.vault.getAbstractFileByPath(normalized);
+                    if (!file) throw new AgentApiError('NOTE_NOT_FOUND', ERROR_MESSAGES.NOTE_NOT_FOUND);
+                    const result = await options.relationsStore.discoverAndCache(file, true);
+                    return {
+                        notePath: normalized,
+                        status: result && result.status || 'ok',
+                        result,
+                    };
+                }
+                return refreshWithExternalEngine(normalized);
+            });
+        },
+
+        async acceptRelation({ notePath, target } = {}) {
+            return run(async () => setRelationStatus(notePath, target, 'accepted'));
+        },
+
+        async rejectRelation({ notePath, target } = {}) {
+            return run(async () => {
+                const mutation = await setRelationStatus(notePath, target, 'rejected');
+                const overridesResult = await readJson(OVERRIDES_PATH, {});
+                const overrides = isObject(overridesResult.value) ? overridesResult.value : {};
+                if (!overrides[mutation.notePath]) overrides[mutation.notePath] = {};
+                if (!isObject(overrides[mutation.notePath].tombstones)) {
+                    overrides[mutation.notePath].tombstones = {};
+                }
+                overrides[mutation.notePath].tombstones[mutation.matchedTitle || target] = {
+                    action: 'deleted',
+                    at: new Date().toISOString(),
+                    ttl_days: 30,
+                    target_hash: '',
+                };
+                await writeJson(OVERRIDES_PATH, overrides);
+                return {
+                    ...mutation,
+                    tombstone: true,
+                };
+            });
+        },
+
+        async insertRelation({ notePath, target, title } = {}) {
+            return run(async () => {
+                const normalized = await assertNoteExists(notePath);
+                const safeTarget = maybeNormalizeTargetPath(target, adapter);
+                const linkTitle = cleanLinkTitle(title) || titleFromTarget(safeTarget);
+                if (!linkTitle) {
+                    throw new AgentApiError('INVALID_ARGUMENT', 'title or target must produce a link title.');
+                }
+                const link = `[[${linkTitle}]]`;
+                const content = await adapter.readText(normalized);
+                const insertion = insertLinkIntoContent(content, link);
+                if (insertion.inserted) {
+                    await adapter.writeText(normalized, insertion.content);
+                }
+                const relationMutation = insertion.inserted
+                    ? await trySetRelationStatus(normalized, safeTarget, 'accepted')
+                        || await trySetRelationStatus(normalized, linkTitle, 'accepted')
+                    : null;
+                return {
+                    notePath: normalized,
+                    target: safeTarget,
+                    title: linkTitle,
+                    link,
+                    inserted: insertion.inserted,
+                    alreadyExists: insertion.alreadyExists,
+                    sectionHeading: insertion.sectionHeading,
+                    line: insertion.line,
+                    relationUpdated: !!relationMutation,
+                };
+            });
+        },
+
+        async getGraphSummary() {
+            return run(async () => {
+                const relations = await readStore();
+                const files = isObject(relations.store.files) ? Object.values(relations.store.files) : [];
+                const relationCount = files.reduce((count, entry) => (
+                    count + (Array.isArray(entry && entry.relations) ? entry.relations.length : 0)
+                ), 0);
+                const conflictsResult = await readJson(CONFLICTS_PATH, null);
+                const conflicts = summarizeConflicts(conflictsResult.value);
+                const indexExists = await adapter.exists(INDEX_PATH);
+                return {
+                    vaultPath: safeVaultPath(),
+                    relationsStore: {
+                        exists: relations.exists,
+                        fileCount: files.length,
+                        relationCount,
+                        updatedAt: relations.store.indexedAt || '',
+                    },
+                    conflicts: {
+                        exists: conflictsResult.exists,
+                        openCount: conflicts.openCount,
+                        highCount: conflicts.highCount,
+                    },
+                    index: {
+                        exists: indexExists,
+                        path: INDEX_PATH,
+                    },
+                };
+            });
+        },
+    };
+}
+
+function summarizeConflicts(value) {
+    const items = [];
+    if (Array.isArray(value)) {
+        items.push(...value);
+    } else if (isObject(value)) {
+        if (Array.isArray(value.conflicts)) items.push(...value.conflicts);
+        for (const [key, item] of Object.entries(value)) {
+            if (key === 'conflicts') continue;
+            if (Array.isArray(item)) items.push(...item);
+            else if (isObject(item) && (item.status || item.severity)) items.push(item);
+        }
+    }
+
+    let openCount = 0;
+    let highCount = 0;
+    for (const item of items) {
+        const status = String(item && item.status || '').toLowerCase();
+        const severity = String(item && (item.severity || item.level) || '').toLowerCase();
+        if (status !== 'resolved' && status !== 'closed') openCount += 1;
+        if (severity === 'high' || severity === 'critical') highCount += 1;
+    }
+    return { openCount, highCount };
+}
+
+module.exports = {
+    AgentApiError,
+    ERROR_MESSAGES,
+    OVERRIDES_PATH,
+    RELATIONS_PATH,
+    createAgentApi,
+};
+
+},
+
+"./engineHealth": function(module, exports, require) {
+const fs = require('fs');
+const path = require('path');
+const { redactSensitiveText } = require('./safety');
+
+const CHECK_GROUPS = ['paths', 'scripts', 'dependencies', 'permissions', 'vault'];
+
+const REQUIRED_ENGINE_SCRIPTS = [
+    { id: 'engine.api_missing', group: 'paths', label: 'api.py', pathParts: ['api.py'], severity: 'error' },
+    { id: 'engine.deploy_missing', group: 'scripts', label: 'scripts/deploy_graphify.py', pathParts: ['scripts', 'deploy_graphify.py'], severity: 'error' },
+    { id: 'engine.vault_ops_missing', group: 'scripts', label: 'scripts/vault_ops.py', pathParts: ['scripts', 'vault_ops.py'], severity: 'warning' },
+    { id: 'engine.index_daemon_missing', group: 'scripts', label: 'scripts/index_daemon.py', pathParts: ['scripts', 'index_daemon.py'], severity: 'warning' },
+    { id: 'engine.template_ingest_missing', group: 'scripts', label: 'graphify-template/scripts/ingest_principles.py', pathParts: ['graphify-template', 'scripts', 'ingest_principles.py'], severity: 'warning' },
+    { id: 'engine.template_lint_missing', group: 'scripts', label: 'graphify-template/scripts/lint.py', pathParts: ['graphify-template', 'scripts', 'lint.py'], severity: 'warning' },
+    { id: 'engine.template_graph_missing', group: 'scripts', label: 'graphify-template/scripts/graph_analyzer.py', pathParts: ['graphify-template', 'scripts', 'graph_analyzer.py'], severity: 'warning' },
+    { id: 'engine.template_index_missing', group: 'scripts', label: 'graphify-template/scripts/index_generator.py', pathParts: ['graphify-template', 'scripts', 'index_generator.py'], severity: 'warning' },
+    { id: 'engine.template_notify_missing', group: 'scripts', label: 'graphify-template/scripts/notification_manager.py', pathParts: ['graphify-template', 'scripts', 'notification_manager.py'], severity: 'warning' },
+    { id: 'engine.template_common_missing', group: 'scripts', label: 'graphify-template/scripts/graphify_common.py', pathParts: ['graphify-template', 'scripts', 'graphify_common.py'], severity: 'warning' },
+];
+
+const REQUIRED_PYTHON_MODULES = [
+    { id: 'engine.dep_requests_missing', packageName: 'requests', importName: 'requests', required: true },
+    { id: 'engine.dep_dotenv_missing', packageName: 'python-dotenv', importName: 'dotenv', required: true },
+    { id: 'engine.dep_yaml_missing', packageName: 'PyYAML', importName: 'yaml', required: true },
+];
+
+function emptyChecks() {
+    return CHECK_GROUPS.reduce((checks, group) => {
+        checks[group] = [];
+        return checks;
+    }, {});
+}
+
+function createEngineHealthIssue(input = {}) {
+    const severity = input.severity === 'warning' || input.severity === 'info' ? input.severity : 'error';
+    return {
+        id: input.id || 'engine.unknown_issue',
+        severity,
+        group: input.group || 'paths',
+        title: input.title || input.id || 'Engine issue',
+        detail: input.detail || '',
+        fix: input.fix || '',
+        command: input.command || '',
+        path: input.path || '',
+    };
+}
+
+function createEngineCheck(input = {}) {
+    return {
+        id: input.id || 'engine.check',
+        label: input.label || input.id || 'Check',
+        status: input.status || 'unknown',
+        severity: input.severity || 'info',
+        detail: input.detail || '',
+        path: input.path || '',
+    };
+}
+
+function addCheck(checks, group, check) {
+    const targetGroup = CHECK_GROUPS.includes(group) ? group : 'paths';
+    checks[targetGroup].push(createEngineCheck(check));
+}
+
+function statusFromIssues(issues) {
+    if (issues.some((issue) => issue.severity === 'error')) return 'error';
+    if (issues.some((issue) => issue.severity === 'warning')) return 'warning';
+    return 'ready';
+}
+
+function summarizeIssue(issue) {
+    if (typeof issue === 'string') return issue;
+    return issue.title || issue.detail || issue.id || 'Engine issue';
+}
+
+function buildEngineDiagnosticText(health = {}, settings = {}) {
+    const status = health.status || (health.ok ? 'ready' : 'error');
+    const lines = [
+        'Understory engine diagnostics',
+        `Checked at: ${health.checkedAt ? new Date(health.checkedAt).toISOString() : 'not checked'}`,
+        `Status: ${status}`,
+        `Plugin version: ${health.pluginVersion || 'unknown'}`,
+        `Engine dir: ${health.engineDir || '(not set)'}`,
+        `Engine version: ${health.engineVersion || 'unknown'}`,
+        `Engine commit: ${health.engineCommit || 'unknown'}`,
+        `Python path: ${health.pythonPath || 'python'}`,
+        `Python version: ${health.pythonVersion || 'unknown'}`,
+        `Vault .understory: ${health.vaultUnderstoryPath || 'not checked'}`,
+    ];
+
+    const issues = Array.isArray(health.issues) ? health.issues : [];
+    if (issues.length) {
+        lines.push('', 'Issues:');
+        for (const issue of issues) {
+            if (typeof issue === 'string') {
+                lines.push(`- ${issue}`);
+            } else {
+                const prefix = `[${issue.severity || 'info'}] ${issue.id || 'engine.issue'}`;
+                lines.push(`- ${prefix}: ${summarizeIssue(issue)}`);
+                if (issue.detail) lines.push(`  Detail: ${issue.detail}`);
+                if (issue.fix) lines.push(`  Fix: ${issue.fix}`);
+                if (issue.command) lines.push(`  Command: ${issue.command}`);
+            }
+        }
+    } else {
+        lines.push('', 'Issues: none');
+    }
+
+    return redactSensitiveText(lines.join('\n'), settings);
+}
+
+function readFileIfExists(filename, fsImpl = fs) {
+    try {
+        if (!filename || !fsImpl.existsSync(filename)) return '';
+        return String(fsImpl.readFileSync(filename, 'utf8') || '').trim();
+    } catch (error) {
+        return '';
+    }
+}
+
+function resolveGitDir(engineDir, fsImpl = fs, pathImpl = path) {
+    const gitPath = pathImpl.join(engineDir, '.git');
+    try {
+        if (!fsImpl.existsSync(gitPath)) return '';
+        const stat = fsImpl.statSync(gitPath);
+        if (stat.isDirectory()) return gitPath;
+        const pointer = readFileIfExists(gitPath, fsImpl);
+        const match = pointer.match(/^gitdir:\s*(.+)$/i);
+        if (!match) return '';
+        return pathImpl.resolve(engineDir, match[1].trim());
+    } catch (error) {
+        return '';
+    }
+}
+
+function readGitCommit(engineDir, fsImpl = fs, pathImpl = path) {
+    const gitDir = resolveGitDir(engineDir, fsImpl, pathImpl);
+    if (!gitDir) return 'unknown';
+    const head = readFileIfExists(pathImpl.join(gitDir, 'HEAD'), fsImpl);
+    if (!head) return 'unknown';
+    if (/^[a-f0-9]{7,40}$/i.test(head)) return head.slice(0, 12);
+    const refMatch = head.match(/^ref:\s*(.+)$/i);
+    if (!refMatch) return 'unknown';
+    const ref = readFileIfExists(pathImpl.join(gitDir, refMatch[1].trim()), fsImpl);
+    return /^[a-f0-9]{7,40}$/i.test(ref) ? ref.slice(0, 12) : 'unknown';
+}
+
+function readEngineVersion(engineDir, options = {}) {
+    const fsImpl = options.fs || fs;
+    const pathImpl = options.path || path;
+    if (!engineDir) return { version: 'unknown', commit: 'unknown' };
+
+    let version = readFileIfExists(pathImpl.join(engineDir, 'VERSION'), fsImpl)
+        || readFileIfExists(pathImpl.join(engineDir, 'version.txt'), fsImpl);
+    if (!version) {
+        const pyproject = readFileIfExists(pathImpl.join(engineDir, 'pyproject.toml'), fsImpl);
+        const match = pyproject.match(/^version\s*=\s*["']([^"']+)["']/m);
+        version = match ? match[1] : '';
+    }
+
+    return {
+        version: version || 'unknown',
+        commit: readGitCommit(engineDir, fsImpl, pathImpl),
+    };
+}
+
+function checkPathAccess(targetPath, mode = 'read', fsImpl = fs) {
+    if (!targetPath) {
+        return { ok: false, exists: false, mode, errorCode: 'EMPTY_PATH', errorMessage: 'Path is empty' };
+    }
+    const wantsWrite = String(mode).includes('write');
+    const wantsRead = String(mode).includes('read') || !wantsWrite;
+    let accessMode = 0;
+    if (wantsRead) accessMode |= fsImpl.constants.R_OK;
+    if (wantsWrite) accessMode |= fsImpl.constants.W_OK;
+
+    try {
+        if (!fsImpl.existsSync(targetPath)) {
+            return { ok: false, exists: false, mode, errorCode: 'ENOENT', errorMessage: 'Path does not exist' };
+        }
+        fsImpl.accessSync(targetPath, accessMode);
+        return { ok: true, exists: true, mode, errorCode: '', errorMessage: '' };
+    } catch (error) {
+        return {
+            ok: false,
+            exists: true,
+            mode,
+            errorCode: error && error.code ? error.code : 'ACCESS_ERROR',
+            errorMessage: error && error.message ? error.message : 'Access check failed',
+        };
+    }
+}
+
+module.exports = {
+    CHECK_GROUPS,
+    REQUIRED_ENGINE_SCRIPTS,
+    REQUIRED_PYTHON_MODULES,
+    addCheck,
+    buildEngineDiagnosticText,
+    checkPathAccess,
+    createEngineCheck,
+    createEngineHealthIssue,
+    emptyChecks,
+    readEngineVersion,
+    statusFromIssues,
+    summarizeIssue,
+};
+
+},
+
 "./settings": function(module, exports, require) {
 const { PluginSettingTab, Setting, Notice, TFile } = require('obsidian');
 const { getLanguage, t } = require('./i18n');
@@ -862,7 +2293,7 @@ class UnderstorySettingTab extends PluginSettingTab {
         this._injectStyles(containerEl);
 
         const header = containerEl.createDiv({ cls: 'understory-settings-header' });
-        header.createEl('h2', { text: t(this.plugin, 'settings_title') });
+        header.createDiv({ text: t(this.plugin, 'settings_title'), cls: 'understory-settings-title' });
         this._renderLanguageToggle(header);
 
         new Setting(containerEl)
@@ -1440,18 +2871,38 @@ class UnderstorySettingTab extends PluginSettingTab {
 
     _renderEngineStatus(containerEl) {
         const health = this.plugin.engineHealth;
-        const statusText = health
-            ? (health.ok
-                ? t(this.plugin, 'engine_status_ok', { python: health.pythonVersion || this.plugin.settings.pythonPath || 'python' })
-                : t(this.plugin, 'engine_status_problem', { message: health.message || t(this.plugin, 'engine_status_unknown') }))
-            : t(this.plugin, 'engine_status_unknown');
+        const status = health ? (health.status || (health.ok ? 'ready' : 'error')) : 'unchecked';
+        const panel = containerEl.createDiv({ cls: 'understory-engine-panel' });
 
-        containerEl.createEl('div', {
-            text: statusText,
-            cls: `setting-item-description understory-engine-status ${health && health.ok ? 'is-ok' : 'is-warning'}`
-        }).style.marginBottom = '8px';
+        const summary = panel.createDiv({ cls: 'understory-engine-summary' });
+        summary.createEl('span', {
+            text: t(this.plugin, `engine_status_badge_${status}`),
+            cls: `understory-engine-badge is-${status}`,
+        });
+        summary.createDiv({
+            text: health
+                ? (health.message || t(this.plugin, 'engine_status_message_ready'))
+                : t(this.plugin, 'engine_status_message_unchecked'),
+            cls: 'understory-engine-summary-text',
+        });
 
-        new Setting(containerEl)
+        this._appendEngineKeyValueGrid(panel, t(this.plugin, 'engine_versions_title'), [
+            [t(this.plugin, 'engine_value_plugin'), health?.pluginVersion || this.plugin.manifest?.version || t(this.plugin, 'engine_value_unknown')],
+            [t(this.plugin, 'engine_value_engine'), health?.engineVersion || t(this.plugin, 'engine_value_unknown')],
+            [t(this.plugin, 'engine_value_engine_commit'), health?.engineCommit || t(this.plugin, 'engine_value_unknown')],
+            [t(this.plugin, 'engine_value_python'), health?.pythonVersion || t(this.plugin, 'engine_value_unknown')],
+        ]);
+
+        this._appendEngineKeyValueGrid(panel, t(this.plugin, 'engine_paths_title'), [
+            [t(this.plugin, 'engine_value_engine_dir'), health?.engineDir || this.plugin.settings.graphifyDir || t(this.plugin, 'engine_value_not_set')],
+            [t(this.plugin, 'engine_value_python_path'), health?.pythonPath || this.plugin.settings.pythonPath || 'python'],
+            [t(this.plugin, 'engine_value_vault'), health?.vaultUnderstoryPath || t(this.plugin, 'engine_value_not_checked')],
+        ]);
+
+        this._appendEngineChecks(panel, health?.checks);
+        this._appendEngineFixes(panel, health?.fixes || health?.issues || []);
+
+        new Setting(panel)
             .setName(t(this.plugin, 'engine_check_name'))
             .setDesc(t(this.plugin, 'engine_check_desc'))
             .addButton((button) => button
@@ -1473,7 +2924,110 @@ class UnderstorySettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                     await this.plugin.checkEngineHealth?.(true, true);
                     this.display();
+                }))
+            .addButton((button) => button
+                .setButtonText(t(this.plugin, 'engine_copy_diagnostics_button'))
+                .setDisabled(!health?.diagnosticText)
+                .onClick(async () => {
+                    await this._copyText(health?.diagnosticText || '', t(this.plugin, 'engine_copy_diagnostics_notice'));
                 }));
+    }
+
+    _appendEngineKeyValueGrid(containerEl, title, rows) {
+        const section = containerEl.createDiv({ cls: 'understory-engine-section' });
+        section.createEl('div', { text: title, cls: 'understory-engine-section-title' });
+        const grid = section.createDiv({ cls: 'understory-engine-kv-grid' });
+        for (const [label, value] of rows) {
+            const row = grid.createDiv({ cls: 'understory-engine-kv' });
+            row.createDiv({ text: label, cls: 'understory-engine-kv-label' });
+            row.createDiv({ text: value || t(this.plugin, 'engine_value_unknown'), cls: 'understory-engine-kv-value' });
+        }
+    }
+
+    _appendEngineChecks(containerEl, checks = {}) {
+        const groups = ['paths', 'scripts', 'dependencies', 'permissions', 'vault'];
+        const section = containerEl.createDiv({ cls: 'understory-engine-section' });
+        section.createEl('div', { text: t(this.plugin, 'engine_checks_title'), cls: 'understory-engine-section-title' });
+        const matrix = section.createDiv({ cls: 'understory-engine-checks' });
+
+        for (const group of groups) {
+            const items = Array.isArray(checks[group]) ? checks[group] : [];
+            const state = this._engineGroupState(items);
+            const groupEl = matrix.createDiv({ cls: `understory-engine-check-group is-${state}` });
+            const head = groupEl.createDiv({ cls: 'understory-engine-check-group-head' });
+            head.createEl('span', { text: t(this.plugin, `engine_group_${group}`) });
+            head.createEl('span', {
+                text: t(this.plugin, `engine_check_status_${state}`),
+                cls: `understory-engine-check-pill is-${state}`,
+            });
+            if (!items.length) {
+                groupEl.createDiv({
+                    text: t(this.plugin, 'engine_check_not_run'),
+                    cls: 'understory-engine-check-empty',
+                });
+                continue;
+            }
+            for (const item of items) {
+                const row = groupEl.createDiv({ cls: 'understory-engine-check-row' });
+                row.createEl('span', {
+                    text: t(this.plugin, `engine_check_status_${item.status || 'unknown'}`),
+                    cls: `understory-engine-check-pill is-${item.status || 'unknown'}`,
+                });
+                const body = row.createDiv({ cls: 'understory-engine-check-body' });
+                body.createDiv({ text: item.label || item.id, cls: 'understory-engine-check-label' });
+                if (item.detail) body.createDiv({ text: item.detail, cls: 'understory-engine-check-detail' });
+                if (item.path) body.createEl('code', { text: item.path, cls: 'understory-engine-path' });
+            }
+        }
+    }
+
+    _appendEngineFixes(containerEl, fixes = []) {
+        const section = containerEl.createDiv({ cls: 'understory-engine-section' });
+        section.createEl('div', { text: t(this.plugin, 'engine_fixes_title'), cls: 'understory-engine-section-title' });
+        if (!fixes.length) {
+            section.createDiv({ text: t(this.plugin, 'engine_fixes_empty'), cls: 'setting-item-description' });
+            return;
+        }
+        const list = section.createDiv({ cls: 'understory-engine-fixes' });
+        for (const issue of fixes) {
+            const item = list.createDiv({ cls: `understory-engine-fix is-${issue.severity || 'info'}` });
+            item.createDiv({ text: issue.title || issue.id, cls: 'understory-engine-fix-title' });
+            if (issue.detail) item.createDiv({ text: issue.detail, cls: 'understory-engine-fix-detail' });
+            if (issue.fix) item.createDiv({ text: issue.fix, cls: 'understory-engine-fix-detail' });
+            if (issue.command) {
+                const commandRow = item.createDiv({ cls: 'understory-engine-command-row' });
+                commandRow.createEl('code', { text: issue.command, cls: 'understory-engine-command' });
+                commandRow.createEl('button', {
+                    text: t(this.plugin, 'engine_copy_command_button'),
+                    cls: 'mod-cta',
+                }).addEventListener('click', () => {
+                    this._copyText(issue.command, t(this.plugin, 'engine_copy_command_notice'));
+                });
+            }
+        }
+    }
+
+    _engineGroupState(items) {
+        if (!items || !items.length) return 'unknown';
+        if (items.some((item) => item.status === 'error')) return 'error';
+        if (items.some((item) => item.status === 'warning')) return 'warning';
+        if (items.every((item) => item.status === 'skipped')) return 'skipped';
+        return 'ok';
+    }
+
+    async _copyText(text, successMessage) {
+        try {
+            if (!text) return;
+            if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(text);
+            } else {
+                const { clipboard } = require('electron');
+                clipboard.writeText(text);
+            }
+            new Notice(successMessage);
+        } catch (error) {
+            new Notice(t(this.plugin, 'engine_copy_failed_notice'));
+        }
     }
 }
 
@@ -1554,6 +3108,7 @@ module.exports = {
 const { Notice, TFile } = require('obsidian');
 const { GraphifyContentModal, MAX_LOG_ENTRIES } = require('./utils');
 const { t } = require('./i18n');
+const { canUseWebhook } = require('./safety');
 
 class GraphifyCoreMethods {
     _vaultBasePath() {
@@ -1601,20 +3156,22 @@ class GraphifyCoreMethods {
             callback: () => this._openOrphansView(),
         });
 
-        // 2. \u4e8b\u4ef6\uff1a\u6587\u4ef6 create/modify \u2192 \u9632\u6296\u89e6\u53d1\u539f\u5219\u63d0\u53d6\uff08\u4e0e\u5173\u8054\u53d1\u73b0\u5e76\u884c\uff0c\u4e92\u4e0d\u5f71\u54cd\uff09
-        this.registerEvent(this.app.vault.on('create', (file) => {
-            if (file && file.extension === 'md' && this.settings.ingestEnabled) {
-                this.scheduleIngest(file);
-            }
-        }));
-        this.registerEvent(this.app.vault.on('modify', (file) => {
-            if (file && file.extension === 'md' && this.settings.ingestEnabled) {
-                this.scheduleIngest(file);
-            }
-        }));
+        // 2. \u4e8b\u4ef6\uff1a\u7b49 workspace ready \u540e\u518d\u76d1\u542c vault create/modify\uff0c\u907f\u514d\u51b7\u542f\u52a8\u65f6\u54cd\u5e94\u521d\u59cb\u626b\u63cf\u4e8b\u4ef6
+        this._runWhenWorkspaceReady(() => {
+            this.registerEvent(this.app.vault.on('create', (file) => {
+                if (file && file.extension === 'md' && this.settings.ingestEnabled) {
+                    this.scheduleIngest(file);
+                }
+            }));
+            this.registerEvent(this.app.vault.on('modify', (file) => {
+                if (file && file.extension === 'md' && this.settings.ingestEnabled) {
+                    this.scheduleIngest(file);
+                }
+            }));
 
-        // 3. \u51b7\u542f\u52a8\u53cb\u597d\uff1a\u5ef6\u8fdf 5s \u68c0\u67e5 .understory \u9aa8\u67b6\uff0c\u518d\u5ef6\u8fdf 60s \u542f\u52a8\u5b9a\u65f6\u5668
-        window.setTimeout(() => this._lazyInitGraphify(), 5000);
+            // 3. \u51b7\u542f\u52a8\u53cb\u597d\uff1a\u5ef6\u8fdf 5s \u68c0\u67e5 .understory \u9aa8\u67b6\uff0c\u518d\u5ef6\u8fdf 60s \u542f\u52a8\u5b9a\u65f6\u5668
+            window.setTimeout(() => this._lazyInitGraphify(), 5000);
+        });
     }
 
     async _lazyInitGraphify() {
@@ -1752,7 +3309,7 @@ class GraphifyCoreMethods {
             await step('graph_analyzer.py', 3 * 60 * 1000, 'graph');
             await step('index_generator.py', 60 * 1000, 'index');
             const notifyArgs = ['--vault', base];
-            if (this.settings.webhookEnabled && this.settings.webhookUrl && (this.settings.networkMode || 'local') !== 'local') {
+            if (canUseWebhook(this.settings)) {
                 notifyArgs.push('--webhook', this.settings.webhookUrl);
                 notifyArgs.push('--webhook-type', this.settings.webhookType || 'slack');
                 notifyArgs.push('--webhook-enabled');
@@ -2243,8 +3800,34 @@ module.exports = GraphifyViewMethods.prototype;
 
 "./graphifyRuntime": function(module, exports, require) {
 const { Notice, TFile } = require('obsidian');
-const { GraphifyContentModal } = require('./utils');
+const { GraphifyContentModal, MAX_LOG_ENTRIES } = require('./utils');
 const { t } = require('./i18n');
+const {
+    REQUIRED_ENGINE_SCRIPTS,
+    REQUIRED_PYTHON_MODULES,
+    addCheck,
+    buildEngineDiagnosticText,
+    checkPathAccess,
+    createEngineHealthIssue,
+    emptyChecks,
+    readEngineVersion,
+    statusFromIssues,
+    summarizeIssue,
+} = require('./engineHealth');
+const { normalizeLogEntry, redactSensitiveText, safeErrorDetail, safeNetworkMode } = require('./safety');
+
+const MANAGED_ENV_KEYS = [
+    'UNDERSTORY_EMBEDDING_PROVIDER',
+    'UNDERSTORY_LLM_PROVIDER',
+    'UNDERSTORY_EMBEDDING_BASE_URL',
+    'UNDERSTORY_EMBEDDING_MODEL',
+    'UNDERSTORY_EMBEDDING_DIMENSIONS',
+    'UNDERSTORY_EMBEDDING_API_KEY',
+    'UNDERSTORY_LLM_BASE_URL',
+    'UNDERSTORY_LLM_MODEL',
+    'UNDERSTORY_LLM_API_KEY',
+    'UNDERSTORY_WEBHOOK_ENABLED',
+];
 
 class GraphifyRuntimeMethods {
     _openOrphansView() {
@@ -2287,28 +3870,41 @@ class GraphifyRuntimeMethods {
 
     _pythonEnv(extra = {}) {
         const vaultBase = this._vaultBasePath ? this._vaultBasePath() : null;
+        const networkMode = safeNetworkMode(this.settings?.networkMode);
+        const webhookEnabled = networkMode !== 'local'
+            && !!this.settings?.webhookEnabled
+            && !!String(this.settings?.webhookUrl || '').trim();
         const env = {
             ...process.env,
             UNDERSTORY_ENGINE_DIR: this._engineDir(),
             OBSIDIAN_VAULT_PATH: vaultBase || process.env.OBSIDIAN_VAULT_PATH || '',
-            UNDERSTORY_NETWORK_MODE: this.settings?.networkMode || 'local',
-            UNDERSTORY_WEBHOOK_ENABLED: this.settings?.webhookEnabled ? '1' : '0',
+            UNDERSTORY_NETWORK_MODE: networkMode,
+            UNDERSTORY_UI_LANGUAGE: this.settings?.uiLanguage || 'en',
+            UNDERSTORY_WEBHOOK_ENABLED: webhookEnabled ? '1' : '0',
             PYTHONIOENCODING: 'utf-8',
             ...extra,
         };
+        for (const key of MANAGED_ENV_KEYS) {
+            delete env[key];
+        }
+        env.UNDERSTORY_WEBHOOK_ENABLED = webhookEnabled ? '1' : '0';
         const setIfPresent = (key, value) => {
             const text = String(value || '').trim();
             if (text) env[key] = text;
         };
-        setIfPresent('UNDERSTORY_EMBEDDING_PROVIDER', this.settings?.embeddingProvider);
-        setIfPresent('UNDERSTORY_LLM_PROVIDER', this.settings?.llmProvider);
-        setIfPresent('UNDERSTORY_EMBEDDING_BASE_URL', this.settings?.embeddingBaseUrl);
-        setIfPresent('UNDERSTORY_EMBEDDING_MODEL', this.settings?.embeddingModel);
-        setIfPresent('UNDERSTORY_EMBEDDING_DIMENSIONS', this.settings?.embeddingDimensions);
-        setIfPresent('UNDERSTORY_EMBEDDING_API_KEY', this.settings?.embeddingApiKey);
-        setIfPresent('UNDERSTORY_LLM_BASE_URL', this.settings?.llmBaseUrl);
-        setIfPresent('UNDERSTORY_LLM_MODEL', this.settings?.llmModel);
-        setIfPresent('UNDERSTORY_LLM_API_KEY', this.settings?.llmApiKey);
+        if (networkMode === 'embedding' || networkMode === 'full') {
+            setIfPresent('UNDERSTORY_EMBEDDING_PROVIDER', this.settings?.embeddingProvider);
+            setIfPresent('UNDERSTORY_EMBEDDING_BASE_URL', this.settings?.embeddingBaseUrl);
+            setIfPresent('UNDERSTORY_EMBEDDING_MODEL', this.settings?.embeddingModel);
+            setIfPresent('UNDERSTORY_EMBEDDING_DIMENSIONS', this.settings?.embeddingDimensions);
+            setIfPresent('UNDERSTORY_EMBEDDING_API_KEY', this.settings?.embeddingApiKey);
+        }
+        if (networkMode === 'full') {
+            setIfPresent('UNDERSTORY_LLM_PROVIDER', this.settings?.llmProvider);
+            setIfPresent('UNDERSTORY_LLM_BASE_URL', this.settings?.llmBaseUrl);
+            setIfPresent('UNDERSTORY_LLM_MODEL', this.settings?.llmModel);
+            setIfPresent('UNDERSTORY_LLM_API_KEY', this.settings?.llmApiKey);
+        }
         return env;
     }
 
@@ -2322,6 +3918,10 @@ class GraphifyRuntimeMethods {
 
     _checkPythonModules(timeoutMs = 5000) {
         return this._runPythonProbe(['-c', 'import requests, dotenv, yaml; print("dependencies ok")'], timeoutMs);
+    }
+
+    _checkPythonModule(moduleName, timeoutMs = 5000) {
+        return this._runPythonProbe(['-c', `import ${moduleName}; print("${moduleName} ok")`], timeoutMs);
     }
 
     _runPythonProbe(args, timeoutMs = 5000) {
@@ -2358,7 +3958,7 @@ class GraphifyRuntimeMethods {
         const key = this._engineHealthKey();
         if (!force && this.engineHealth && this.engineHealth.key === key && Date.now() - this.engineHealth.checkedAt < 60000) {
             if (showNotice) {
-                new Notice(this.engineHealth.ok
+                new Notice(this.engineHealth.status === 'ready'
                     ? t(this, 'engine_health_ok_notice')
                     : t(this, 'engine_health_problem_notice', { message: this.engineHealth.message }));
             }
@@ -2366,48 +3966,299 @@ class GraphifyRuntimeMethods {
         }
 
         const issues = [];
+        const checks = emptyChecks();
         const engineDir = this._engineDir();
+        const pythonPath = this._pythonExe();
+        const vaultBase = this._vaultBasePath ? this._vaultBasePath() : null;
+        const vaultUnderstoryPath = vaultBase ? this._joinPath(vaultBase, '.understory') : '';
         let pythonVersion = '';
+        let engineVersion = 'unknown';
+        let engineCommit = 'unknown';
+
+        const pipInstallCommand = engineDir
+            ? `${pythonPath} -m pip install -r "${this._joinPath(engineDir, 'requirements.txt')}"`
+            : `${pythonPath} -m pip install -r "<engineDir>/requirements.txt"`;
+        const addIssue = (input) => {
+            const issue = createEngineHealthIssue(input);
+            issues.push(issue);
+            return issue;
+        };
 
         if (!engineDir) {
-            issues.push(t(this, 'engine_missing_dir'));
-        } else if (!fs.existsSync(engineDir)) {
-            issues.push(t(this, 'engine_dir_not_found', { path: engineDir }));
+            addCheck(checks, 'paths', {
+                id: 'engine.dir',
+                label: t(this, 'engine_check_engine_dir_label'),
+                status: 'error',
+                severity: 'error',
+                detail: t(this, 'engine_missing_dir'),
+            });
+            addIssue({
+                id: 'engine.dir_missing',
+                severity: 'error',
+                group: 'paths',
+                title: t(this, 'engine_issue_dir_missing_title'),
+                detail: t(this, 'engine_missing_dir'),
+                fix: t(this, 'engine_issue_dir_missing_fix'),
+                command: '$env:UNDERSTORY_ENGINE_DIR="C:\\path\\to\\Understory-graphify-engine"',
+            });
         } else {
-            const apiPath = this._enginePath('api.py');
-            const scriptsPath = this._enginePath('scripts');
-            if (!fs.existsSync(apiPath)) issues.push(t(this, 'engine_api_missing', { path: apiPath }));
-            if (!fs.existsSync(scriptsPath)) issues.push(t(this, 'engine_scripts_missing', { path: scriptsPath }));
+            const engineAccess = checkPathAccess(engineDir, 'read', fs);
+            addCheck(checks, 'paths', {
+                id: 'engine.dir',
+                label: t(this, 'engine_check_engine_dir_label'),
+                status: engineAccess.ok ? 'ok' : 'error',
+                severity: engineAccess.ok ? 'info' : 'error',
+                detail: engineAccess.ok
+                    ? t(this, 'engine_check_ok')
+                    : t(this, engineAccess.exists ? 'engine_permission_read_failed' : 'engine_dir_not_found', { path: engineDir, message: engineAccess.errorMessage }),
+                path: engineDir,
+            });
+
+            if (!engineAccess.exists) {
+                addIssue({
+                    id: 'engine.dir_not_found',
+                    severity: 'error',
+                    group: 'paths',
+                    title: t(this, 'engine_issue_dir_not_found_title'),
+                    detail: t(this, 'engine_dir_not_found', { path: engineDir }),
+                    fix: t(this, 'engine_issue_dir_not_found_fix'),
+                    command: 'git clone https://github.com/fyaic/Understory-graphify-engine.git',
+                    path: engineDir,
+                });
+            } else if (!engineAccess.ok) {
+                addIssue({
+                    id: 'engine.dir_unreadable',
+                    severity: 'error',
+                    group: 'permissions',
+                    title: t(this, 'engine_issue_permission_title'),
+                    detail: t(this, 'engine_permission_read_failed', { path: engineDir, message: engineAccess.errorMessage }),
+                    fix: t(this, 'engine_issue_permission_fix'),
+                    path: engineDir,
+                });
+            } else {
+                const versionInfo = readEngineVersion(engineDir);
+                engineVersion = versionInfo.version;
+                engineCommit = versionInfo.commit;
+
+                for (const script of REQUIRED_ENGINE_SCRIPTS) {
+                    const scriptPath = this._joinPath(engineDir, ...script.pathParts);
+                    const access = checkPathAccess(scriptPath, 'read', fs);
+                    addCheck(checks, script.group, {
+                        id: script.id,
+                        label: script.label,
+                        status: access.ok ? 'ok' : (script.severity === 'error' ? 'error' : 'warning'),
+                        severity: access.ok ? 'info' : script.severity,
+                        detail: access.ok
+                            ? t(this, 'engine_check_ok')
+                            : t(this, 'engine_script_missing_detail', { script: script.label, path: scriptPath }),
+                        path: scriptPath,
+                    });
+                    if (!access.ok) {
+                        addIssue({
+                            id: script.id,
+                            severity: script.severity,
+                            group: script.group,
+                            title: t(this, script.id === 'engine.api_missing' ? 'engine_issue_api_missing_title' : 'engine_issue_script_missing_title', { script: script.label }),
+                            detail: t(this, 'engine_script_missing_detail', { script: script.label, path: scriptPath }),
+                            fix: t(this, script.severity === 'error' ? 'engine_issue_script_missing_fix_error' : 'engine_issue_script_missing_fix_warning'),
+                            command: script.severity === 'error' ? 'git clone https://github.com/fyaic/Understory-graphify-engine.git' : '',
+                            path: scriptPath,
+                        });
+                    }
+                }
+            }
         }
 
         try {
             pythonVersion = await this._checkPythonVersion();
         } catch (error) {
-            issues.push(t(this, 'engine_python_failed', { message: String(error.message || error) }));
+            const message = redactSensitiveText(String(error.message || error), this.settings);
+            addIssue({
+                id: 'engine.python_failed',
+                severity: 'error',
+                group: 'dependencies',
+                title: t(this, 'engine_issue_python_failed_title'),
+                detail: t(this, 'engine_python_failed', { message }),
+                fix: t(this, 'engine_issue_python_failed_fix'),
+                command: `${pythonPath} --version`,
+            });
         }
 
         if (pythonVersion) {
-            try {
-                await this._checkPythonModules();
-            } catch (error) {
-                issues.push(t(this, 'engine_deps_failed', { message: String(error.message || error) }));
+            addCheck(checks, 'dependencies', {
+                id: 'engine.python',
+                label: t(this, 'engine_check_python_label'),
+                status: 'ok',
+                severity: 'info',
+                detail: pythonVersion,
+                path: pythonPath,
+            });
+            if (force) {
+                for (const moduleInfo of REQUIRED_PYTHON_MODULES) {
+                    try {
+                        await this._checkPythonModule(moduleInfo.importName);
+                        addCheck(checks, 'dependencies', {
+                            id: moduleInfo.id,
+                            label: moduleInfo.packageName,
+                            status: 'ok',
+                            severity: 'info',
+                            detail: t(this, 'engine_check_ok'),
+                        });
+                    } catch (error) {
+                        const message = redactSensitiveText(String(error.message || error), this.settings);
+                        addCheck(checks, 'dependencies', {
+                            id: moduleInfo.id,
+                            label: moduleInfo.packageName,
+                            status: 'warning',
+                            severity: 'warning',
+                            detail: message,
+                        });
+                        addIssue({
+                            id: moduleInfo.id,
+                            severity: 'warning',
+                            group: 'dependencies',
+                            title: t(this, 'engine_issue_dependency_missing_title', { name: moduleInfo.packageName }),
+                            detail: t(this, 'engine_issue_dependency_missing_detail', { name: moduleInfo.packageName, module: moduleInfo.importName, message }),
+                            fix: t(this, 'engine_issue_dependency_missing_fix'),
+                            command: pipInstallCommand,
+                        });
+                    }
+                }
+            } else {
+                addCheck(checks, 'dependencies', {
+                    id: 'engine.dependencies',
+                    label: t(this, 'engine_check_dependencies_label'),
+                    status: 'skipped',
+                    severity: 'info',
+                    detail: t(this, 'engine_check_dependencies_skipped'),
+                });
+            }
+        } else {
+            addCheck(checks, 'dependencies', {
+                id: 'engine.python',
+                label: t(this, 'engine_check_python_label'),
+                status: 'error',
+                severity: 'error',
+                detail: t(this, 'engine_python_failed', { message: pythonPath }),
+                path: pythonPath,
+            });
+        }
+
+        if (!vaultBase) {
+            addCheck(checks, 'vault', {
+                id: 'engine.vault_base',
+                label: t(this, 'engine_check_vault_label'),
+                status: 'skipped',
+                severity: 'info',
+                detail: t(this, 'engine_vault_base_skipped'),
+            });
+        } else {
+            const vaultDirExists = fs.existsSync(vaultUnderstoryPath);
+            addCheck(checks, 'vault', {
+                id: 'engine.vault_understory',
+                label: t(this, 'engine_check_vault_understory_label'),
+                status: vaultDirExists ? 'ok' : 'warning',
+                severity: vaultDirExists ? 'info' : 'warning',
+                detail: vaultDirExists ? t(this, 'engine_check_ok') : t(this, 'engine_vault_understory_missing', { path: vaultUnderstoryPath }),
+                path: vaultUnderstoryPath,
+            });
+            if (!vaultDirExists) {
+                addIssue({
+                    id: 'engine.vault_understory_missing',
+                    severity: 'warning',
+                    group: 'vault',
+                    title: t(this, 'engine_issue_vault_missing_title'),
+                    detail: t(this, 'engine_vault_understory_missing', { path: vaultUnderstoryPath }),
+                    fix: t(this, 'engine_issue_vault_missing_fix'),
+                    command: engineDir ? `${pythonPath} "${this._joinPath(engineDir, 'scripts', 'deploy_graphify.py')}" --vault "${vaultBase}"` : '',
+                    path: vaultUnderstoryPath,
+                });
+                const vaultRootAccess = checkPathAccess(vaultBase, 'write', fs);
+                if (!vaultRootAccess.ok) {
+                    addIssue({
+                        id: 'engine.vault_root_not_writable',
+                        severity: 'warning',
+                        group: 'permissions',
+                        title: t(this, 'engine_issue_vault_permission_title'),
+                        detail: t(this, 'engine_permission_write_failed', { path: vaultBase, message: vaultRootAccess.errorMessage }),
+                        fix: t(this, 'engine_issue_vault_permission_fix'),
+                        path: vaultBase,
+                    });
+                }
+            } else {
+                const vaultWriteAccess = checkPathAccess(vaultUnderstoryPath, 'write', fs);
+                addCheck(checks, 'permissions', {
+                    id: 'engine.vault_understory_write',
+                    label: t(this, 'engine_check_vault_write_label'),
+                    status: vaultWriteAccess.ok ? 'ok' : 'error',
+                    severity: vaultWriteAccess.ok ? 'info' : 'error',
+                    detail: vaultWriteAccess.ok
+                        ? t(this, 'engine_check_ok')
+                        : t(this, 'engine_permission_write_failed', { path: vaultUnderstoryPath, message: vaultWriteAccess.errorMessage }),
+                    path: vaultUnderstoryPath,
+                });
+                if (!vaultWriteAccess.ok) {
+                    addIssue({
+                        id: 'engine.vault_understory_not_writable',
+                        severity: 'error',
+                        group: 'permissions',
+                        title: t(this, 'engine_issue_vault_permission_title'),
+                        detail: t(this, 'engine_permission_write_failed', { path: vaultUnderstoryPath, message: vaultWriteAccess.errorMessage }),
+                        fix: t(this, 'engine_issue_vault_permission_fix'),
+                        path: vaultUnderstoryPath,
+                    });
+                }
+
+                const vaultScriptsPath = this._joinPath(vaultUnderstoryPath, 'scripts');
+                const vaultScriptsExist = fs.existsSync(vaultScriptsPath);
+                addCheck(checks, 'vault', {
+                    id: 'engine.vault_scripts',
+                    label: t(this, 'engine_check_vault_scripts_label'),
+                    status: vaultScriptsExist ? 'ok' : 'warning',
+                    severity: vaultScriptsExist ? 'info' : 'warning',
+                    detail: vaultScriptsExist ? t(this, 'engine_check_ok') : t(this, 'engine_vault_scripts_missing', { path: vaultScriptsPath }),
+                    path: vaultScriptsPath,
+                });
+                if (!vaultScriptsExist) {
+                    addIssue({
+                        id: 'engine.vault_scripts_missing',
+                        severity: 'warning',
+                        group: 'vault',
+                        title: t(this, 'engine_issue_vault_scripts_missing_title'),
+                        detail: t(this, 'engine_vault_scripts_missing', { path: vaultScriptsPath }),
+                        fix: t(this, 'engine_issue_vault_missing_fix'),
+                        command: engineDir ? `${pythonPath} "${this._joinPath(engineDir, 'scripts', 'deploy_graphify.py')}" --vault "${vaultBase}"` : '',
+                        path: vaultScriptsPath,
+                    });
+                }
             }
         }
 
-        const ok = issues.length === 0;
+        const status = statusFromIssues(issues);
+        const ok = status !== 'error';
+        const message = issues.length ? summarizeIssue(issues[0]) : '';
         this.engineHealth = {
             ok,
+            status,
             key,
+            pluginVersion: this.manifest?.version || this.app?.plugins?.manifests?.understory?.version || 'unknown',
             engineDir,
-            pythonPath: this._pythonExe(),
+            engineVersion,
+            engineCommit,
+            pythonPath,
             pythonVersion,
+            vaultBase,
+            vaultUnderstoryPath,
+            checks,
             issues,
-            message: issues[0] || '',
+            fixes: issues.filter((issue) => issue.fix || issue.command),
+            message,
             checkedAt: Date.now(),
         };
+        this.engineHealth.diagnosticText = buildEngineDiagnosticText(this.engineHealth, this.settings);
 
         if (showNotice) {
-            new Notice(ok
+            new Notice(this.engineHealth.status === 'ready'
                 ? t(this, 'engine_health_ok_notice')
                 : t(this, 'engine_health_problem_notice', { message: this.engineHealth.message }), 7000);
         }
@@ -2453,14 +4304,14 @@ class GraphifyRuntimeMethods {
             proc.on('close', (code) => {
                 if (timer) clearTimeout(timer);
                 if (code === 0) resolve(stdout);
-                else reject(new Error(`Script failed (${code}): ${stderr.slice(0, 300)}`));
+                else reject(new Error(`Script failed (${code}): ${safeErrorDetail({ stderr, settings: this.settings })}`));
             });
         });
     }
 
     async _addLogEntry(entry) {
         if (!this.settings.linkLog) this.settings.linkLog = [];
-        this.settings.linkLog.unshift(entry);
+        this.settings.linkLog.unshift(normalizeLogEntry(entry, this.settings));
         if (this.settings.linkLog.length > MAX_LOG_ENTRIES) {
             this.settings.linkLog = this.settings.linkLog.slice(0, MAX_LOG_ENTRIES);
         }
@@ -2492,7 +4343,7 @@ class GraphifyRuntimeMethods {
                 relations: [],
                 message: errorInfo.desc,
                 errorCategory: errorInfo.category,
-                errorDetail: stderr.slice(0, 300)
+                errorDetail: safeErrorDetail({ stderr, settings: this.settings })
             });
             return;
         }
@@ -2511,7 +4362,7 @@ class GraphifyRuntimeMethods {
         if (!raw) {
             // stdout 为空 = Python 异常崩溃且未输出 JSON（旧版本或极端情况）
             const errorInfo = this._classifyError(stderr);
-            console.error('[Understory] Empty stdout, Python likely crashed:', stderr);
+            console.error('[Understory] Empty stdout, Python likely crashed:', safeErrorDetail({ stderr, settings: this.settings }));
             await this._addLogEntry({
                 time: this._formatTime(new Date()),
                 file: file.basename,
@@ -2521,7 +4372,11 @@ class GraphifyRuntimeMethods {
                 relations: [],
                 message: t(this, 'log_python_crash', { message: errorInfo.desc }),
                 errorCategory: errorInfo.category,
-                errorDetail: stderr.slice(0, 300) || t(this, 'process_empty_stdout_detail')
+                errorDetail: safeErrorDetail({
+                    stderr,
+                    message: t(this, 'process_empty_stdout_detail'),
+                    settings: this.settings,
+                })
             });
             return;
         }
@@ -2563,7 +4418,7 @@ class GraphifyRuntimeMethods {
                 });
             } else if (result.status === 'error') {
                 // Python 端已捕获的异常（新版）
-                console.error(`[Understory] Python error: ${result.message}`);
+                console.error(`[Understory] Python error: ${redactSensitiveText(result.message, this.settings)}`);
                 const errorInfo = this._classifyError(result.message + ' ' + (result.error_detail || ''));
                 await this._addLogEntry({
                     time: this._formatTime(new Date()),
@@ -2574,7 +4429,11 @@ class GraphifyRuntimeMethods {
                     relations: [],
                     message: errorInfo.desc,
                     errorCategory: errorInfo.category,
-                    errorDetail: result.error_detail || result.message
+                    errorDetail: safeErrorDetail({
+                        stderr: result.error_detail,
+                        message: result.message,
+                        settings: this.settings,
+                    })
                 });
             } else {
                 await this._addLogEntry({
@@ -2589,7 +4448,7 @@ class GraphifyRuntimeMethods {
             }
         } catch (e) {
             // JSON 解析失败（输出损坏或不完整）
-            console.error('[Understory] JSON parse error:', e, 'raw:', raw.slice(0, 200));
+            console.error('[Understory] JSON parse error:', e && e.message ? e.message : e);
             const errorInfo = this._classifyError(stderr);
             await this._addLogEntry({
                 time: this._formatTime(new Date()),
@@ -2600,7 +4459,7 @@ class GraphifyRuntimeMethods {
                 relations: [],
                 message: t(this, 'parse_failed_message'),
                 errorCategory: errorInfo.category !== t(this, 'error_unknown_category') ? errorInfo.category : t(this, 'parse_error_category'),
-                errorDetail: `stdout: ${raw.slice(0, 200)}\nstderr: ${stderr.slice(0, 200)}`
+                errorDetail: safeErrorDetail({ stdout: raw, stderr, settings: this.settings })
             });
         }
     }
@@ -2636,7 +4495,7 @@ class GraphifyRuntimeMethods {
             return { category: t(this, 'error_env_category'), desc: t(this, 'error_python_desc') };
         }
 
-        return { category: t(this, 'error_unknown_category'), desc: stderr.slice(0, 100) || t(this, 'error_unknown_desc') };
+        return { category: t(this, 'error_unknown_category'), desc: redactSensitiveText(stderr, this.settings).slice(0, 100) || t(this, 'error_unknown_desc') };
     }
 
     _showClickableNotice(message, filePath, duration = 6000) {
@@ -2666,6 +4525,7 @@ const { Notice, TFile } = require('obsidian');
 const { MAX_PROCESS_OUTPUT_BYTES } = require('./utils');
 const { DEFAULT_SETTINGS, getDefaultEngineDir, getDefaultPythonPath } = require('./settings');
 const { t } = require('./i18n');
+const { normalizeSettings } = require('./safety');
 
 class LinkDiscoveryMethods {
     scheduleLink(file) {
@@ -2963,7 +4823,7 @@ class LinkDiscoveryMethods {
 
     async loadSettings() {
         const data = await this.loadData() || {};
-        this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
+        this.settings = normalizeSettings(data, DEFAULT_SETTINGS);
         if (!this.settings.graphifyDir) this.settings.graphifyDir = getDefaultEngineDir();
         if (!this.settings.pythonPath) this.settings.pythonPath = getDefaultPythonPath();
         if (this.checkEngineHealth) {
@@ -3157,7 +5017,6 @@ class LinkDiscoveryMethods {
             this.periodicTimer = null;
         }
         this.stopDaemon(false);
-        console.log('[Understory] Plugin unloaded');
     }
 }
 
@@ -3218,8 +5077,10 @@ class SettingsStyleMethods {
     gap: 12px;
     margin-bottom: 12px;
 }
-.understory-settings-header h2 {
+.understory-settings-title {
     margin: 0;
+    font-size: var(--font-ui-large);
+    font-weight: 600;
 }
 .understory-language-toggle {
     display: inline-flex;
@@ -3427,6 +5288,160 @@ class SettingsStyleMethods {
 .understory-folder-setting {
     padding-top: 4px;
     padding-bottom: 4px;
+}
+.understory-engine-panel {
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+    background: var(--background-secondary);
+}
+.understory-engine-summary {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+.understory-engine-badge,
+.understory-engine-check-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 20px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: var(--font-ui-smaller);
+    line-height: 1.2;
+    white-space: nowrap;
+    border: 1px solid var(--background-modifier-border);
+}
+.understory-engine-badge.is-ready,
+.understory-engine-check-pill.is-ok {
+    color: var(--text-success);
+    background: var(--background-primary);
+}
+.understory-engine-badge.is-warning,
+.understory-engine-check-pill.is-warning {
+    color: var(--text-warning);
+    background: var(--background-primary);
+}
+.understory-engine-badge.is-error,
+.understory-engine-check-pill.is-error {
+    color: var(--text-error);
+    background: var(--background-primary);
+}
+.understory-engine-badge.is-unchecked,
+.understory-engine-check-pill.is-skipped,
+.understory-engine-check-pill.is-unknown {
+    color: var(--text-muted);
+    background: var(--background-primary);
+}
+.understory-engine-summary-text {
+    color: var(--text-normal);
+    line-height: 1.4;
+}
+.understory-engine-section {
+    margin-top: 12px;
+}
+.understory-engine-section-title {
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+.understory-engine-kv-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 6px;
+}
+.understory-engine-kv {
+    min-width: 0;
+    padding: 6px 8px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    background: var(--background-primary);
+}
+.understory-engine-kv-label {
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    margin-bottom: 2px;
+}
+.understory-engine-kv-value {
+    color: var(--text-normal);
+    overflow-wrap: anywhere;
+}
+.understory-engine-checks {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 8px;
+}
+.understory-engine-check-group {
+    min-width: 0;
+    padding: 8px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    background: var(--background-primary);
+}
+.understory-engine-check-group-head,
+.understory-engine-check-row,
+.understory-engine-command-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+.understory-engine-check-group-head {
+    justify-content: space-between;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+.understory-engine-check-row {
+    padding: 5px 0;
+    border-top: 1px solid var(--background-modifier-border-hover);
+}
+.understory-engine-check-body {
+    min-width: 0;
+}
+.understory-engine-check-label,
+.understory-engine-fix-title {
+    font-weight: 600;
+}
+.understory-engine-check-detail,
+.understory-engine-check-empty,
+.understory-engine-fix-detail {
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+.understory-engine-path,
+.understory-engine-command {
+    display: inline-block;
+    max-width: 100%;
+    margin-top: 3px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+.understory-engine-fixes {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.understory-engine-fix {
+    padding: 8px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    background: var(--background-primary);
+}
+.understory-engine-fix.is-error {
+    border-color: var(--text-error);
+}
+.understory-engine-fix.is-warning {
+    border-color: var(--text-warning);
+}
+.understory-engine-command-row {
+    margin-top: 6px;
+    justify-content: space-between;
+}
+.understory-engine-command-row button {
+    flex: 0 0 auto;
 }
 `;
     }
@@ -3768,6 +5783,7 @@ const crypto = require('crypto');
 const { Notice, TFile } = require('obsidian');
 const { MAX_PROCESS_OUTPUT_BYTES } = require('./utils');
 const { t } = require('./i18n');
+const { safeErrorDetail } = require('./safety');
 
 const RELATIONS_PATH = '.understory/relations.json';
 const OVERRIDES_PATH = '.understory/link_overrides.json';
@@ -4026,14 +6042,21 @@ class RelationsStore {
                     return;
                 }
                 if (code !== 0) {
-                    reject(new Error(stderr.slice(0, 300) || `api.py exited with code ${code}`));
+                    reject(new Error(safeErrorDetail({
+                        stderr,
+                        message: `api.py exited with code ${code}`,
+                        settings: this.plugin.settings,
+                    })));
                     return;
                 }
                 try {
                     resolve(this._parseProcessJson(stdout));
                 } catch (error) {
-                    const detail = stderr ? ` stderr: ${stderr.slice(0, 200)}` : '';
-                    reject(new Error(`Failed to parse api.py JSON: ${stdout.slice(0, 200)}${detail}`));
+                    reject(new Error(`Failed to parse api.py JSON: ${safeErrorDetail({
+                        stdout,
+                        stderr,
+                        settings: this.plugin.settings,
+                    })}`));
                 }
             });
         });
@@ -4064,6 +6087,27 @@ class RelationsStore {
         }
     }
 
+    _relationSectionHeadings() {
+        return [
+            t(this.plugin, 'related_section_heading'),
+            '## 🏷️ Related notes',
+            '## Related notes',
+            '## 🏷️关联文件',
+            '## 关联文件',
+        ].filter((heading, index, headings) => heading && headings.indexOf(heading) === index);
+    }
+
+    _findRelationSection(content) {
+        let best = null;
+        for (const heading of this._relationSectionHeadings()) {
+            const index = content.indexOf(heading);
+            if (index !== -1 && (!best || index < best.index)) {
+                best = { index, heading };
+            }
+        }
+        return best;
+    }
+
     async insertRelationIntoBody(file, relation) {
         if (!(file instanceof TFile) || !relation) return false;
         const link = `[[${relation.title}]]`;
@@ -4072,17 +6116,17 @@ class RelationsStore {
             new Notice(t(this.plugin, 'insert_duplicate_notice'));
             return false;
         }
-        const anchor = '## 🏷️关联文件';
-        const idx = content.indexOf(anchor);
-        if (idx === -1) {
+        const section = this._findRelationSection(content);
+        if (!section) {
+            const anchor = t(this.plugin, 'related_section_heading');
             content = `${content.replace(/\s+$/, '')}\n\n${anchor}\n\n${t(this.plugin, 'manual_insert_heading')}\n\n${link}\n`;
         } else {
-            const after = content.slice(idx + anchor.length);
+            const after = content.slice(section.index + section.heading.length);
             const nextHeading = after.search(/\n## /);
             if (nextHeading === -1) {
                 content = `${content.replace(/\s+$/, '')}\n${link}\n`;
             } else {
-                const insertAt = idx + anchor.length + nextHeading;
+                const insertAt = section.index + section.heading.length + nextHeading;
                 content = `${content.slice(0, insertAt).replace(/\s+$/, '')}\n${link}\n${content.slice(insertAt)}`;
             }
         }

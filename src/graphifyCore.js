@@ -1,6 +1,7 @@
 const { Notice, TFile } = require('obsidian');
 const { GraphifyContentModal, MAX_LOG_ENTRIES } = require('./utils');
 const { t } = require('./i18n');
+const { canUseWebhook } = require('./safety');
 
 class GraphifyCoreMethods {
     _vaultBasePath() {
@@ -48,20 +49,22 @@ class GraphifyCoreMethods {
             callback: () => this._openOrphansView(),
         });
 
-        // 2. \u4e8b\u4ef6\uff1a\u6587\u4ef6 create/modify \u2192 \u9632\u6296\u89e6\u53d1\u539f\u5219\u63d0\u53d6\uff08\u4e0e\u5173\u8054\u53d1\u73b0\u5e76\u884c\uff0c\u4e92\u4e0d\u5f71\u54cd\uff09
-        this.registerEvent(this.app.vault.on('create', (file) => {
-            if (file && file.extension === 'md' && this.settings.ingestEnabled) {
-                this.scheduleIngest(file);
-            }
-        }));
-        this.registerEvent(this.app.vault.on('modify', (file) => {
-            if (file && file.extension === 'md' && this.settings.ingestEnabled) {
-                this.scheduleIngest(file);
-            }
-        }));
+        // 2. \u4e8b\u4ef6\uff1a\u7b49 workspace ready \u540e\u518d\u76d1\u542c vault create/modify\uff0c\u907f\u514d\u51b7\u542f\u52a8\u65f6\u54cd\u5e94\u521d\u59cb\u626b\u63cf\u4e8b\u4ef6
+        this._runWhenWorkspaceReady(() => {
+            this.registerEvent(this.app.vault.on('create', (file) => {
+                if (file && file.extension === 'md' && this.settings.ingestEnabled) {
+                    this.scheduleIngest(file);
+                }
+            }));
+            this.registerEvent(this.app.vault.on('modify', (file) => {
+                if (file && file.extension === 'md' && this.settings.ingestEnabled) {
+                    this.scheduleIngest(file);
+                }
+            }));
 
-        // 3. \u51b7\u542f\u52a8\u53cb\u597d\uff1a\u5ef6\u8fdf 5s \u68c0\u67e5 .understory \u9aa8\u67b6\uff0c\u518d\u5ef6\u8fdf 60s \u542f\u52a8\u5b9a\u65f6\u5668
-        window.setTimeout(() => this._lazyInitGraphify(), 5000);
+            // 3. \u51b7\u542f\u52a8\u53cb\u597d\uff1a\u5ef6\u8fdf 5s \u68c0\u67e5 .understory \u9aa8\u67b6\uff0c\u518d\u5ef6\u8fdf 60s \u542f\u52a8\u5b9a\u65f6\u5668
+            window.setTimeout(() => this._lazyInitGraphify(), 5000);
+        });
     }
 
     async _lazyInitGraphify() {
@@ -199,7 +202,7 @@ class GraphifyCoreMethods {
             await step('graph_analyzer.py', 3 * 60 * 1000, 'graph');
             await step('index_generator.py', 60 * 1000, 'index');
             const notifyArgs = ['--vault', base];
-            if (this.settings.webhookEnabled && this.settings.webhookUrl && (this.settings.networkMode || 'local') !== 'local') {
+            if (canUseWebhook(this.settings)) {
                 notifyArgs.push('--webhook', this.settings.webhookUrl);
                 notifyArgs.push('--webhook-type', this.settings.webhookType || 'slack');
                 notifyArgs.push('--webhook-enabled');

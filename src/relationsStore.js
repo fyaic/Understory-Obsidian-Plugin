@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const { Notice, TFile } = require('obsidian');
 const { MAX_PROCESS_OUTPUT_BYTES } = require('./utils');
 const { t } = require('./i18n');
+const { safeErrorDetail } = require('./safety');
 
 const RELATIONS_PATH = '.understory/relations.json';
 const OVERRIDES_PATH = '.understory/link_overrides.json';
@@ -260,14 +261,21 @@ class RelationsStore {
                     return;
                 }
                 if (code !== 0) {
-                    reject(new Error(stderr.slice(0, 300) || `api.py exited with code ${code}`));
+                    reject(new Error(safeErrorDetail({
+                        stderr,
+                        message: `api.py exited with code ${code}`,
+                        settings: this.plugin.settings,
+                    })));
                     return;
                 }
                 try {
                     resolve(this._parseProcessJson(stdout));
                 } catch (error) {
-                    const detail = stderr ? ` stderr: ${stderr.slice(0, 200)}` : '';
-                    reject(new Error(`Failed to parse api.py JSON: ${stdout.slice(0, 200)}${detail}`));
+                    reject(new Error(`Failed to parse api.py JSON: ${safeErrorDetail({
+                        stdout,
+                        stderr,
+                        settings: this.plugin.settings,
+                    })}`));
                 }
             });
         });
@@ -298,6 +306,27 @@ class RelationsStore {
         }
     }
 
+    _relationSectionHeadings() {
+        return [
+            t(this.plugin, 'related_section_heading'),
+            '## 🏷️ Related notes',
+            '## Related notes',
+            '## 🏷️关联文件',
+            '## 关联文件',
+        ].filter((heading, index, headings) => heading && headings.indexOf(heading) === index);
+    }
+
+    _findRelationSection(content) {
+        let best = null;
+        for (const heading of this._relationSectionHeadings()) {
+            const index = content.indexOf(heading);
+            if (index !== -1 && (!best || index < best.index)) {
+                best = { index, heading };
+            }
+        }
+        return best;
+    }
+
     async insertRelationIntoBody(file, relation) {
         if (!(file instanceof TFile) || !relation) return false;
         const link = `[[${relation.title}]]`;
@@ -306,17 +335,17 @@ class RelationsStore {
             new Notice(t(this.plugin, 'insert_duplicate_notice'));
             return false;
         }
-        const anchor = '## 🏷️关联文件';
-        const idx = content.indexOf(anchor);
-        if (idx === -1) {
+        const section = this._findRelationSection(content);
+        if (!section) {
+            const anchor = t(this.plugin, 'related_section_heading');
             content = `${content.replace(/\s+$/, '')}\n\n${anchor}\n\n${t(this.plugin, 'manual_insert_heading')}\n\n${link}\n`;
         } else {
-            const after = content.slice(idx + anchor.length);
+            const after = content.slice(section.index + section.heading.length);
             const nextHeading = after.search(/\n## /);
             if (nextHeading === -1) {
                 content = `${content.replace(/\s+$/, '')}\n${link}\n`;
             } else {
-                const insertAt = idx + anchor.length + nextHeading;
+                const insertAt = section.index + section.heading.length + nextHeading;
                 content = `${content.slice(0, insertAt).replace(/\s+$/, '')}\n${link}\n${content.slice(insertAt)}`;
             }
         }

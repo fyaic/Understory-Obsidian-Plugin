@@ -7,4 +7,5 @@ Thumbs.db
 *.log
 dist/
 tmp/
-
+.serena/
+.spec-workflow/

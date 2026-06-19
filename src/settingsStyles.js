@@ -10,8 +10,10 @@ class SettingsStyleMethods {
     gap: 12px;
     margin-bottom: 12px;
 }
-.understory-settings-header h2 {
+.understory-settings-title {
     margin: 0;
+    font-size: var(--font-ui-large);
+    font-weight: 600;
 }
 .understory-language-toggle {
     display: inline-flex;
@@ -219,6 +221,160 @@ class SettingsStyleMethods {
 .understory-folder-setting {
     padding-top: 4px;
     padding-bottom: 4px;
+}
+.understory-engine-panel {
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+    background: var(--background-secondary);
+}
+.understory-engine-summary {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+.understory-engine-badge,
+.understory-engine-check-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 20px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: var(--font-ui-smaller);
+    line-height: 1.2;
+    white-space: nowrap;
+    border: 1px solid var(--background-modifier-border);
+}
+.understory-engine-badge.is-ready,
+.understory-engine-check-pill.is-ok {
+    color: var(--text-success);
+    background: var(--background-primary);
+}
+.understory-engine-badge.is-warning,
+.understory-engine-check-pill.is-warning {
+    color: var(--text-warning);
+    background: var(--background-primary);
+}
+.understory-engine-badge.is-error,
+.understory-engine-check-pill.is-error {
+    color: var(--text-error);
+    background: var(--background-primary);
+}
+.understory-engine-badge.is-unchecked,
+.understory-engine-check-pill.is-skipped,
+.understory-engine-check-pill.is-unknown {
+    color: var(--text-muted);
+    background: var(--background-primary);
+}
+.understory-engine-summary-text {
+    color: var(--text-normal);
+    line-height: 1.4;
+}
+.understory-engine-section {
+    margin-top: 12px;
+}
+.understory-engine-section-title {
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+.understory-engine-kv-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 6px;
+}
+.understory-engine-kv {
+    min-width: 0;
+    padding: 6px 8px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    background: var(--background-primary);
+}
+.understory-engine-kv-label {
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    margin-bottom: 2px;
+}
+.understory-engine-kv-value {
+    color: var(--text-normal);
+    overflow-wrap: anywhere;
+}
+.understory-engine-checks {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 8px;
+}
+.understory-engine-check-group {
+    min-width: 0;
+    padding: 8px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    background: var(--background-primary);
+}
+.understory-engine-check-group-head,
+.understory-engine-check-row,
+.understory-engine-command-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+.understory-engine-check-group-head {
+    justify-content: space-between;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+.understory-engine-check-row {
+    padding: 5px 0;
+    border-top: 1px solid var(--background-modifier-border-hover);
+}
+.understory-engine-check-body {
+    min-width: 0;
+}
+.understory-engine-check-label,
+.understory-engine-fix-title {
+    font-weight: 600;
+}
+.understory-engine-check-detail,
+.understory-engine-check-empty,
+.understory-engine-fix-detail {
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+.understory-engine-path,
+.understory-engine-command {
+    display: inline-block;
+    max-width: 100%;
+    margin-top: 3px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+.understory-engine-fixes {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.understory-engine-fix {
+    padding: 8px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    background: var(--background-primary);
+}
+.understory-engine-fix.is-error {
+    border-color: var(--text-error);
+}
+.understory-engine-fix.is-warning {
+    border-color: var(--text-warning);
+}
+.understory-engine-command-row {
+    margin-top: 6px;
+    justify-content: space-between;
+}
+.understory-engine-command-row button {
+    flex: 0 0 auto;
 }
 `;
     }

@@ -2,6 +2,7 @@ const { Notice, TFile } = require('obsidian');
 const { MAX_PROCESS_OUTPUT_BYTES } = require('./utils');
 const { DEFAULT_SETTINGS, getDefaultEngineDir, getDefaultPythonPath } = require('./settings');
 const { t } = require('./i18n');
+const { normalizeSettings } = require('./safety');
 
 class LinkDiscoveryMethods {
     scheduleLink(file) {
@@ -299,7 +300,7 @@ class LinkDiscoveryMethods {
 
     async loadSettings() {
         const data = await this.loadData() || {};
-        this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
+        this.settings = normalizeSettings(data, DEFAULT_SETTINGS);
         if (!this.settings.graphifyDir) this.settings.graphifyDir = getDefaultEngineDir();
         if (!this.settings.pythonPath) this.settings.pythonPath = getDefaultPythonPath();
         if (this.checkEngineHealth) {
@@ -493,7 +494,6 @@ class LinkDiscoveryMethods {
             this.periodicTimer = null;
         }
         this.stopDaemon(false);
-        console.log('[Understory] Plugin unloaded');
     }
 }
 

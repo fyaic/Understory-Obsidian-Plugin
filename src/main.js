@@ -4,6 +4,7 @@ const { registerCoreCommands } = require('./commands');
 const graphifyLayer = require('./graphifyLayer');
 const linkDiscoveryMethods = require('./linkDiscovery');
 const { RelationsStore } = require('./relationsStore');
+const { createAgentApi } = require('./agentApi');
 const { UnderstorySidebarView, VIEW_TYPE_UNDERSTORY_SIDEBAR, UNDERSTORY_ICON } = require('./sidebarView');
 const { t } = require('./i18n');
 
@@ -13,6 +14,12 @@ class UnderstoryPlugin extends Plugin {
 
         this.timers = new Map();
         this.relationsStore = new RelationsStore(this);
+        this.agentApi = createAgentApi({
+            app: this.app,
+            settings: this.settings,
+            relationsStore: this.relationsStore,
+            plugin: this,
+        });
 
         this.addSettingTab(new UnderstorySettingTab(this.app, this));
         this.registerView(
@@ -29,41 +36,45 @@ class UnderstoryPlugin extends Plugin {
         this.refreshTimer = null;
         this.daemonProcess = null;
 
-        this.registerEvent(this.app.vault.on('create', (file) => {
-            if (file.extension === 'md') this.scheduleLink(file);
-        }));
-        this.registerEvent(this.app.vault.on('delete', (file) => {
-            this._clearScheduledLink(file?.path);
-        }));
-        this.registerEvent(this.app.vault.on('rename', (file, oldPath) => {
-            this._clearScheduledLink(oldPath);
-            if (file?.extension === 'md') {
-                this._clearScheduledLink(file.path);
-            }
-        }));
-
-        if (this.settings.autoRefreshEnabled) {
-            this.checkAndStartRefresh();
-        }
-
-        if (this.settings.daemonEnabled) {
-            await this.startDaemon();
-        }
-
         this.ingestTimers = new Map();
         this.periodicTimer = null;
         this._initGraphifyAI();
 
-        const attachSidebar = () => this.ensureSidebarLeaf({ reveal: !!this.settings.openSidebarOnLoad })
-            .catch((error) => console.warn('[Understory] Failed to attach sidebar view:', error));
-        if (this.app.workspace.onLayoutReady) {
-            this.app.workspace.onLayoutReady(attachSidebar);
-        } else {
-            window.setTimeout(attachSidebar, 1000);
-        }
+        this._runWhenWorkspaceReady(() => {
+            this.registerEvent(this.app.vault.on('create', (file) => {
+                if (file.extension === 'md') this.scheduleLink(file);
+            }));
+            this.registerEvent(this.app.vault.on('delete', (file) => {
+                this._clearScheduledLink(file?.path);
+            }));
+            this.registerEvent(this.app.vault.on('rename', (file, oldPath) => {
+                this._clearScheduledLink(oldPath);
+                if (file?.extension === 'md') {
+                    this._clearScheduledLink(file.path);
+                }
+            }));
 
-        console.log('[Understory] Plugin loaded');
+            if (this.settings.autoRefreshEnabled) {
+                this.checkAndStartRefresh();
+            }
+
+            if (this.settings.daemonEnabled) {
+                this.startDaemon().catch((error) => console.warn('[Understory] Failed to start daemon:', error));
+            }
+
+            this.ensureSidebarLeaf({ reveal: !!this.settings.openSidebarOnLoad })
+                .catch((error) => console.warn('[Understory] Failed to attach sidebar view:', error));
+        });
+
         new Notice(t(this, 'plugin_enabled'));
+    }
+
+    _runWhenWorkspaceReady(callback) {
+        if (this.app.workspace.onLayoutReady) {
+            this.app.workspace.onLayoutReady(callback);
+        } else {
+            window.setTimeout(callback, 1000);
+        }
     }
 
     async ensureSidebarLeaf({ reveal = false } = {}) {

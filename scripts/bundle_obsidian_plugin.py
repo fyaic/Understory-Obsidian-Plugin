@@ -10,6 +10,9 @@ from pathlib import Path
 MODULES = [
     "main.js",
     "i18n.js",
+    "safety.js",
+    "agentApi.js",
+    "engineHealth.js",
     "settings.js",
     "commands.js",
     "graphifyLayer.js",
