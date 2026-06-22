@@ -122,6 +122,37 @@ test('getRelations treats RelationsStore-style 16 character hashes as fresh', as
     assert.equal(current.data.stale, false);
 });
 
+test('Vault-as-API read tools return scoped snippets and relation context', async (t) => {
+    const vaultPath = await createVault(t);
+    await seedRelations(vaultPath, 'Notes/Source.md', '# Source\n\nMemory architecture connects local notes without scanning every file.');
+    await writeVaultFile(vaultPath, 'Notes/Target.md', '# Target\n\nTarget note explains the memory graph and local API boundaries.');
+    const api = createAgentApi({ vaultPath });
+
+    const capabilities = await api.getCapabilities();
+    assert.equal(capabilities.ok, true);
+    assert.equal(capabilities.data.privacy.opensHttpPort, false);
+    assert.ok(capabilities.data.tools.read.includes('understory_search'));
+
+    const search = await api.search({ query: 'memory graph', limit: 5 });
+    assert.equal(search.ok, true);
+    assert.equal(search.data.mode, 'local_keyword_relations');
+    assert.ok(search.data.results.length >= 1);
+    assert.ok(search.data.results[0].snippet.length < 260);
+    assert.ok(search.data.results[0].why);
+
+    const brief = await api.getNoteBrief({ notePath: 'Notes/Source.md' });
+    assert.equal(brief.ok, true);
+    assert.equal(brief.data.bodyIncluded, false);
+    assert.equal(brief.data.relationCount, 1);
+    assert.equal(brief.data.relations[0].target, 'Notes/Target.md');
+
+    const context = await api.getContext({ notePath: 'Notes/Source.md', limit: 3 });
+    assert.equal(context.ok, true);
+    assert.equal(context.data.bodyIncluded, false);
+    assert.equal(context.data.mode, 'note_relations_context');
+    assert.ok(context.data.items.some((item) => item.path === 'Notes/Target.md'));
+});
+
 test('acceptRelation and rejectRelation update relation state and tombstones', async (t) => {
     const vaultPath = await createVault(t);
     await seedRelations(vaultPath, 'Notes/Source.md');

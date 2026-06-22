@@ -1,4 +1,14 @@
-const { PluginSettingTab, Setting, Notice, TFile } = require('obsidian');
+const { PluginSettingTab, Setting, Notice, TFile, setIcon } = require('obsidian');
+const { UNDERSTORY_SETTINGS_LOGO_DATA_URI } = require('./brandAssets');
+const {
+    USAGE_MODES,
+    agentProfilesForLanguage,
+    checkAgentAccessStatus,
+    createAgentAccessPaths,
+    createAgentSetupPack,
+    createStandaloneMcpServerSource,
+    writeAgentAccessFile,
+} = require('./agentAccess');
 const { getLanguage, t } = require('./i18n');
 
 const ENGINE_DIR_ENV = 'UNDERSTORY_ENGINE_DIR';
@@ -59,6 +69,8 @@ const DEFAULT_SETTINGS = {
     linkLog: [],
     uiLanguage: 'en',
     networkMode: 'local',
+    agentProfileId: 'generic',
+    agentUsageModeId: 'memory',
     embeddingProvider: 'zhipu',
     embeddingBaseUrl: PROVIDER_PRESETS.zhipu.baseUrl,
     embeddingModel: PROVIDER_PRESETS.zhipu.embeddingModel,
@@ -73,7 +85,6 @@ const DEFAULT_SETTINGS = {
     sidebarShowScores: true,
     sidebarShowConflicts: true,
     sidebarGroupBy: 'concept',
-    openSidebarOnLoad: false,
     // AIC-2104: 持续自动更新开关
     autoRefreshEnabled: false,
     // AIC-2105: 文件夹白名单（空数组表示全部）
@@ -132,12 +143,173 @@ class UnderstorySettingTab extends PluginSettingTab {
         this._injectStyles(containerEl);
 
         const header = containerEl.createDiv({ cls: 'understory-settings-header' });
-        header.createDiv({ text: t(this.plugin, 'settings_title'), cls: 'understory-settings-title' });
+        const brand = header.createDiv({ cls: 'understory-settings-brand' });
+        const logo = brand.createEl('img', { cls: 'understory-settings-logo' });
+        logo.setAttribute('src', UNDERSTORY_SETTINGS_LOGO_DATA_URI);
+        logo.setAttribute('alt', 'Understory logo');
+        brand.createDiv({ text: t(this.plugin, 'settings_title'), cls: 'understory-settings-title' });
         this._renderLanguageToggle(header);
+
+        const tabIds = this._settingsTabs().map((tab) => tab.id);
+        const activeTab = tabIds.includes(this._activeSettingsTab) ? this._activeSettingsTab : 'setup';
+        this._activeSettingsTab = activeTab;
+        this._renderSettingsTabs(containerEl, activeTab);
+        const pageEl = containerEl.createDiv({ cls: 'understory-settings-page' });
+
+        if (activeTab === 'models') {
+            this._renderModelsTab(pageEl);
+        } else if (activeTab === 'suggestions') {
+            this._renderSuggestionsTab(pageEl);
+        } else if (activeTab === 'agents') {
+            this._renderAgentAccessTab(pageEl);
+        } else if (activeTab === 'maintenance') {
+            this._renderMaintenanceTab(pageEl);
+        } else {
+            this._activeSettingsTab = 'setup';
+            this._renderSetupTab(pageEl);
+        }
+    }
+
+    _settingsTabs() {
+        return [
+            { id: 'setup', label: t(this.plugin, 'settings_tab_setup') },
+            { id: 'models', label: t(this.plugin, 'settings_tab_models') },
+            { id: 'suggestions', label: t(this.plugin, 'settings_tab_suggestions') },
+            { id: 'maintenance', label: t(this.plugin, 'settings_tab_maintenance') },
+            { id: 'agents', label: t(this.plugin, 'settings_tab_agents') },
+        ];
+    }
+
+    _renderSettingsTabs(containerEl, activeTab) {
+        const toggle = containerEl.createDiv({ cls: 'understory-settings-toggle' });
+        toggle.createDiv({
+            cls: 'understory-settings-toggle-label',
+            text: t(this.plugin, 'settings_page_toggle_label'),
+        });
+
+        const tabs = this._settingsTabs();
+        const tablist = toggle.createDiv({ cls: 'understory-settings-tablist' });
+        tablist.setAttribute('role', 'tablist');
+        tablist.setAttribute('aria-label', t(this.plugin, 'settings_page_toggle_label'));
+
+        for (const tab of tabs) {
+            const isActive = tab.id === activeTab;
+            const button = tablist.createEl('button', {
+                text: tab.label,
+                cls: `understory-settings-toggle-button${isActive ? ' is-active' : ''}`,
+            });
+            button.type = 'button';
+            button.tabIndex = isActive ? 0 : -1;
+            button.setAttribute('role', 'tab');
+            button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            button.setAttribute('data-settings-page', tab.id);
+            button.addEventListener('click', () => {
+                this._activeSettingsTab = tab.id;
+                this.display();
+            });
+            button.addEventListener('keydown', (event) => {
+                const currentIndex = tabs.findIndex((candidate) => candidate.id === tab.id);
+                const delta = event.key === 'ArrowRight' || event.key === 'ArrowDown'
+                    ? 1
+                    : event.key === 'ArrowLeft' || event.key === 'ArrowUp'
+                        ? -1
+                        : 0;
+                if (!delta) return;
+                event.preventDefault?.();
+                const nextIndex = (currentIndex + delta + tabs.length) % tabs.length;
+                this._activeSettingsTab = tabs[nextIndex].id;
+                this.display();
+            });
+        }
+    }
+
+    _renderTabIntro(containerEl, titleKey, descKey) {
+        const intro = containerEl.createDiv({ cls: 'understory-tab-intro' });
+        intro.createDiv({ text: t(this.plugin, titleKey), cls: 'understory-tab-intro-title' });
+        intro.createDiv({ text: t(this.plugin, descKey), cls: 'understory-tab-intro-desc' });
+    }
+
+    _setupStatusInfo() {
+        const health = this.plugin.engineHealth;
+        const engineDir = String(this.plugin.settings.graphifyDir || '').trim();
+        if (!engineDir) {
+            return {
+                status: 'needed',
+                title: t(this.plugin, 'setup_needed_title'),
+                desc: t(this.plugin, 'setup_needed_desc'),
+            };
+        }
+        if (!health) {
+            return {
+                status: 'unchecked',
+                title: t(this.plugin, 'setup_unchecked_title'),
+                desc: t(this.plugin, 'setup_unchecked_desc'),
+            };
+        }
+        if (health.status === 'ready') {
+            return {
+                status: 'ready',
+                title: t(this.plugin, 'setup_ready_title'),
+                desc: t(this.plugin, 'setup_ready_desc'),
+            };
+        }
+        if (health.status === 'warning') {
+            return {
+                status: 'warning',
+                title: t(this.plugin, 'setup_warning_title'),
+                desc: health.message || t(this.plugin, 'setup_warning_desc'),
+            };
+        }
+        return {
+            status: 'error',
+            title: t(this.plugin, 'setup_error_title'),
+            desc: health.message || t(this.plugin, 'setup_error_desc'),
+        };
+    }
+
+    _renderSetupSteps(containerEl) {
+        const steps = [
+            [t(this.plugin, 'setup_step_engine_title'), t(this.plugin, 'setup_step_engine_desc')],
+            [t(this.plugin, 'setup_step_python_title'), t(this.plugin, 'setup_step_python_desc')],
+            [t(this.plugin, 'setup_step_check_title'), t(this.plugin, 'setup_step_check_desc')],
+        ];
+        this._renderNumberedSteps(containerEl, steps);
+    }
+
+    _renderNumberedSteps(containerEl, steps) {
+        const list = containerEl.createDiv({ cls: 'understory-setup-steps' });
+        for (let index = 0; index < steps.length; index += 1) {
+            const [title, desc] = steps[index];
+            const row = list.createDiv({ cls: 'understory-setup-step' });
+            row.createDiv({ text: String(index + 1), cls: 'understory-setup-step-number' });
+            const body = row.createDiv({ cls: 'understory-setup-step-body' });
+            body.createDiv({ text: title, cls: 'understory-setup-step-title' });
+            body.createDiv({ text: desc, cls: 'understory-setup-step-desc' });
+        }
+    }
+
+    _renderAgentMultiVaultSteps(containerEl) {
+        const steps = [
+            [t(this.plugin, 'agent_multi_vault_step_open_title'), t(this.plugin, 'agent_multi_vault_step_open_desc')],
+            [t(this.plugin, 'agent_multi_vault_step_prepare_title'), t(this.plugin, 'agent_multi_vault_step_prepare_desc')],
+            [t(this.plugin, 'agent_multi_vault_step_copy_title'), t(this.plugin, 'agent_multi_vault_step_copy_desc')],
+        ];
+        this._renderNumberedSteps(containerEl, steps);
+    }
+
+    _renderSetupTab(containerEl) {
+        this._renderTabIntro(containerEl, 'setup_page_title', 'setup_page_desc');
+
+        const info = this._setupStatusInfo();
+        const card = containerEl.createDiv({ cls: `understory-setup-card is-${info.status}` });
+        card.createDiv({ text: info.title, cls: 'understory-setup-card-title' });
+        card.createDiv({ text: info.desc, cls: 'understory-setup-card-desc' });
+
+        this._renderSetupSteps(containerEl);
 
         new Setting(containerEl)
             .setName(t(this.plugin, 'engine_dir_name'))
-            .setDesc(t(this.plugin, 'engine_dir_desc'))
+            .setDesc(t(this.plugin, 'engine_dir_user_desc'))
             .addText((text) => text
                 .setPlaceholder(t(this.plugin, 'engine_dir_placeholder'))
                 .setValue(this.plugin.settings.graphifyDir)
@@ -148,7 +320,7 @@ class UnderstorySettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName(t(this.plugin, 'python_path_name'))
-            .setDesc(t(this.plugin, 'python_path_desc'))
+            .setDesc(t(this.plugin, 'python_path_user_desc'))
             .addText((text) => text
                 .setPlaceholder('python')
                 .setValue(this.plugin.settings.pythonPath)
@@ -157,8 +329,45 @@ class UnderstorySettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
-        this._renderEngineStatus(containerEl);
+        new Setting(containerEl)
+            .setName(t(this.plugin, 'setup_check_name'))
+            .setDesc(t(this.plugin, 'setup_check_desc'))
+            .addButton((button) => button
+                .setButtonText(t(this.plugin, 'engine_check_button'))
+                .setCta()
+                .onClick(async () => {
+                    if (!this.plugin.checkEngineHealth) {
+                        new Notice(t(this.plugin, 'engine_check_unavailable'));
+                        return;
+                    }
+                    await this.plugin.checkEngineHealth(true, true);
+                    this.display();
+                }))
+            .addButton((button) => button
+                .setButtonText(t(this.plugin, 'engine_use_env_button'))
+                .setDisabled(!getDefaultEngineDir())
+                .onClick(async () => {
+                    this.plugin.settings.graphifyDir = getDefaultEngineDir();
+                    this.plugin.settings.pythonPath = getDefaultPythonPath();
+                    await this.plugin.saveSettings();
+                    await this.plugin.checkEngineHealth?.(true, true);
+                    this.display();
+                }))
+            .addButton((button) => button
+                .setButtonText(t(this.plugin, 'setup_open_diagnostics_button'))
+                .onClick(() => {
+                    this._activeSettingsTab = 'maintenance';
+                    this.display();
+                }));
+    }
+
+    _renderModelsTab(containerEl) {
+        this._renderTabIntro(containerEl, 'models_page_title', 'models_page_desc');
         this._renderPrivacySettings(containerEl);
+    }
+
+    _renderSuggestionsTab(containerEl) {
+        this._renderTabIntro(containerEl, 'suggestions_page_title', 'suggestions_page_desc');
 
         new Setting(containerEl)
             .setName(t(this.plugin, 'debounce_name'))
@@ -172,15 +381,15 @@ class UnderstorySettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
-        containerEl.createEl('h3', { text: t(this.plugin, 'excluded_folders_title') });
-        containerEl.createEl('div', {
+        containerEl.createDiv({ text: t(this.plugin, 'excluded_folders_title'), cls: 'understory-section-title-text' });
+        containerEl.createDiv({
             text: t(this.plugin, 'excluded_folders_desc'),
             cls: 'setting-item-description'
         }).style.marginBottom = '8px';
         this._renderFolderTree(containerEl, 'excludedFolders', 'refreshFolders', t(this.plugin, 'excluded_selected'));
 
-        containerEl.createEl('h3', { text: t(this.plugin, 'relation_title') });
-        containerEl.createEl('div', {
+        containerEl.createDiv({ text: t(this.plugin, 'relation_title'), cls: 'understory-section-title-text' });
+        containerEl.createDiv({
             text: t(this.plugin, 'relation_desc'),
             cls: 'setting-item-description'
         }).style.marginBottom = '8px';
@@ -199,16 +408,6 @@ class UnderstorySettingTab extends PluginSettingTab {
                     if (value === 'sidebar' || value === 'both') {
                         await this.plugin.openSidebar();
                     }
-                }));
-
-        new Setting(containerEl)
-            .setName(t(this.plugin, 'open_sidebar_on_load_name'))
-            .setDesc(t(this.plugin, 'open_sidebar_on_load_desc'))
-            .addToggle((toggle) => toggle
-                .setValue(!!this.plugin.settings.openSidebarOnLoad)
-                .onChange(async (value) => {
-                    this.plugin.settings.openSidebarOnLoad = value;
-                    await this.plugin.saveSettings();
                 }));
 
         new Setting(containerEl)
@@ -252,6 +451,10 @@ class UnderstorySettingTab extends PluginSettingTab {
                     this.plugin.settings.ingestEnabled = value;
                     await this.plugin.saveSettings();
                 }));
+    }
+
+    _renderMaintenanceTab(containerEl) {
+        this._renderTabIntro(containerEl, 'maintenance_page_title', 'maintenance_page_desc');
 
         new Setting(containerEl)
             .setName(t(this.plugin, 'lint_name'))
@@ -345,7 +548,7 @@ class UnderstorySettingTab extends PluginSettingTab {
             const lastLint = this.plugin.settings.lastLintTime;
             const openHigh = this.plugin._countOpenConflicts ? this.plugin._countOpenConflicts('high') : 0;
             const openAll = this.plugin._countOpenConflicts ? this.plugin._countOpenConflicts() : 0;
-            containerEl.createEl('div', {
+            containerEl.createDiv({
                 text: lastLint > 0
                     ? t(this.plugin, 'last_lint', { time: new Date(lastLint).toLocaleString(), all: openAll, high: openHigh })
                     : t(this.plugin, 'last_lint_never'),
@@ -377,14 +580,14 @@ class UnderstorySettingTab extends PluginSettingTab {
                     .onClick(() => this.plugin._openGraphifyIndex()));
         }
 
-        containerEl.createEl('h4', { text: t(this.plugin, 'relation_logs_title') });
-        containerEl.createEl('div', {
+        containerEl.createDiv({ text: t(this.plugin, 'relation_logs_title'), cls: 'understory-section-title-text' });
+        containerEl.createDiv({
             text: t(this.plugin, 'relation_logs_desc'),
             cls: 'setting-item-description'
         }).style.marginBottom = '8px';
         this._renderLogs(containerEl);
 
-        containerEl.createEl('h3', { text: t(this.plugin, 'refresh_title') });
+        containerEl.createDiv({ text: t(this.plugin, 'refresh_title'), cls: 'understory-section-title-text' });
 
         new Setting(containerEl)
             .setName(t(this.plugin, 'auto_refresh_name'))
@@ -411,16 +614,16 @@ class UnderstorySettingTab extends PluginSettingTab {
                         await this.plugin.saveSettings();
                     }));
 
-            containerEl.createEl('h4', { text: t(this.plugin, 'refresh_folders_title') });
-            containerEl.createEl('div', {
+            containerEl.createDiv({ text: t(this.plugin, 'refresh_folders_title'), cls: 'understory-section-subtitle-text' });
+            containerEl.createDiv({
                 text: t(this.plugin, 'refresh_folders_desc'),
                 cls: 'setting-item-description'
             }).style.marginBottom = '8px';
             this._renderFolderTree(containerEl, 'refreshFolders', 'excludedFolders', t(this.plugin, 'refresh_selected'));
 
             const lastRefresh = this.plugin.settings.lastRefreshTime;
-            containerEl.createEl('h4', { text: t(this.plugin, 'refresh_status_title') });
-            containerEl.createEl('div', {
+            containerEl.createDiv({ text: t(this.plugin, 'refresh_status_title'), cls: 'understory-section-subtitle-text' });
+            containerEl.createDiv({
                 text: lastRefresh > 0
                     ? t(this.plugin, 'last_refresh', { time: new Date(lastRefresh).toLocaleString() })
                     : t(this.plugin, 'last_refresh_never'),
@@ -430,7 +633,7 @@ class UnderstorySettingTab extends PluginSettingTab {
             if (this.plugin.settings.refreshInProgress) {
                 const idx = this.plugin.settings.refreshQueueIndex || 0;
                 const total = (this.plugin.settings.refreshQueue || []).length;
-                containerEl.createEl('div', {
+                containerEl.createDiv({
                     text: t(this.plugin, 'refresh_progress', { current: idx, total }),
                     cls: 'setting-item-description'
                 }).style.marginBottom = '6px';
@@ -456,8 +659,8 @@ class UnderstorySettingTab extends PluginSettingTab {
                 });
         }
 
-        containerEl.createEl('h3', { text: t(this.plugin, 'advanced_index_title') });
-        containerEl.createEl('div', {
+        containerEl.createDiv({ text: t(this.plugin, 'advanced_index_title'), cls: 'understory-section-title-text' });
+        containerEl.createDiv({
             text: t(this.plugin, 'advanced_index_desc'),
             cls: 'setting-item-description'
         }).style.marginBottom = '8px';
@@ -491,7 +694,7 @@ class UnderstorySettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
-        containerEl.createEl('div', {
+        containerEl.createDiv({
             text: this.plugin.daemonProcess
                 ? t(this.plugin, 'daemon_running')
                 : (this.plugin.settings.daemonEnabled
@@ -499,6 +702,249 @@ class UnderstorySettingTab extends PluginSettingTab {
                     : t(this.plugin, 'daemon_stopped')),
             cls: 'setting-item-description'
         }).style.marginBottom = '8px';
+
+        containerEl.createDiv({ text: t(this.plugin, 'maintenance_diagnostics_title'), cls: 'understory-section-title-text' });
+        containerEl.createDiv({
+            text: t(this.plugin, 'maintenance_diagnostics_desc'),
+            cls: 'setting-item-description'
+        }).style.marginBottom = '8px';
+        this._renderEngineStatus(containerEl);
+    }
+
+    _agentAccessContext() {
+        const paths = createAgentAccessPaths(this.app || this.plugin.app);
+        return {
+            ...paths,
+            agentProfileId: this.plugin.settings.agentProfileId || 'generic',
+            usageModeId: this.plugin.settings.agentUsageModeId || 'memory',
+            engineDir: this.plugin.settings.graphifyDir || getDefaultEngineDir(),
+            networkMode: this.plugin.settings.networkMode || 'local',
+            pluginVersion: this.plugin.manifest && this.plugin.manifest.version,
+            pythonPath: this.plugin.settings.pythonPath || getDefaultPythonPath(),
+        };
+    }
+
+    _renderAgentPreview(containerEl, text, language) {
+        const preview = containerEl.createEl('pre', { cls: 'understory-agent-preview' });
+        preview.setAttribute('data-language', language || 'text');
+        const code = preview.createEl('code');
+        code.setText(text);
+        return preview;
+    }
+
+    _renderAgentInstallNotes(containerEl, text) {
+        const notes = containerEl.createDiv({ cls: 'understory-agent-quote-block understory-agent-install-notes' });
+        for (const line of String(text || '').split(/\r?\n/).filter(Boolean)) {
+            notes.createDiv({ text: line, cls: 'understory-agent-install-note-line' });
+        }
+        return notes;
+    }
+
+    _renderAgentStep(containerEl, step, titleKey, descKey) {
+        const section = containerEl.createDiv({ cls: 'understory-agent-step' });
+        section.createDiv({
+            text: t(this.plugin, 'agent_step_label', { step }),
+            cls: 'understory-agent-step-label',
+        });
+        section.createDiv({ text: t(this.plugin, titleKey), cls: 'understory-section-title-text' });
+        section.createDiv({
+            text: t(this.plugin, descKey),
+            cls: 'setting-item-description',
+        }).style.marginBottom = '8px';
+        return section;
+    }
+
+    _renderAgentIdentityGrid(containerEl, context, vaultIdentity) {
+        const status = checkAgentAccessStatus(context);
+        const serverCheck = status.checks.find((check) => check.key === 'mcpServerPath');
+        const items = [
+            {
+                label: t(this.plugin, 'agent_identity_vault_name_label'),
+                value: vaultIdentity.vaultName,
+                ok: !!vaultIdentity.vaultName,
+            },
+            {
+                label: t(this.plugin, 'agent_identity_server_key_label'),
+                value: vaultIdentity.serverKey,
+                ok: !!vaultIdentity.serverKey,
+            },
+            {
+                label: t(this.plugin, 'agent_identity_vault_path_label'),
+                value: vaultIdentity.vaultPath || t(this.plugin, 'agent_status_not_available'),
+                ok: !!vaultIdentity.vaultPath,
+            },
+            {
+                label: t(this.plugin, 'agent_identity_export_status_label'),
+                value: context.mcpServerPath,
+                ok: !!(serverCheck && serverCheck.ok),
+            },
+        ];
+
+        const list = containerEl.createDiv({ cls: 'understory-agent-quote-block understory-agent-identity-list' });
+        for (const item of items) {
+            const row = list.createDiv({ cls: `understory-agent-identity-row${item.ok ? ' is-ok' : ' is-warning'}` });
+            row.createDiv({ text: item.label, cls: 'understory-agent-identity-label' });
+            row.createDiv({ text: item.value, cls: 'understory-agent-identity-value' });
+        }
+    }
+
+    _renderAgentCheckList(containerEl, context) {
+        const status = checkAgentAccessStatus(context);
+        const list = containerEl.createDiv({ cls: 'understory-agent-check-list' });
+        for (const check of status.checks) {
+            const row = list.createDiv({ cls: `understory-agent-check-row${check.ok ? ' is-ok' : ' is-warning'}` });
+            row.createDiv({
+                text: check.ok ? t(this.plugin, 'agent_check_ok_label') : t(this.plugin, 'agent_check_attention_label'),
+                cls: 'understory-agent-check-state',
+            });
+            row.createDiv({ text: check.label, cls: 'understory-agent-check-label' });
+        }
+    }
+
+    _renderAgentAccessTab(containerEl) {
+        this._renderTabIntro(containerEl, 'agents_page_title', 'agents_page_desc');
+
+        const context = this._agentAccessContext();
+        const setupPack = createAgentSetupPack(context, this.plugin.settings);
+        const { agentProfile, diagnosticsText, installNotesText, mcpConfigText, setupPackText, skillText, usageMode, vaultIdentity } = setupPack;
+        const agentProfiles = agentProfilesForLanguage(getLanguage(this.plugin));
+
+        const identityStep = this._renderAgentStep(containerEl, 1, 'agent_current_vault_title', 'agent_current_vault_desc');
+        this._renderAgentIdentityGrid(identityStep, context, vaultIdentity);
+
+        const usageStep = this._renderAgentStep(containerEl, 2, 'agent_choose_use_case_title', 'agent_choose_use_case_desc');
+        new Setting(usageStep)
+            .setName(t(this.plugin, 'agent_usage_mode_select_name'))
+            .setDesc(t(this.plugin, 'agent_usage_mode_select_desc'))
+            .addDropdown((dropdown) => {
+                for (const mode of Object.values(USAGE_MODES)) dropdown.addOption(mode.id, mode.label);
+                dropdown
+                    .setValue(usageMode.id)
+                    .onChange(async (value) => {
+                        this.plugin.settings.agentUsageModeId = value;
+                        await this.plugin.saveSettings();
+                        this.display();
+                    });
+            });
+        usageStep.createDiv({
+            text: t(this.plugin, 'agent_usage_mode_selected_label', { mode: usageMode.label }),
+            cls: 'setting-item-description',
+        });
+        usageStep.createDiv({
+            text: usageMode.installHint,
+            cls: 'setting-item-description',
+        });
+
+        const profileStep = this._renderAgentStep(containerEl, 3, 'agent_choose_agent_title', 'agent_choose_agent_desc');
+        new Setting(profileStep)
+            .setName(t(this.plugin, 'agent_profile_select_name'))
+            .setDesc(t(this.plugin, 'agent_profile_select_desc'))
+            .addDropdown((dropdown) => {
+                for (const profile of Object.values(agentProfiles)) dropdown.addOption(profile.id, profile.label);
+                dropdown
+                    .setValue(agentProfile.id)
+                    .onChange(async (value) => {
+                        this.plugin.settings.agentProfileId = value;
+                        await this.plugin.saveSettings();
+                        this.display();
+                    });
+            });
+        profileStep.createDiv({
+            text: t(this.plugin, 'agent_profile_selected_label', { profile: agentProfile.label }),
+            cls: 'setting-item-description',
+        });
+        this._renderAgentInstallNotes(profileStep, installNotesText);
+
+        const exportStep = this._renderAgentStep(containerEl, 4, 'agent_export_local_title', 'agent_export_local_desc');
+        this._renderAgentCheckList(exportStep, context);
+        new Setting(exportStep)
+            .setName(t(this.plugin, 'agent_export_actions_name'))
+            .setDesc(t(this.plugin, 'agent_export_actions_desc'))
+            .addButton((button) => button
+                .setButtonText(t(this.plugin, 'agent_export_mcp_button'))
+                .onClick(async () => this._exportAgentMcpServer(context)))
+            .addButton((button) => button
+                .setButtonText(t(this.plugin, 'agent_check_mcp_button'))
+                .onClick(() => this._checkAgentAccessStatus(context)))
+            .addButton((button) => button
+                .setButtonText(t(this.plugin, 'agent_copy_diagnostics_button'))
+                .onClick(() => this._copyText(diagnosticsText, t(this.plugin, 'agent_copy_diagnostics_notice'))));
+
+        const copyStep = this._renderAgentStep(containerEl, 5, 'agent_copy_config_title', 'agent_copy_config_desc');
+        new Setting(copyStep)
+            .setName(t(this.plugin, 'agent_copy_setup_pack_name'))
+            .setDesc(t(this.plugin, 'agent_copy_setup_pack_desc'))
+            .addButton((button) => button
+                .setButtonText(t(this.plugin, 'agent_copy_setup_pack_button'))
+                .onClick(() => this._copyText(setupPackText, t(this.plugin, 'agent_copy_setup_pack_notice'))));
+
+        copyStep.createDiv({ text: t(this.plugin, 'agent_mcp_title'), cls: 'understory-section-title-text' });
+        copyStep.createDiv({ text: t(this.plugin, 'agent_mcp_desc'), cls: 'setting-item-description' });
+        this._renderAgentPreview(copyStep, mcpConfigText, 'json');
+        new Setting(copyStep)
+            .setName(t(this.plugin, 'agent_copy_mcp_action_name'))
+            .setDesc(t(this.plugin, 'agent_copy_mcp_action_desc'))
+            .addButton((button) => button
+                .setButtonText(t(this.plugin, 'agent_copy_mcp_button'))
+                .onClick(() => this._copyText(mcpConfigText, t(this.plugin, 'agent_copy_mcp_notice'))));
+
+        copyStep.createDiv({ text: t(this.plugin, 'agent_skill_title'), cls: 'understory-section-title-text' });
+        copyStep.createDiv({ text: t(this.plugin, 'agent_skill_desc'), cls: 'setting-item-description' });
+        this._renderAgentPreview(copyStep, skillText, 'markdown');
+        new Setting(copyStep)
+            .setName(t(this.plugin, 'agent_copy_skill_action_name'))
+            .setDesc(t(this.plugin, 'agent_copy_skill_action_desc'))
+            .addButton((button) => button
+                .setButtonText(t(this.plugin, 'agent_copy_skill_button'))
+                .onClick(() => this._copyText(skillText, t(this.plugin, 'agent_copy_skill_notice'))))
+            .addButton((button) => button
+                .setButtonText(t(this.plugin, 'agent_export_skill_button'))
+                .onClick(async () => this._exportAgentSkill(context, skillText)));
+
+        containerEl.createDiv({ text: t(this.plugin, 'agent_multi_vault_title'), cls: 'understory-section-title-text' });
+        containerEl.createDiv({
+            text: t(this.plugin, 'agent_multi_vault_desc'),
+            cls: 'setting-item-description',
+        });
+        this._renderAgentMultiVaultSteps(containerEl);
+
+        containerEl.createDiv({ text: t(this.plugin, 'agent_safety_title'), cls: 'understory-section-title-text' });
+        const safetyList = containerEl.createDiv({ cls: 'understory-agent-safety-list' });
+        for (const key of ['agent_safety_local', 'agent_safety_private', 'agent_safety_confirm']) {
+            safetyList.createDiv({ text: t(this.plugin, key), cls: 'understory-agent-safety-item' });
+        }
+    }
+
+    async _exportAgentMcpServer(context) {
+        try {
+            await writeAgentAccessFile(context.mcpServerPath, createStandaloneMcpServerSource());
+            new Notice(t(this.plugin, 'agent_export_mcp_notice', { path: context.mcpServerPath }));
+            this.display();
+        } catch (error) {
+            new Notice(t(this.plugin, 'agent_export_failed_notice', { message: error && error.message ? error.message : String(error || '') }));
+        }
+    }
+
+    async _exportAgentSkill(context, skillText) {
+        try {
+            await writeAgentAccessFile(context.skillPath, skillText);
+            new Notice(t(this.plugin, 'agent_export_skill_notice', { path: context.skillPath }));
+        } catch (error) {
+            new Notice(t(this.plugin, 'agent_export_failed_notice', { message: error && error.message ? error.message : String(error || '') }));
+        }
+    }
+
+    _checkAgentAccessStatus(context) {
+        const status = checkAgentAccessStatus(context);
+        if (status.ok) {
+            new Notice(t(this.plugin, 'agent_check_ready_notice'));
+            return;
+        }
+        const missing = status.checks
+            .filter((check) => !check.ok)
+            .map((check) => check.label)
+            .join(', ');
+        new Notice(t(this.plugin, 'agent_check_attention_notice', { items: missing }));
     }
 
     _renderLanguageToggle(parent) {
@@ -508,7 +954,8 @@ class UnderstorySettingTab extends PluginSettingTab {
         button.type = 'button';
         button.setAttribute('aria-label', current === 'en' ? 'Switch UI to Chinese' : '切换到英文界面');
         button.setAttribute('title', current === 'en' ? 'Switch to Chinese' : 'Switch to English');
-        button.createSpan({ cls: 'understory-language-toggle-icon', text: '🌐' });
+        const icon = button.createSpan({ cls: 'understory-language-toggle-icon' });
+        setIcon(icon, 'globe-2');
         button.createSpan({ cls: 'understory-language-toggle-label', text: current === 'en' ? 'EN' : '中文' });
         button.addEventListener('click', async () => {
             this.plugin.settings.uiLanguage = next;
@@ -547,10 +994,10 @@ class UnderstorySettingTab extends PluginSettingTab {
 
     _renderPrivacySettings(containerEl) {
         containerEl.createEl('h3', { text: t(this.plugin, 'privacy_title') });
-        containerEl.createEl('div', {
+        containerEl.createDiv({
             text: t(this.plugin, 'privacy_desc'),
-            cls: 'setting-item-description'
-        }).style.marginBottom = '8px';
+            cls: 'setting-item-description understory-privacy-intro'
+        });
 
         const mode = this.plugin.settings.networkMode || 'local';
         new Setting(containerEl)
@@ -570,20 +1017,29 @@ class UnderstorySettingTab extends PluginSettingTab {
                     this.display();
                 }));
 
-        containerEl.createEl('div', {
+        containerEl.createDiv({
             text: t(this.plugin, `network_mode_${mode}_summary`),
-            cls: 'setting-item-description understory-privacy-summary'
-        }).style.marginBottom = '12px';
-        containerEl.createEl('div', {
-            text: t(this.plugin, 'api_key_overview'),
-            cls: 'setting-item-description understory-privacy-summary'
-        }).style.marginBottom = '6px';
-        containerEl.createEl('div', {
-            text: mode === 'local' ? t(this.plugin, 'api_key_local_notice') : t(this.plugin, 'provider_terms_notice'),
-            cls: 'setting-item-description understory-privacy-summary'
-        }).style.marginBottom = '12px';
+            cls: 'setting-item-description understory-privacy-note'
+        });
+
+        if (mode === 'local') {
+            containerEl.createDiv({
+                text: t(this.plugin, 'model_config_local_notice'),
+                cls: 'setting-item-description understory-privacy-inline-note'
+            });
+            return;
+        }
+
+        containerEl.createDiv({
+            text: t(this.plugin, 'provider_terms_notice'),
+            cls: 'setting-item-description understory-privacy-note'
+        });
 
         containerEl.createEl('h4', { text: t(this.plugin, 'embedding_section_title') });
+        containerEl.createDiv({
+            text: t(this.plugin, 'embedding_setup_notice'),
+            cls: 'setting-item-description understory-privacy-note'
+        });
         new Setting(containerEl)
             .setName(t(this.plugin, 'embedding_provider_name'))
             .setDesc(t(this.plugin, 'embedding_provider_desc'))
@@ -599,8 +1055,20 @@ class UnderstorySettingTab extends PluginSettingTab {
                     this.display();
                 }));
 
-        if (mode !== 'local' && (this.plugin.settings.embeddingProvider || 'zhipu') !== 'none') {
+        if ((this.plugin.settings.embeddingProvider || 'zhipu') !== 'none') {
             const embeddingPreset = providerPreset(this.plugin.settings.embeddingProvider || 'zhipu');
+            const keySetting = new Setting(containerEl)
+                .setName(t(this.plugin, 'embedding_api_key_name'))
+                .setDesc(t(this.plugin, 'embedding_api_key_desc'));
+            this._renderPasswordText(
+                keySetting,
+                this.plugin.settings.embeddingApiKey,
+                t(this.plugin, 'api_key_placeholder'),
+                async (value) => {
+                    this.plugin.settings.embeddingApiKey = value.trim();
+                    await this.plugin.saveSettings();
+                }
+            );
             new Setting(containerEl)
                 .setName(t(this.plugin, 'embedding_base_url_name'))
                 .setDesc(t(this.plugin, 'embedding_base_url_desc'))
@@ -632,43 +1100,60 @@ class UnderstorySettingTab extends PluginSettingTab {
                         this.plugin.settings.embeddingDimensions = Number.isFinite(parsed) ? parsed : '';
                         await this.plugin.saveSettings();
                     }));
-            const keySetting = new Setting(containerEl)
-                .setName(t(this.plugin, 'embedding_api_key_name'))
-                .setDesc(t(this.plugin, 'embedding_api_key_desc'));
-            this._renderPasswordText(
-                keySetting,
-                this.plugin.settings.embeddingApiKey,
-                t(this.plugin, 'api_key_placeholder'),
-                async (value) => {
-                    this.plugin.settings.embeddingApiKey = value.trim();
-                    await this.plugin.saveSettings();
-                }
-            );
-            containerEl.createEl('div', {
+            containerEl.createDiv({
                 text: t(this.plugin, 'api_key_storage_desc'),
-                cls: 'setting-item-description understory-privacy-summary'
-            }).style.marginBottom = '8px';
+                cls: 'setting-item-description understory-privacy-footnote'
+            });
+        } else {
+            containerEl.createDiv({
+                text: t(this.plugin, 'embedding_none_notice'),
+                cls: 'setting-item-description understory-privacy-inline-note'
+            });
+        }
+
+        if (mode !== 'full') {
+            containerEl.createEl('h4', { text: t(this.plugin, 'llm_section_title') });
+            containerEl.createDiv({
+                text: t(this.plugin, 'llm_disabled_desc'),
+                cls: 'setting-item-description understory-privacy-inline-note'
+            });
+            return;
         }
 
         containerEl.createEl('h4', { text: t(this.plugin, 'llm_section_title') });
+        containerEl.createDiv({
+            text: t(this.plugin, 'llm_setup_notice'),
+            cls: 'setting-item-description understory-privacy-note'
+        });
         new Setting(containerEl)
             .setName(t(this.plugin, 'llm_provider_name'))
-            .setDesc(mode === 'full' ? t(this.plugin, 'llm_provider_desc') : t(this.plugin, 'llm_disabled_desc'))
+            .setDesc(t(this.plugin, 'llm_provider_desc'))
             .addDropdown((dropdown) => dropdown
                 .addOption('zhipu', t(this.plugin, 'provider_zhipu'))
                 .addOption('openai', t(this.plugin, 'provider_openai'))
                 .addOption('custom', t(this.plugin, 'provider_custom'))
                 .addOption('none', t(this.plugin, 'provider_none'))
                 .setValue(this.plugin.settings.llmProvider || 'zhipu')
-                .setDisabled(mode !== 'full')
                 .onChange(async (value) => {
                     this._applyProviderPreset('llm', value);
                     await this.plugin.saveSettings();
                     this.display();
                 }));
 
-        if (mode === 'full' && (this.plugin.settings.llmProvider || 'zhipu') !== 'none') {
+        if ((this.plugin.settings.llmProvider || 'zhipu') !== 'none') {
             const llmPreset = providerPreset(this.plugin.settings.llmProvider || 'zhipu');
+            const keySetting = new Setting(containerEl)
+                .setName(t(this.plugin, 'llm_api_key_name'))
+                .setDesc(t(this.plugin, 'llm_api_key_desc'));
+            this._renderPasswordText(
+                keySetting,
+                this.plugin.settings.llmApiKey,
+                t(this.plugin, 'api_key_placeholder'),
+                async (value) => {
+                    this.plugin.settings.llmApiKey = value.trim();
+                    await this.plugin.saveSettings();
+                }
+            );
             new Setting(containerEl)
                 .setName(t(this.plugin, 'llm_base_url_name'))
                 .setDesc(t(this.plugin, 'llm_base_url_desc'))
@@ -689,22 +1174,15 @@ class UnderstorySettingTab extends PluginSettingTab {
                         this.plugin.settings.llmModel = value.trim();
                         await this.plugin.saveSettings();
                     }));
-            const keySetting = new Setting(containerEl)
-                .setName(t(this.plugin, 'llm_api_key_name'))
-                .setDesc(t(this.plugin, 'llm_api_key_desc'));
-            this._renderPasswordText(
-                keySetting,
-                this.plugin.settings.llmApiKey,
-                t(this.plugin, 'api_key_placeholder'),
-                async (value) => {
-                    this.plugin.settings.llmApiKey = value.trim();
-                    await this.plugin.saveSettings();
-                }
-            );
-            containerEl.createEl('div', {
+            containerEl.createDiv({
                 text: t(this.plugin, 'api_key_storage_desc'),
-                cls: 'setting-item-description understory-privacy-summary'
-            }).style.marginBottom = '8px';
+                cls: 'setting-item-description understory-privacy-footnote'
+            });
+        } else {
+            containerEl.createDiv({
+                text: t(this.plugin, 'llm_none_notice'),
+                cls: 'setting-item-description understory-privacy-inline-note'
+            });
         }
     }
 

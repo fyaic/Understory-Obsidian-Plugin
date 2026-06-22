@@ -67,8 +67,6 @@ class UnderstoryPlugin extends Plugin {
                 this.startDaemon().catch((error) => console.warn('[Understory] Failed to start daemon:', error));
             }
 
-            this.ensureSidebarLeaf({ reveal: !!this.settings.openSidebarOnLoad })
-                .catch((error) => console.warn('[Understory] Failed to attach sidebar view:', error));
         });
 
         new Notice(t(this, 'plugin_enabled'));
@@ -118,6 +116,13 @@ module.exports = UnderstoryPlugin;
 
 },
 
+"./brandAssets": function(module, exports, require) {
+const UNDERSTORY_SETTINGS_LOGO_DATA_URI = 'data:image/png;base64,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';
+
+module.exports = { UNDERSTORY_SETTINGS_LOGO_DATA_URI };
+
+},
+
 "./i18n": function(module, exports, require) {
 const DEFAULT_LANGUAGE = 'en';
 
@@ -126,11 +131,117 @@ const STRINGS = {
         language_toggle_name: '界面语言',
         language_toggle_desc: '在中文和 English 之间切换。设置页和右侧边栏会立即更新。',
         settings_title: 'Understory 设置',
+        settings_page_toggle_label: '设置页面',
+        settings_tab_setup: '开始使用',
+        settings_tab_models: '联网与隐私',
+        settings_tab_suggestions: '关联发现',
+        settings_tab_agents: 'Agent访问',
+        settings_tab_maintenance: '关联维护',
+        setup_page_title: '先完成必要设置',
+        setup_page_desc: 'Understory 需要知道本地引擎在哪里。配置好后，它才会开始为你的 vault 维护关联和风险提醒。',
+        setup_ready_title: '设置完成',
+        setup_ready_desc: '本地引擎已经可用。你可以继续配置关联发现，或保持默认设置直接开始使用。',
+        setup_warning_title: '基本可用，还有建议处理的项目',
+        setup_warning_desc: 'Understory 可以运行，但有一些辅助脚本、vault 部署或权限项目建议检查。',
+        setup_needed_title: '需要选择本地引擎文件夹',
+        setup_needed_desc: '请选择你电脑上的 Understory 引擎文件夹。通常是你下载或 clone 的 Understory-graphify-engine 文件夹。',
+        setup_unchecked_title: '还没有检查本地设置',
+        setup_unchecked_desc: '填写文件夹后点击「检查设置」，确认 Understory 能连接本地引擎和 Python。',
+        setup_error_title: '设置还没完成',
+        setup_error_desc: 'Understory 还不能连接本地引擎。请按下面步骤检查路径和 Python。',
+        setup_step_engine_title: '选择 Understory 引擎文件夹',
+        setup_step_engine_desc: '这是本地分析程序所在的文件夹，不是你的 vault 文件夹。',
+        setup_step_python_title: '确认 Python 可用',
+        setup_step_python_desc: '大多数用户保持 python 即可；如果你使用虚拟环境，可以填写完整 Python 路径。',
+        setup_step_check_title: '运行一次检查',
+        setup_step_check_desc: '检查通过后再去配置关联发现和联网模式。不会自动安装依赖或修改系统。',
+        setup_check_name: '完成设置检查',
+        setup_check_desc: '检查本地引擎、Python、脚本和 vault 配置。遇到问题时会告诉你下一步该做什么。',
+        setup_open_diagnostics_button: '查看技术诊断',
+        models_page_title: '联网与隐私',
+        models_page_desc: '先决定是否允许联网。默认完全本地；只有你主动选择云模型并填写自己的密钥时，才会请求模型服务。',
+        suggestions_page_title: '关联发现',
+        suggestions_page_desc: '决定关联发现结果出现在哪里、忽略哪些文件夹，以及右侧栏要显示多少信息。',
+        agents_page_title: 'Agent访问',
+        agents_page_desc: '把这个 vault 暴露为本地 Agent API：复制 MCP JSON，并按 Query-only 或 Agent memory model 选择配套的 Skill prompt。',
+        maintenance_page_title: '关联维护',
+        maintenance_page_desc: '这里放定期检查、刷新、日志和技术诊断。日常使用通常不用频繁调整。',
+        agent_step_label: '步骤 {step}',
+        agent_current_vault_title: '当前 vault',
+        agent_current_vault_desc: 'Understory 只识别当前打开的 vault，并为它生成独立的 MCP identity。',
+        agent_choose_use_case_title: '选择用途',
+        agent_choose_use_case_desc: '选择你希望 Agent 如何使用这个 vault：只做显式查询，或作为主动上下文与长期记忆层。',
+        agent_choose_agent_title: '选择 Agent',
+        agent_choose_agent_desc: '选择你要配置的 Agent。Profile 只改变说明文案，不改变 vault identity。',
+        agent_export_local_title: '准备本地 MCP 文件',
+        agent_export_local_desc: '先在当前 vault 的 .understory/agent 文件夹创建本地 MCP server 文件。它不是云端 server，不会打开 HTTP 端口，只是给 MCP JSON 调用的本地入口。',
+        agent_copy_config_title: '安装到 Agent',
+        agent_copy_config_desc: '复制 MCP JSON 到 Agent 的 MCP 设置；再复制 Skill prompt 给 Agent。也可以一次复制完整 setup pack。',
+        agent_identity_vault_name_label: 'Vault 名称',
+        agent_identity_server_key_label: 'MCP server key',
+        agent_identity_vault_path_label: 'Vault 路径',
+        agent_identity_export_status_label: '导出路径',
+        agent_status_not_available: '当前 Obsidian adapter 未提供本地路径',
+        agent_status_not_set: '未设置',
+        agent_usage_mode_select_name: '使用模式',
+        agent_usage_mode_select_desc: 'Query-only 更保守；Agent memory model 会让 agent 在相关任务中主动获取上下文并提出可沉淀的记忆更新。',
+        agent_usage_mode_selected_label: '当前用途：{mode}',
+        agent_profile_select_name: 'Agent profile',
+        agent_profile_select_desc: '不同 profile 提供不同安装说明；不会自动写入外部 Agent 配置目录。',
+        agent_profile_selected_label: '当前 profile：{profile}',
+        agent_check_ok_label: 'OK',
+        agent_check_attention_label: '需处理',
+        agent_mcp_title: 'MCP JSON（复制到 Agent 的 MCP 设置）',
+        agent_mcp_desc: '这是要复制粘贴的 MCP JSON。它会调用上一步创建的本地 MCP server 文件，并绑定当前 vault。',
+        agent_export_actions_name: '创建本地 MCP server 文件',
+        agent_export_actions_desc: '创建或更新 vault 内的本地 server 文件，然后检查 Agent 是否能通过这些路径启动它。',
+        agent_copy_setup_pack_name: '复制完整 setup pack',
+        agent_copy_setup_pack_desc: '包含 MCP JSON、Skill prompt、当前 vault identity 和安装说明；适合一次性贴给 Agent 或保存为配置记录。',
+        agent_copy_mcp_action_name: '复制 MCP JSON',
+        agent_copy_mcp_action_desc: '把这段 JSON 复制到 Codex、Claude、Cursor、OpenClaw 或其他支持 MCP stdio 的 Agent 设置里。',
+        agent_copy_skill_action_name: '复制 Skill prompt',
+        agent_copy_skill_action_desc: '把这段 prompt / instructions 复制给 Agent，或保存到当前 vault 供之后安装。',
+        agent_copy_mcp_button: '复制 MCP JSON',
+        agent_copy_mcp_notice: 'Understory: MCP JSON 已复制',
+        agent_export_mcp_button: '创建本地 MCP server 文件',
+        agent_export_mcp_notice: 'Understory: 本地 MCP server 文件已创建：{path}',
+        agent_check_mcp_button: '检查 MCP 状态',
+        agent_check_ready_notice: 'Understory: MCP server 路径已就绪',
+        agent_check_attention_notice: 'Understory: 需要处理这些项目：{items}',
+        agent_copy_diagnostics_button: '复制诊断',
+        agent_copy_diagnostics_notice: 'Understory: Agent access 诊断已复制',
+        agent_skill_title: 'Skill prompt（复制给 Agent）',
+        agent_skill_desc: '这是要贴给 Agent 的 prompt / instructions。它告诉 Agent 何时使用 Understory、只能使用当前 vault、以及写入前必须确认。',
+        agent_skill_actions_name: 'Skill 操作',
+        agent_skill_actions_desc: '复制 Skill，或导出到 vault 的 .understory/agent/understory-skill.md，便于粘贴到不同 Agent 的技能目录。',
+        agent_copy_skill_button: '复制 Skill prompt',
+        agent_copy_skill_notice: 'Understory: Skill prompt 已复制',
+        agent_copy_setup_pack_button: '复制完整 setup pack',
+        agent_copy_setup_pack_notice: 'Understory: setup pack 已复制',
+        agent_export_skill_button: '保存 Skill prompt 到 vault',
+        agent_export_skill_notice: 'Understory: Skill prompt 已保存到 {path}',
+        agent_export_failed_notice: 'Understory: 导出失败：{message}',
+        agent_multi_vault_title: '多 vault 设置',
+        agent_multi_vault_desc: '每个 vault 都是独立 MCP identity。需要给同一个 Agent 接入多个 vault 时，按下面三步重复。',
+        agent_multi_vault_step_open_title: '打开目标 vault',
+        agent_multi_vault_step_open_desc: '在需要给 Agent 使用的那个 Obsidian vault 里打开 Understory 的 Agent访问。',
+        agent_multi_vault_step_prepare_title: '创建本地 MCP 文件',
+        agent_multi_vault_step_prepare_desc: '在该 vault 内点击“创建本地 MCP server 文件”，生成只绑定这个 vault 的本地入口。',
+        agent_multi_vault_step_copy_title: '复制到同一个 Agent',
+        agent_multi_vault_step_copy_desc: '把这个 vault 的 MCP JSON 和 Skill prompt 加入 Agent。第二个 vault 会有不同 server key，不要都命名为 understory。',
+        agent_safety_title: '安全边界',
+        agent_safety_local: '🔒 MCP 使用本地 stdio，不开启 HTTP 端口。',
+        agent_safety_private: '🌿 不向 Bondie Labs 发送 vault、API key、prompt、embedding 或日志。',
+        agent_safety_confirm: '✍️ Skill 默认只读；任何写入类工具都必须先说明并确认。',
+        maintenance_diagnostics_title: '技术诊断',
+        maintenance_diagnostics_desc: '只有排查本地引擎、Python 或权限问题时才需要看这里。',
         engine_dir_name: 'Understory 文件夹',
         engine_dir_desc: '默认读取 UNDERSTORY_ENGINE_DIR。只有移动过 Understory 引擎时才需要手动修改。',
+        engine_dir_user_desc: '选择本地 Understory 引擎所在的文件夹。不要选择你的 Obsidian vault。',
         engine_dir_placeholder: '留空则读取 UNDERSTORY_ENGINE_DIR',
         python_path_name: 'Python',
         python_path_desc: '默认读取 UNDERSTORY_PYTHON_PATH。能正常运行就保持默认。',
+        python_path_user_desc: '通常保持 python 即可。如果检查失败，再填写你的 Python 可执行文件路径。',
         engine_status_ok: '当前状态：本地引擎可用（{python}）',
         engine_status_problem: '当前状态：需要处理 - {message}',
         engine_status_unknown: '当前状态：尚未检查本地引擎',
@@ -221,11 +332,12 @@ const STRINGS = {
         engine_copy_command_button: '复制命令',
         engine_copy_command_notice: 'Understory: 命令已复制',
         engine_copy_failed_notice: 'Understory: 复制失败，请手动选择文本复制',
-        privacy_title: '隐私与模型',
-        privacy_desc: '选择 Understory 是否可以联网，以及联网时把内容发给哪个模型服务。开发团队不会接收你的笔记或密钥。',
-        api_key_overview: '你可以自己选择 OpenAI、智谱或兼容服务，并填写自己的密钥。Understory 不会接收或代管这些密钥。',
+        privacy_title: '模型服务',
+        privacy_desc: '选择 Understory 是否可以联网。只有你主动选择云模型并填写自己的密钥时，才会请求模型服务。',
+        api_key_overview: '你可以选择 OpenAI、智谱或兼容 OpenAI 的服务。Understory 会帮你预填常见 Endpoint，但你可以修改成自己的兼容网关、自建服务或其他兼容地址。',
         api_key_local_notice: '完全本地模式不需要任何模型密钥，也不会把模型服务密钥传给本地引擎或发送 Webhook。',
         provider_terms_notice: '如果启用云模型，请确认所选服务商的价格、账单、隐私条款和数据处理规则。',
+        model_config_local_notice: '当前是完全本地模式，所以不显示云模型配置。若要填写 API key 和 Endpoint，请先把联网方式切换为「只用向量模型」或「完整 AI 分析」。',
         network_mode_name: '联网方式',
         network_mode_desc: '先决定隐私边界，再配置模型。新安装默认完全本地。',
         network_mode_local: '完全本地',
@@ -235,28 +347,32 @@ const STRINGS = {
         network_mode_embedding_summary: '只把用于相似度分析的文本片段发给向量模型。不会请求推理模型。',
         network_mode_full_summary: '允许向量模型和推理模型。用于语义索引、主张提取、概念解释和冲突判断。',
         embedding_section_title: '向量模型',
-        embedding_provider_name: '向量模型服务',
-        embedding_provider_desc: '用于发现意思相近的笔记。完全本地模式下不会调用。',
-        embedding_base_url_name: '服务地址',
-        embedding_base_url_desc: 'OpenAI、智谱或兼容 OpenAI 接口的服务地址。',
+        embedding_setup_notice: '选择服务商后，Understory 会预填常见 Endpoint 和模型名。你可以直接填写自己的 API key，也可以修改 Endpoint。',
+        embedding_provider_name: '向量模型服务商',
+        embedding_provider_desc: '用于发现意思相近的笔记。选择自定义时可填写自己的兼容服务。',
+        embedding_base_url_name: 'Endpoint / Base URL',
+        embedding_base_url_desc: '模型服务地址。OpenAI 和智谱会自动预填，也可以改成兼容网关、自建服务或其他兼容地址。',
         embedding_model_name: '向量模型名称',
-        embedding_model_desc: '用于把文本转换成向量的模型。',
+        embedding_model_desc: '用于把文本转换成向量的模型。服务商预设只是建议，可以修改。',
         embedding_dimensions_name: '向量维度',
         embedding_dimensions_desc: '保持默认即可；只有你知道模型要求时再改。',
-        embedding_api_key_name: '向量模型密钥',
-        embedding_api_key_desc: '用于把文本片段转换成向量，帮助 Understory 发现语义相近的笔记和关系。只在「只用向量模型」或「完整 AI 分析」中使用。',
+        embedding_api_key_name: '向量模型 API key',
+        embedding_api_key_desc: '用于把文本片段转换成向量，帮助 Understory 发现语义相近的笔记和关系。',
+        embedding_none_notice: '你选择了不使用向量模型。Understory 会继续使用本地结构、关键词、ER 和图分析。',
         llm_section_title: '推理模型',
-        llm_provider_name: '推理模型服务',
-        llm_provider_desc: '用于原则提取、概念解释和冲突判断。',
-        llm_disabled_desc: '只有选择「完整 AI 分析」时才会使用推理模型。',
-        llm_base_url_name: '服务地址',
-        llm_base_url_desc: 'OpenAI、智谱或兼容 OpenAI 接口的服务地址。',
+        llm_setup_notice: '完整 AI 分析会额外使用推理模型。你可以使用同一个服务商，也可以填写不同的 API key、Endpoint 和模型名。',
+        llm_provider_name: '推理模型服务商',
+        llm_provider_desc: '用于主张提取、概念解释和冲突判断。选择自定义时可填写自己的兼容服务。',
+        llm_disabled_desc: '当前只启用了向量模型，不会使用推理模型。若要配置推理模型，请把联网方式切换为「完整 AI 分析」。',
+        llm_base_url_name: 'Endpoint / Base URL',
+        llm_base_url_desc: '模型服务地址。OpenAI 和智谱会自动预填，也可以改成兼容网关、自建服务或其他兼容地址。',
         llm_model_name: '推理模型名称',
-        llm_model_desc: '用于阅读和判断文本的模型。',
-        llm_api_key_name: '推理模型密钥',
-        llm_api_key_desc: '用于完整 AI 分析，例如提取主张、解释概念、辅助判断冲突。只在「完整 AI 分析」中使用。',
+        llm_model_desc: '用于阅读和判断文本的模型。服务商预设只是建议，可以修改。',
+        llm_api_key_name: '推理模型 API key',
+        llm_api_key_desc: '用于完整 AI 分析，例如提取主张、解释概念、辅助判断冲突。',
+        llm_none_notice: '你选择了不使用推理模型。完整 AI 分析中的语义解释和冲突判断能力会受限。',
         api_key_storage_desc: '可留空并改用环境变量。若填写，会保存在本机 Obsidian 插件配置中。',
-        api_key_placeholder: '留空则读取环境变量',
+        api_key_placeholder: '粘贴你的 API key；留空则读取环境变量',
         model_placeholder: '模型名称',
         provider_zhipu: '智谱',
         provider_openai: 'OpenAI',
@@ -267,16 +383,14 @@ const STRINGS = {
         excluded_folders_title: '不要处理这些文件夹',
         excluded_folders_desc: '这些文件夹里的笔记不会被读取、分析或刷新。',
         excluded_selected: '已排除',
-        relation_title: '关联建议',
-        relation_desc: '告诉 Understory 关联建议应该出现在哪里，以及要不要提醒你潜在问题。',
+        relation_title: '关联发现',
+        relation_desc: '告诉 Understory 关联发现结果应该出现在哪里，以及要不要提醒你潜在问题。',
         related_section_heading: '## 🏷️关联文件',
         presentation_mode_name: '把建议放在哪里',
         presentation_mode_desc: '想安静查看就放右侧栏；想长期保留链接就写入正文。',
         presentation_sidebar: '只显示在右侧栏',
         presentation_body: '写入笔记正文',
         presentation_both: '右侧栏和正文都显示',
-        open_sidebar_on_load_name: '启动时打开右侧栏',
-        open_sidebar_on_load_desc: '打开 Obsidian 后自动显示 Show Understory。',
         sidebar_group_name: '建议怎么分组',
         sidebar_group_desc: '按主题更适合阅读；按关系类型更适合排查。',
         sidebar_group_concept: '按主题/来源',
@@ -378,7 +492,7 @@ const STRINGS = {
         action_show_understory: 'Show Understory',
         action_refresh_understory: 'Refresh Understory',
         action_settings: 'Understory Settings',
-        plugin_enabled: 'Understory: 已启用',
+        plugin_enabled: 'Understory: 已启用。需要设置时请点击插件页的 Options。',
         open_sidebar_failed: 'Understory: 无法打开右侧边栏，请先恢复一个可用工作区',
         folder_list_whitelist: '白名单',
         folder_list_blacklist: '黑名单',
@@ -493,12 +607,118 @@ const STRINGS = {
     en: {
         language_toggle_name: 'Interface language',
         language_toggle_desc: 'Switch between Chinese and English. Settings and the right sidebar update immediately.',
-        settings_title: '🌱 Understory Settings',
+        settings_title: 'Understory Settings',
+        settings_page_toggle_label: 'Settings pages',
+        settings_tab_setup: 'Start here',
+        settings_tab_models: 'Network & privacy',
+        settings_tab_suggestions: 'Relation discovery',
+        settings_tab_agents: 'AI agents',
+        settings_tab_maintenance: 'Relation maintenance',
+        setup_page_title: 'Finish the required setup first',
+        setup_page_desc: 'Understory needs to know where the local engine lives before it can maintain relationships and warnings for your vault.',
+        setup_ready_title: 'Setup is complete',
+        setup_ready_desc: 'The local engine is available. You can tune suggestions next, or keep the defaults and start using Understory.',
+        setup_warning_title: 'Usable, with a few things to review',
+        setup_warning_desc: 'Understory can run, but some helper scripts, vault deployment, or permissions should be checked.',
+        setup_needed_title: 'Choose the local engine folder',
+        setup_needed_desc: 'Select the Understory engine folder on this computer. It is usually the Understory-graphify-engine folder you downloaded or cloned.',
+        setup_unchecked_title: 'Setup has not been checked yet',
+        setup_unchecked_desc: 'After choosing the folder, click Check setup to confirm Understory can use the local engine and Python.',
+        setup_error_title: 'Setup is not complete',
+        setup_error_desc: 'Understory cannot connect to the local engine yet. Check the folder path and Python below.',
+        setup_step_engine_title: 'Choose the Understory engine folder',
+        setup_step_engine_desc: 'This is the local analysis program folder, not your Obsidian vault folder.',
+        setup_step_python_title: 'Confirm Python works',
+        setup_step_python_desc: 'Most users can leave this as python. If you use a virtual environment, enter the full Python path.',
+        setup_step_check_title: 'Run one setup check',
+        setup_step_check_desc: 'Check setup before tuning suggestions or AI modes. It will not install dependencies or change your system automatically.',
+        setup_check_name: 'Complete setup check',
+        setup_check_desc: 'Checks the local engine, Python, scripts, and vault setup. If something is missing, Understory will tell you the next step.',
+        setup_open_diagnostics_button: 'View technical diagnostics',
+        models_page_title: 'Network and privacy',
+        models_page_desc: 'Choose the privacy boundary first. New installs stay local unless you explicitly choose a cloud model and enter your own key.',
+        suggestions_page_title: 'Relation discovery',
+        suggestions_page_desc: 'Choose where related-note suggestions appear, which folders to ignore, and how much detail the sidebar should show.',
+        agents_page_title: 'Agent access for AI agents',
+        agents_page_desc: 'Expose this vault as a local Agent API: copy the MCP JSON and the matching Skill prompt for query-only or agent memory use.',
+        maintenance_page_title: 'Relation maintenance',
+        maintenance_page_desc: 'Periodic checks, refresh, logs, and technical diagnostics live here. Most users do not need to change these often.',
+        agent_step_label: 'Step {step}',
+        agent_current_vault_title: 'Current vault',
+        agent_current_vault_desc: 'Understory only identifies the currently open vault and gives it an independent MCP identity.',
+        agent_choose_use_case_title: 'Choose use case',
+        agent_choose_use_case_desc: 'Choose how this agent should use the vault: explicit query only, or active context and long-term memory.',
+        agent_choose_agent_title: 'Choose agent',
+        agent_choose_agent_desc: 'Choose the agent you are configuring. The profile changes instructions only; it does not change the vault identity.',
+        agent_export_local_title: 'Prepare local MCP file',
+        agent_export_local_desc: 'Create the local MCP server file inside this vault under .understory/agent. This is not a cloud server and does not open an HTTP port; it is the local entrypoint that the MCP JSON runs.',
+        agent_copy_config_title: 'Install in your agent',
+        agent_copy_config_desc: 'Copy the MCP JSON into your agent MCP settings, then copy the Skill prompt to the agent. You can also copy the full setup pack.',
+        agent_identity_vault_name_label: 'Vault name',
+        agent_identity_server_key_label: 'MCP server key',
+        agent_identity_vault_path_label: 'Vault path',
+        agent_identity_export_status_label: 'Export path',
+        agent_status_not_available: 'The current Obsidian adapter did not expose a local path',
+        agent_status_not_set: 'Not set',
+        agent_usage_mode_select_name: 'Use case',
+        agent_usage_mode_select_desc: 'Query-only is conservative. Agent memory model lets the agent proactively retrieve relevant context and propose durable memory updates.',
+        agent_usage_mode_selected_label: 'Selected use case: {mode}',
+        agent_profile_select_name: 'Agent profile',
+        agent_profile_select_desc: 'Profiles provide agent-specific install notes. Understory does not write external agent config files automatically.',
+        agent_profile_selected_label: 'Selected profile: {profile}',
+        agent_check_ok_label: 'OK',
+        agent_check_attention_label: 'Needs attention',
+        agent_mcp_title: 'MCP JSON (paste into agent MCP settings)',
+        agent_mcp_desc: 'This is the copy/paste MCP configuration. It runs the local MCP server file from the previous step and binds the agent to this vault.',
+        agent_export_actions_name: 'Create local MCP server file',
+        agent_export_actions_desc: 'Create or update the local server file inside this vault, then check whether the agent can start it through these paths.',
+        agent_copy_setup_pack_name: 'Copy full setup pack',
+        agent_copy_setup_pack_desc: 'Includes the MCP JSON, Skill prompt, current vault identity, and install notes. Use this when you want one copyable setup artifact.',
+        agent_copy_mcp_action_name: 'Copy MCP JSON',
+        agent_copy_mcp_action_desc: 'Paste this JSON into Codex, Claude, Cursor, OpenClaw, or any agent that supports MCP stdio.',
+        agent_copy_skill_action_name: 'Copy Skill prompt',
+        agent_copy_skill_action_desc: 'Paste this prompt / instructions into the agent, or save it to this vault for later installation.',
+        agent_copy_mcp_button: 'Copy MCP JSON',
+        agent_copy_mcp_notice: 'Understory: MCP JSON copied',
+        agent_export_mcp_button: 'Create local MCP server file',
+        agent_export_mcp_notice: 'Understory: local MCP server file created at {path}',
+        agent_check_mcp_button: 'Check MCP status',
+        agent_check_ready_notice: 'Understory: MCP configuration paths are ready',
+        agent_check_attention_notice: 'Understory: review these items: {items}',
+        agent_copy_diagnostics_button: 'Copy diagnostics',
+        agent_copy_diagnostics_notice: 'Understory: Agent access diagnostics copied',
+        agent_skill_title: 'Skill prompt (paste into agent)',
+        agent_skill_desc: 'This is the prompt / instructions to give the agent. It tells the agent when to use Understory, which vault it is bound to, and when writes require confirmation.',
+        agent_skill_actions_name: 'Skill actions',
+        agent_skill_actions_desc: 'Copy the Skill or export it to .understory/agent/understory-skill.md inside the vault for installation into different agents.',
+        agent_copy_skill_button: 'Copy Skill prompt',
+        agent_copy_skill_notice: 'Understory: Skill prompt copied',
+        agent_copy_setup_pack_button: 'Copy full setup pack',
+        agent_copy_setup_pack_notice: 'Understory: setup pack copied',
+        agent_export_skill_button: 'Save Skill prompt to vault',
+        agent_export_skill_notice: 'Understory: Skill prompt saved to {path}',
+        agent_export_failed_notice: 'Understory: export failed: {message}',
+        agent_multi_vault_title: 'Multi-vault setup',
+        agent_multi_vault_desc: 'Each vault has its own MCP identity. Repeat these three steps for every vault you want the same agent to access.',
+        agent_multi_vault_step_open_title: 'Open the target vault',
+        agent_multi_vault_step_open_desc: 'Open Agent Access in Understory inside the Obsidian vault you want the agent to use.',
+        agent_multi_vault_step_prepare_title: 'Create the local MCP file',
+        agent_multi_vault_step_prepare_desc: 'In that vault, click Create local MCP server file to generate the local entrypoint bound only to this vault.',
+        agent_multi_vault_step_copy_title: 'Add this vault to the agent',
+        agent_multi_vault_step_copy_desc: 'Add this vault\'s MCP JSON and Skill prompt to the agent. A second vault gets a different server key; do not name every entry understory.',
+        agent_safety_title: 'Safety boundary',
+        agent_safety_local: '🔒 MCP uses local stdio and does not open an HTTP port.',
+        agent_safety_private: '🌿 Vault data, API keys, prompts, embeddings, and logs are not sent to Bondie Labs.',
+        agent_safety_confirm: '✍️ The Skill defaults to read-only behavior; write tools must be explained and confirmed first.',
+        maintenance_diagnostics_title: 'Technical diagnostics',
+        maintenance_diagnostics_desc: 'Use this only when troubleshooting the local engine, Python, or permissions.',
         engine_dir_name: 'Understory folder',
         engine_dir_desc: 'Defaults to UNDERSTORY_ENGINE_DIR. Change this only if you moved the Understory engine.',
+        engine_dir_user_desc: 'Choose the local Understory engine folder. Do not choose your Obsidian vault.',
         engine_dir_placeholder: 'Leave blank to use UNDERSTORY_ENGINE_DIR',
         python_path_name: 'Python',
         python_path_desc: 'Defaults to UNDERSTORY_PYTHON_PATH. Leave this as python if everything works.',
+        python_path_user_desc: 'Usually leave this as python. If setup check fails, enter your Python executable path.',
         engine_status_ok: 'Current status: local engine is ready ({python})',
         engine_status_problem: 'Current status: needs attention - {message}',
         engine_status_unknown: 'Current status: local engine has not been checked',
@@ -589,11 +809,12 @@ const STRINGS = {
         engine_copy_command_button: 'Copy command',
         engine_copy_command_notice: 'Understory: command copied',
         engine_copy_failed_notice: 'Understory: copy failed; select the text and copy it manually',
-        privacy_title: 'Privacy and models',
-        privacy_desc: 'Choose whether Understory may use the network, and which model service receives content. The Understory team does not receive your notes or keys.',
-        api_key_overview: 'You choose the provider, such as OpenAI, Zhipu, or a compatible endpoint, and use your own API key. Understory does not receive or manage these keys.',
+        privacy_title: 'Model services',
+        privacy_desc: 'Choose whether Understory may use the network. New installs stay local unless you explicitly choose a cloud model and enter your own key.',
+        api_key_overview: 'You can use OpenAI, Zhipu, or an OpenAI-compatible service. Understory prefills common endpoints, but you can change them for a proxy, self-hosted service, or another compatible endpoint.',
         api_key_local_notice: 'Local only mode does not need any model key, does not pass provider keys to the local engine, and does not send webhooks.',
         provider_terms_notice: 'If you enable cloud models, review the selected provider\'s pricing, billing, privacy terms, and data handling rules.',
+        model_config_local_notice: 'Cloud model settings are hidden because Local only is selected. To enter an API key and endpoint, switch Network mode to Vector model only or Full AI analysis.',
         network_mode_name: 'Network mode',
         network_mode_desc: 'Set the privacy boundary first, then configure models. New installs stay local by default.',
         network_mode_local: 'Local only',
@@ -603,28 +824,32 @@ const STRINGS = {
         network_mode_embedding_summary: 'Only text snippets needed for similarity analysis are sent to the vector model. No reasoning model is used.',
         network_mode_full_summary: 'Allows both vector and reasoning models for semantic indexing, claim extraction, concept explanations, and conflict checks.',
         embedding_section_title: 'Vector model',
-        embedding_provider_name: 'Vector model service',
-        embedding_provider_desc: 'Used to find notes with similar meaning. It is not called in Local only mode.',
-        embedding_base_url_name: 'Service URL',
-        embedding_base_url_desc: 'OpenAI, Zhipu, or another OpenAI-compatible service URL.',
+        embedding_setup_notice: 'Choose a provider, then paste your API key. Understory prefills the usual endpoint and model name, but both remain editable.',
+        embedding_provider_name: 'Vector model provider',
+        embedding_provider_desc: 'Used to find notes with similar meaning. Choose Custom for your own compatible service.',
+        embedding_base_url_name: 'Endpoint / Base URL',
+        embedding_base_url_desc: 'The model service endpoint. OpenAI and Zhipu are prefilled, and you can change this for a proxy, self-hosted service, or another compatible endpoint.',
         embedding_model_name: 'Vector model name',
-        embedding_model_desc: 'The model that turns text into vectors.',
+        embedding_model_desc: 'The model that turns text into vectors. Provider defaults are suggestions and can be changed.',
         embedding_dimensions_name: 'Vector dimensions',
         embedding_dimensions_desc: 'Leave the default unless your model requires another value.',
-        embedding_api_key_name: 'Vector model key',
-        embedding_api_key_desc: 'Used to turn text snippets into vectors so Understory can find semantically related notes and relationships. Used only in Vector model only or Full AI analysis mode.',
+        embedding_api_key_name: 'Vector model API key',
+        embedding_api_key_desc: 'Used to turn text snippets into vectors so Understory can find semantically related notes and relationships.',
+        embedding_none_notice: 'Vector models are off. Understory will continue using local structure, keywords, ER, and graph analysis.',
         llm_section_title: 'Reasoning model',
-        llm_provider_name: 'Reasoning model service',
-        llm_provider_desc: 'Used for claim extraction, concept explanations, and conflict checks.',
-        llm_disabled_desc: 'The reasoning model is used only in Full AI analysis mode.',
-        llm_base_url_name: 'Service URL',
-        llm_base_url_desc: 'OpenAI, Zhipu, or another OpenAI-compatible service URL.',
+        llm_setup_notice: 'Full AI analysis can also use a reasoning model. You may use the same provider, or enter a different API key, endpoint, and model name.',
+        llm_provider_name: 'Reasoning model provider',
+        llm_provider_desc: 'Used for claim extraction, concept explanations, and conflict checks. Choose Custom for your own compatible service.',
+        llm_disabled_desc: 'Only the vector model is enabled right now. To configure a reasoning model, switch Network mode to Full AI analysis.',
+        llm_base_url_name: 'Endpoint / Base URL',
+        llm_base_url_desc: 'The model service endpoint. OpenAI and Zhipu are prefilled, and you can change this for a proxy, self-hosted service, or another compatible endpoint.',
         llm_model_name: 'Reasoning model name',
-        llm_model_desc: 'The model that reads and judges text.',
-        llm_api_key_name: 'Reasoning model key',
-        llm_api_key_desc: 'Used for Full AI analysis, such as extracting claims, explaining concepts, and helping review conflicts. Used only in Full AI analysis mode.',
+        llm_model_desc: 'The model that reads and judges text. Provider defaults are suggestions and can be changed.',
+        llm_api_key_name: 'Reasoning model API key',
+        llm_api_key_desc: 'Used for Full AI analysis, such as extracting claims, explaining concepts, and helping review conflicts.',
+        llm_none_notice: 'Reasoning models are off. Semantic explanations and conflict-review features in Full AI analysis will be limited.',
         api_key_storage_desc: 'You can leave this blank and use an environment variable. If filled in, it is stored in this local Obsidian plugin configuration.',
-        api_key_placeholder: 'Leave blank to use environment variables',
+        api_key_placeholder: 'Paste your API key; leave blank to use environment variables',
         model_placeholder: 'Model name',
         provider_zhipu: 'Zhipu',
         provider_openai: 'OpenAI',
@@ -635,7 +860,7 @@ const STRINGS = {
         excluded_folders_title: 'Folders to ignore',
         excluded_folders_desc: 'Notes in these folders will not be read, analyzed, or refreshed.',
         excluded_selected: 'Excluded',
-        relation_title: 'Relation Suggestions',
+        relation_title: 'Relation discovery',
         relation_desc: 'Choose where Understory shows related-note suggestions, and whether it should warn you about possible issues.',
         related_section_heading: '## 🏷️ Related notes',
         presentation_mode_name: 'Show suggestions in',
@@ -643,8 +868,6 @@ const STRINGS = {
         presentation_sidebar: 'Right sidebar only',
         presentation_body: 'Note body',
         presentation_both: 'Right sidebar and note body',
-        open_sidebar_on_load_name: 'Open sidebar on startup',
-        open_sidebar_on_load_desc: 'Automatically show Show Understory when Obsidian opens.',
         sidebar_group_name: 'Group suggestions by',
         sidebar_group_desc: 'Topics are easier to read. Relation types are better for troubleshooting.',
         sidebar_group_concept: 'Topic/source',
@@ -683,7 +906,7 @@ const STRINGS = {
         open_index_button: 'Open analysis home',
         relation_logs_title: 'Recent activity',
         relation_logs_desc: 'See what Understory has done recently.',
-        refresh_title: 'Keep Suggestions Fresh',
+        refresh_title: 'Keep relation discovery fresh',
         auto_refresh_name: 'Refresh old suggestions automatically',
         auto_refresh_desc: 'As your vault grows, older notes can receive newer relation suggestions.',
         refresh_frequency_name: 'How often to refresh',
@@ -746,7 +969,7 @@ const STRINGS = {
         action_show_understory: 'Show Understory',
         action_refresh_understory: 'Refresh Understory',
         action_settings: 'Understory Settings',
-        plugin_enabled: 'Understory: enabled',
+        plugin_enabled: 'Understory: enabled. Open Options when you are ready to set it up.',
         open_sidebar_failed: 'Understory: unable to open the right sidebar. Restore an available workspace first.',
         folder_list_whitelist: 'include list',
         folder_list_blacklist: 'ignore list',
@@ -1113,6 +1336,61 @@ function countLinesBefore(content, index) {
     return String(content).slice(0, index).split(/\r?\n/).length;
 }
 
+function clampLimit(value, fallback = 8, max = 25) {
+    const number = Number(value);
+    if (!Number.isFinite(number) || number <= 0) return fallback;
+    return Math.min(Math.floor(number), max);
+}
+
+function searchTerms(query) {
+    return String(query || '')
+        .toLowerCase()
+        .split(/[\s,，。.;；:：!?！？()[\]{}"'`]+/)
+        .map((term) => term.trim())
+        .filter((term) => term.length >= 2)
+        .slice(0, 8);
+}
+
+function stripMarkdownNoise(content) {
+    return String(content || '')
+        .replace(/^---[\s\S]*?---\s*/m, '')
+        .replace(/```[\s\S]*?```/g, ' ')
+        .replace(/!\[[^\]]*\]\([^)]+\)/g, ' ')
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+        .replace(/[#>*_`~-]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function compactSnippet(content, query, maxLength = 220) {
+    const clean = stripMarkdownNoise(content);
+    if (!clean) return '';
+    const lower = clean.toLowerCase();
+    const terms = searchTerms(query);
+    const firstHit = terms
+        .map((term) => lower.indexOf(term))
+        .filter((index) => index >= 0)
+        .sort((a, b) => a - b)[0];
+    const start = firstHit > 60 ? firstHit - 60 : 0;
+    const snippet = clean.slice(start, start + maxLength);
+    return `${start > 0 ? '...' : ''}${snippet}${start + maxLength < clean.length ? '...' : ''}`;
+}
+
+function noteTitleFromPath(notePath) {
+    return titleFromTarget(notePath);
+}
+
+function relationText(relation) {
+    if (!relation) return '';
+    return [
+        relation.title,
+        relation.target,
+        relation.type,
+        relation.group,
+        relation.source,
+    ].filter(Boolean).join(' ');
+}
+
 function createMeta(context, settings) {
     const meta = {
         apiVersion: API_VERSION,
@@ -1443,7 +1721,7 @@ function relationType(relation) {
 function relationSource(relation) {
     if (relation.source) return relation.source;
     if (relation.reason) return relation.reason;
-    return 'graphify';
+    return 'understory';
 }
 
 function normalizeRelations(result) {
@@ -1736,7 +2014,184 @@ function createAgentApi(options = {}) {
             : '';
     }
 
+    async function listMarkdownNotePaths() {
+        const seen = new Set();
+        const vault = options.app && options.app.vault;
+        if (vault && typeof vault.getMarkdownFiles === 'function') {
+            for (const file of vault.getMarkdownFiles()) {
+                if (file && file.path && !file.path.startsWith('.understory/')) seen.add(toPosixPath(file.path));
+            }
+        }
+
+        const vaultRoot = adapter.getVaultPath && adapter.getVaultPath();
+        if (vaultRoot) {
+            async function walk(relativeDir = '') {
+                const absoluteDir = path.join(vaultRoot, ...relativeDir.split('/').filter(Boolean));
+                let entries = [];
+                try {
+                    entries = await fs.promises.readdir(absoluteDir, { withFileTypes: true });
+                } catch (error) {
+                    return;
+                }
+                for (const entry of entries) {
+                    const relativePath = relativeDir ? `${relativeDir}/${entry.name}` : entry.name;
+                    if (entry.isDirectory()) {
+                        if (entry.name === '.obsidian' || entry.name === '.understory') continue;
+                        await walk(relativePath);
+                    } else if (entry.isFile() && /\.md$/i.test(entry.name)) {
+                        seen.add(toPosixPath(relativePath));
+                    }
+                }
+            }
+            await walk('');
+        }
+
+        return [...seen].sort((a, b) => a.localeCompare(b));
+    }
+
+    function relationMatches(entry, terms) {
+        const relations = Array.isArray(entry && entry.relations) ? entry.relations : [];
+        const matches = [];
+        for (const relation of relations) {
+            const text = relationText(relation).toLowerCase();
+            if (terms.some((term) => text.includes(term))) matches.push(relation);
+        }
+        return matches;
+    }
+
+    async function buildNoteBrief(notePath, store, query) {
+        const normalized = normalizeInputPath(notePath, adapter, 'notePath');
+        const [content, stat] = await Promise.all([
+            adapter.readText(normalized),
+            adapter.stat(normalized).catch(() => ({ mtime: 0 })),
+        ]);
+        const entry = store.files[normalized] || null;
+        const relations = Array.isArray(entry && entry.relations) ? entry.relations : [];
+        return {
+            path: normalized,
+            title: noteTitleFromPath(normalized),
+            snippet: compactSnippet(content, query),
+            relationCount: relations.length,
+            relations: relations.slice(0, 8).map((relation) => ({
+                target: relation.target || '',
+                title: relation.title || titleFromTarget(relation.target || ''),
+                type: relation.type || '',
+                status: relation.status || 'suggested',
+                score: relation.score,
+            })),
+            indexedAt: entry && entry.indexedAt || '',
+            mtime: stat.mtime || 0,
+        };
+    }
+
+    async function searchLocal({ query, limit } = {}) {
+        const terms = searchTerms(query);
+        if (!terms.length) {
+            throw new AgentApiError('INVALID_ARGUMENT', 'query must contain at least one searchable term.');
+        }
+        const maxResults = clampLimit(limit);
+        const { store } = await readStore();
+        const paths = new Set([
+            ...Object.keys(store.files || {}),
+            ...(await listMarkdownNotePaths()),
+        ]);
+        const results = [];
+
+        for (const notePath of paths) {
+            let content = '';
+            try {
+                if (!(await adapter.exists(notePath))) continue;
+                content = await adapter.readText(notePath);
+            } catch (error) {
+                continue;
+            }
+            const entry = store.files[notePath] || null;
+            const title = noteTitleFromPath(notePath);
+            const haystacks = {
+                title: title.toLowerCase(),
+                path: notePath.toLowerCase(),
+                body: stripMarkdownNoise(content).toLowerCase(),
+            };
+            let score = 0;
+            const reasons = [];
+            for (const term of terms) {
+                if (haystacks.title.includes(term)) {
+                    score += 6;
+                    reasons.push('title');
+                }
+                if (haystacks.path.includes(term)) {
+                    score += 3;
+                    reasons.push('path');
+                }
+                if (haystacks.body.includes(term)) {
+                    score += 2;
+                    reasons.push('content snippet');
+                }
+            }
+            const relationHits = relationMatches(entry, terms);
+            if (relationHits.length) {
+                score += relationHits.length * 4;
+                reasons.push('relations graph');
+            }
+            if (!score) continue;
+            const brief = await buildNoteBrief(notePath, store, query);
+            results.push({
+                path: brief.path,
+                title: brief.title,
+                snippet: brief.snippet,
+                why: [...new Set(reasons)].join(', '),
+                score,
+                relationCount: brief.relationCount,
+                matchedRelations: relationHits.slice(0, 5).map((relation) => ({
+                    target: relation.target || '',
+                    title: relation.title || titleFromTarget(relation.target || ''),
+                    type: relation.type || '',
+                    status: relation.status || 'suggested',
+                })),
+            });
+        }
+
+        results.sort((a, b) => b.score - a.score || a.path.localeCompare(b.path));
+        return {
+            query,
+            mode: 'local_keyword_relations',
+            limit: maxResults,
+            results: results.slice(0, maxResults),
+        };
+    }
+
     return {
+        async getCapabilities() {
+            return run(async () => ({
+                apiVersion: API_VERSION,
+                transport: 'cli_or_mcp_stdio',
+                privacy: {
+                    networkMode: safeNetworkMode(settings.networkMode),
+                    opensHttpPort: false,
+                    sendsDataToBondieLabs: false,
+                    returnsFullNoteBodiesByDefault: false,
+                },
+                tools: {
+                    read: [
+                        'understory_status',
+                        'understory_get_capabilities',
+                        'understory_graph_summary',
+                        'understory_get_relations',
+                        'understory_search',
+                        'understory_get_context',
+                        'understory_get_note_brief',
+                    ],
+                    write: [
+                        'understory_refresh_relations',
+                        'understory_accept_relation',
+                        'understory_reject_relation',
+                        'understory_insert_relation',
+                    ],
+                },
+                writeSafety: 'Write tools modify local vault metadata or note content and require user confirmation.',
+            }));
+        },
+
         async status() {
             return run(async () => {
                 const { exists, store } = await readStore();
@@ -1795,6 +2250,60 @@ function createAgentApi(options = {}) {
                     stale,
                     relations: Array.isArray(entry.relations) ? entry.relations : [],
                     entry,
+                };
+            });
+        },
+
+        async search({ query, limit } = {}) {
+            return run(async () => searchLocal({ query, limit }));
+        },
+
+        async getNoteBrief({ notePath } = {}) {
+            return run(async () => {
+                const normalized = await assertNoteExists(notePath);
+                const { store } = await readStore();
+                const brief = await buildNoteBrief(normalized, store, '');
+                return {
+                    ...brief,
+                    bodyIncluded: false,
+                };
+            });
+        },
+
+        async getContext({ query, notePath, limit } = {}) {
+            return run(async () => {
+                const maxResults = clampLimit(limit, 6, 12);
+                if (notePath) {
+                    const normalized = await assertNoteExists(notePath);
+                    const { store } = await readStore();
+                    const source = await buildNoteBrief(normalized, store, query || '');
+                    const related = [];
+                    for (const relation of source.relations) {
+                        if (!relation.target) continue;
+                        try {
+                            if (await adapter.exists(relation.target)) {
+                                related.push(await buildNoteBrief(relation.target, store, query || ''));
+                            }
+                        } catch (error) {
+                            // Relations may point to aliases or notes that are not present locally.
+                        }
+                        if (related.length >= maxResults - 1) break;
+                    }
+                    return {
+                        mode: 'note_relations_context',
+                        query: query || '',
+                        source,
+                        items: [source, ...related].slice(0, maxResults),
+                        bodyIncluded: false,
+                    };
+                }
+
+                const search = await searchLocal({ query, limit: maxResults });
+                return {
+                    mode: 'search_context',
+                    query,
+                    items: search.results,
+                    bodyIncluded: false,
                 };
             });
         },
@@ -1945,6 +2454,570 @@ module.exports = {
     OVERRIDES_PATH,
     RELATIONS_PATH,
     createAgentApi,
+};
+
+},
+
+"./agentAccess": function(module, exports, require) {
+const fs = require('fs');
+const path = require('path');
+const { redactSensitiveText } = require('./safety');
+
+const AGENT_DIR = '.understory/agent';
+const MCP_SERVER_FILENAME = 'understory-mcp-server.js';
+const SKILL_FILENAME = 'understory-skill.md';
+const SERVER_KEY_PREFIX = 'understory-';
+
+const AGENT_PROFILES = {
+    generic: {
+        id: 'generic',
+        label: 'Generic MCP',
+        installHint: 'Paste this JSON into any MCP client that supports stdio. Keep the MCP server key unique for this vault.',
+        zh: {
+            label: '通用 MCP',
+            installHint: '把这段 JSON 粘贴到任何支持 stdio 的 MCP 客户端。请为这个 vault 保留独立的 MCP server key。',
+        },
+    },
+    codex: {
+        id: 'codex',
+        label: 'Codex',
+        installHint: 'Add this entry to Codex MCP configuration for this vault. Keep it alongside other vault entries instead of renaming it to a global "understory" key.',
+        zh: {
+            label: 'Codex',
+            installHint: '把这个 entry 加入 Codex 的 MCP 配置。它只对应当前 vault，请和其他 vault entry 并列保存，不要改成全局 understory key。',
+        },
+    },
+    claude: {
+        id: 'claude',
+        label: 'Claude Desktop',
+        installHint: 'Paste the server entry into Claude Desktop MCP configuration. Repeat setup inside each Obsidian vault you want Claude to access.',
+        zh: {
+            label: 'Claude Desktop',
+            installHint: '把 server entry 粘贴到 Claude Desktop 的 MCP 配置。每个需要 Claude 访问的 Obsidian vault 都要分别重复设置。',
+        },
+    },
+    cursor: {
+        id: 'cursor',
+        label: 'Cursor',
+        installHint: 'Use this as a Cursor MCP server entry for the current vault. If you configure multiple vaults, keep each vault-specific server key.',
+        zh: {
+            label: 'Cursor',
+            installHint: '把这段配置作为当前 vault 的 Cursor MCP server entry。配置多个 vault 时，请保留每个 vault 自己的 server key。',
+        },
+    },
+    openclaw: {
+        id: 'openclaw',
+        label: 'OpenClaw',
+        installHint: 'Give OpenClaw this MCP entry and the matching Skill prompt so it calls the current vault through the matching server key.',
+        zh: {
+            label: 'OpenClaw',
+            installHint: '把这个 MCP entry 和匹配的 Skill prompt 给 OpenClaw，让它通过对应 server key 调用当前 vault。',
+        },
+    },
+};
+
+const USAGE_MODES = {
+    query: {
+        id: 'query',
+        label: 'Query-only',
+        installHint: 'Use this Skill when you only want the agent to query this vault after you explicitly ask for vault search, citation, or summary.',
+    },
+    memory: {
+        id: 'memory',
+        label: 'Agent memory model',
+        installHint: 'Use this Skill when you want the agent to treat this vault as active local context and a long-term memory layer for ongoing work.',
+    },
+};
+
+function normalizeMcpPath(value) {
+    return String(value || '').replace(/\\/g, '/');
+}
+
+function pathBasename(value) {
+    const normalized = normalizeMcpPath(value).replace(/\/+$/, '');
+    if (!normalized) return '';
+    const parts = normalized.split('/');
+    return parts[parts.length - 1] || '';
+}
+
+function readVaultName(app) {
+    const vault = app && app.vault;
+    if (!vault) return '';
+    if (typeof vault.getName === 'function') return vault.getName() || '';
+    return vault.name || '';
+}
+
+function shortHash(value) {
+    const input = String(value || 'understory-vault');
+    let hash = 2166136261;
+    for (let i = 0; i < input.length; i += 1) {
+        hash ^= input.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(16).padStart(8, '0').slice(0, 8);
+}
+
+function slugifyVaultName(value) {
+    const normalized = String(value || '')
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase();
+    return normalized
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '')
+        .slice(0, 48)
+        .replace(/^-|-$/g, '');
+}
+
+function normalizeServerKeyOverride(value) {
+    let key = String(value || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+    if (!key || key === 'understory') return null;
+    if (!key.startsWith(SERVER_KEY_PREFIX)) key = `${SERVER_KEY_PREFIX}${key}`;
+    return key;
+}
+
+function createServerKey(vaultSlug, options = {}) {
+    const override = normalizeServerKeyOverride(options.serverKey);
+    if (override) {
+        return {
+            collisionSuffix: '',
+            serverKey: override,
+            warning: String(options.serverKey).startsWith(SERVER_KEY_PREFIX) ? '' : 'server_key_prefix_added',
+        };
+    }
+
+    let slug = slugifyVaultName(vaultSlug);
+    const hashSource = options.hashSource || vaultSlug || 'understory-vault';
+    if (!slug) slug = `vault-${shortHash(hashSource)}`;
+    if (slug.length < 3) slug = `${slug}-${shortHash(hashSource).slice(0, 4)}`;
+
+    let serverKey = `${SERVER_KEY_PREFIX}${slug}`;
+    let collisionSuffix = '';
+    const existing = new Set(options.existingServerKeys || []);
+    if (existing.has(serverKey)) {
+        collisionSuffix = shortHash(hashSource).slice(0, 6);
+        serverKey = `${serverKey}-${collisionSuffix}`;
+    }
+
+    return {
+        collisionSuffix,
+        serverKey,
+        warning: '',
+    };
+}
+
+function getVaultBasePath(app) {
+    const adapter = app && app.vault && app.vault.adapter;
+    if (!adapter) return '';
+    if (typeof adapter.getBasePath === 'function') return adapter.getBasePath() || '';
+    return adapter.basePath || adapter.vaultPath || '';
+}
+
+function createVaultIdentity(appOrVaultPath, options = {}) {
+    const vaultPath = options.vaultPath || (typeof appOrVaultPath === 'string'
+        ? appOrVaultPath
+        : getVaultBasePath(appOrVaultPath));
+    const vaultName = String(
+        options.vaultName
+        || (typeof appOrVaultPath === 'string' ? '' : readVaultName(appOrVaultPath))
+        || pathBasename(vaultPath)
+        || 'Current vault'
+    ).trim();
+    let vaultSlug = slugifyVaultName(options.vaultSlug || vaultName);
+    let serverKeySource = vaultSlug ? 'vault-name' : 'path-hash';
+    const hashSource = normalizeMcpPath(vaultPath) || vaultName;
+    if (!vaultSlug) vaultSlug = `vault-${shortHash(hashSource)}`;
+    if (vaultSlug.length < 3) vaultSlug = `${vaultSlug}-${shortHash(hashSource).slice(0, 4)}`;
+
+    const serverKeyResult = createServerKey(vaultSlug, {
+        existingServerKeys: options.existingServerKeys,
+        hashSource,
+        serverKey: options.serverKey,
+    });
+    if (options.serverKey) serverKeySource = 'manual';
+
+    return {
+        collisionSuffix: serverKeyResult.collisionSuffix,
+        serverKey: serverKeyResult.serverKey,
+        serverKeySource,
+        serverKeyWarning: serverKeyResult.warning,
+        status: vaultPath ? 'ready' : 'missing_path',
+        vaultName,
+        vaultPath: vaultPath || '',
+        vaultSlug,
+    };
+}
+
+function resolveVaultIdentity(options = {}) {
+    if (options.vaultIdentity) return options.vaultIdentity;
+    return createVaultIdentity(options.vaultPath || '', options);
+}
+
+function resolveAgentProfile(profileId) {
+    return AGENT_PROFILES[profileId] || AGENT_PROFILES.generic;
+}
+
+function languageId(value) {
+    return String(value || '').toLowerCase().startsWith('zh') ? 'zh' : 'en';
+}
+
+function localizeAgentProfile(profile, language) {
+    const resolved = profile || AGENT_PROFILES.generic;
+    if (languageId(language) !== 'zh' || !resolved.zh) return resolved;
+    return {
+        ...resolved,
+        label: resolved.zh.label || resolved.label,
+        installHint: resolved.zh.installHint || resolved.installHint,
+    };
+}
+
+function agentProfilesForLanguage(language) {
+    const profiles = {};
+    for (const [id, profile] of Object.entries(AGENT_PROFILES)) {
+        profiles[id] = localizeAgentProfile(profile, language);
+    }
+    return profiles;
+}
+
+function resolveUsageMode(modeId) {
+    return USAGE_MODES[modeId] || USAGE_MODES.memory;
+}
+
+function createAgentAccessPaths(appOrVaultPath) {
+    const vaultIdentity = createVaultIdentity(appOrVaultPath);
+    const vaultPath = vaultIdentity.vaultPath;
+    const agentDir = vaultPath ? path.join(vaultPath, AGENT_DIR) : AGENT_DIR;
+    return {
+        vaultPath,
+        vaultIdentity,
+        vaultName: vaultIdentity.vaultName,
+        vaultSlug: vaultIdentity.vaultSlug,
+        serverKey: vaultIdentity.serverKey,
+        agentDir,
+        mcpServerPath: path.join(agentDir, MCP_SERVER_FILENAME),
+        skillPath: path.join(agentDir, SKILL_FILENAME),
+        skillVaultPath: `${AGENT_DIR}/${SKILL_FILENAME}`,
+        mcpServerVaultPath: `${AGENT_DIR}/${MCP_SERVER_FILENAME}`,
+    };
+}
+
+function createMcpConfig(options = {}) {
+    const args = [normalizeMcpPath(options.mcpServerPath || `${AGENT_DIR}/${MCP_SERVER_FILENAME}`)];
+    if (options.vaultPath) args.push('--vault', normalizeMcpPath(options.vaultPath));
+    if (options.engineDir) args.push('--engine-dir', normalizeMcpPath(options.engineDir));
+    args.push('--python-path', options.pythonPath || 'python');
+
+    return {
+        command: 'node',
+        args,
+    };
+}
+
+function formatMcpConfig(options = {}) {
+    const vaultIdentity = resolveVaultIdentity(options);
+    const serverKey = options.serverKey || vaultIdentity.serverKey;
+    return JSON.stringify({
+        mcpServers: {
+            [serverKey]: createMcpConfig({
+                ...options,
+                vaultPath: vaultIdentity.vaultPath || options.vaultPath,
+            }),
+        },
+    }, null, 2);
+}
+
+function createAgentInstallNotes(options = {}) {
+    const vaultIdentity = resolveVaultIdentity(options);
+    const profile = localizeAgentProfile(resolveAgentProfile(options.agentProfileId || options.agentProfile), options.uiLanguage);
+    const usageMode = resolveUsageMode(options.usageModeId || options.usageMode);
+    const profileSeparator = languageId(options.uiLanguage) === 'zh' ? '：' : ': ';
+    return [
+        `${profile.label}${profileSeparator}${profile.installHint}`,
+        `Use case: ${usageMode.label}. ${usageMode.installHint}`,
+        `MCP server key: ${vaultIdentity.serverKey}`,
+        vaultIdentity.vaultPath
+            ? `This entry is bound to vault "${vaultIdentity.vaultName}" at ${normalizeMcpPath(vaultIdentity.vaultPath)}.`
+            : 'The current Obsidian adapter did not expose a vault path; export after opening the target vault.',
+        'For multiple vaults, repeat this setup from each vault and keep each generated MCP server entry.',
+        'Understory does not scan all Obsidian vaults or write external agent config files automatically.',
+    ].join('\n');
+}
+
+function createUnderstorySkill(options = {}) {
+    const vaultIdentity = resolveVaultIdentity(options);
+    const profile = localizeAgentProfile(resolveAgentProfile(options.agentProfileId || options.agentProfile), options.uiLanguage);
+    const usageMode = resolveUsageMode(options.usageModeId || options.usageMode);
+    const vaultLine = vaultIdentity.vaultPath
+        ? `- Vault path: \`${normalizeMcpPath(vaultIdentity.vaultPath)}\`. Treat this path as local and private.`
+        : '- The vault path is supplied by the MCP server configuration. Treat it as local and private.';
+    const behavior = usageMode.id === 'query'
+        ? [
+            'Use this skill when the user explicitly asks to query, search, cite, summarize, or inspect this Obsidian vault.',
+            '',
+            '## Query-only Behavior',
+            '',
+            '- Call the Understory MCP server before reading the filesystem directly for vault search or retrieval tasks.',
+            '- Start with `understory_status` to confirm the vault and local engine state.',
+            '- Prefer `understory_search`, `understory_get_context`, or `understory_get_note_brief` for scoped context packages.',
+            '- Use `understory_graph_summary` for a vault overview and `understory_get_relations` when a note path is known.',
+            '- Do not call Understory automatically at task start unless the user asks to use Understory, search Obsidian, check this vault, or cite vault context.',
+            '- Do not scan the entire vault by default.',
+            '- Do not return full note bodies unless the user explicitly asks and the result is necessary.',
+            '',
+            '## Write Safety',
+            '',
+            '- Treat Query-only mode as read-only.',
+            '- Do not create, update, accept, reject, insert, refresh, write back, or maintain notes, relations, or memory from this Skill.',
+            '- Never send vault text, API keys, prompts, embeddings, logs, or webhook URLs to Bondie Labs.',
+        ]
+        : [
+            'Use this skill when the agent should use this Obsidian vault as active local context and a long-term memory layer for projects, preferences, notes, knowledge relationships, claims, conflicts, or related-note discovery.',
+            '',
+            '## Memory Model Behavior',
+            '',
+            '- Call the Understory MCP server before reading the filesystem directly.',
+            '- For complex, ongoing, or project-specific tasks that may relate to this vault, retrieve relevant Understory context early even if the user did not explicitly say "search Obsidian".',
+            '- Start with `understory_status` to confirm the vault and local engine state.',
+            '- Prefer `understory_search`, `understory_get_context`, or `understory_get_note_brief` for scoped context packages before forming a plan.',
+            '- Use `understory_graph_summary` for a vault overview and `understory_get_relations` when a note path is known.',
+            '- Do not scan the entire vault by default.',
+            '- Do not return full note bodies unless the user explicitly asks and the result is necessary.',
+            '- At the end of substantial work, identify durable memory, relation, decision, or project-state updates that may be worth preserving.',
+            '',
+            '## Memory Write Safety',
+            '',
+            '- Default to read-only context gathering while reasoning.',
+            '- Before calling write tools such as accept, reject, insert, refresh, or writeback, explain the planned local change and ask the user to confirm.',
+            '- If a memory or relation update is useful but no safe write tool is available, present a concise suggested note update for user approval.',
+            '- Never send vault text, API keys, prompts, embeddings, logs, or webhook URLs to Bondie Labs.',
+        ];
+    return [
+        '# Understory Skill',
+        '',
+        `Use case: ${usageMode.label}.`,
+        '',
+        ...behavior,
+        '',
+        '## Fallback',
+        '',
+        '- If MCP is unavailable, report the connection problem and tell the user to open Obsidian Settings -> Understory -> AI agents.',
+        '- Use direct file reads only after MCP is unavailable or insufficient, and keep reads scoped to the user request.',
+        '',
+        '## Local Context',
+        '',
+        `- Vault name: ${vaultIdentity.vaultName}`,
+        vaultLine,
+        `- MCP server key: \`${vaultIdentity.serverKey}\`.`,
+        `- Usage mode: ${usageMode.label}.`,
+        `- Target agent profile: ${profile.label}.`,
+        '- This Skill is only for this vault.',
+        "- If the user asks about another vault, use that vault's matching Understory MCP server.",
+        '- Do not pass another `vaultPath` to this server unless the user explicitly asks for advanced troubleshooting.',
+        '- The MCP transport is stdio; Understory does not open an HTTP port for agent access.',
+        '',
+    ].join('\n');
+}
+
+function createAgentDiagnostics(options = {}, settings = {}) {
+    const vaultIdentity = resolveVaultIdentity(options);
+    const lines = [
+        'Understory Agent Access diagnostics',
+        `Plugin version: ${options.pluginVersion || 'unknown'}`,
+        `Vault name: ${vaultIdentity.vaultName || 'not available'}`,
+        `Vault path: ${vaultIdentity.vaultPath || 'not available'}`,
+        `MCP server key: ${vaultIdentity.serverKey || 'not available'}`,
+        `MCP server path: ${options.mcpServerPath || 'not exported yet'}`,
+        `Skill path: ${options.skillPath || 'not exported yet'}`,
+        `Engine folder: ${options.engineDir || 'not set'}`,
+        `Python path: ${options.pythonPath || 'python'}`,
+        `Network mode: ${options.networkMode || 'local'}`,
+        'Transport: MCP stdio, no HTTP port',
+    ];
+    return redactSensitiveText(lines.join('\n'), settings);
+}
+
+function createAgentSetupPack(options = {}, settings = {}) {
+    const vaultIdentity = resolveVaultIdentity(options);
+    const uiLanguage = options.uiLanguage || settings.uiLanguage || 'en';
+    const agentProfile = localizeAgentProfile(resolveAgentProfile(options.agentProfileId || options.agentProfile), uiLanguage);
+    const usageMode = resolveUsageMode(options.usageModeId || options.usageMode);
+    const setupOptions = {
+        ...options,
+        agentProfileId: agentProfile.id,
+        usageModeId: usageMode.id,
+        uiLanguage,
+        vaultIdentity,
+    };
+    const mcpConfigText = formatMcpConfig(setupOptions);
+    const skillText = createUnderstorySkill(setupOptions);
+    const installNotesText = createAgentInstallNotes(setupOptions);
+    const diagnosticsText = createAgentDiagnostics(setupOptions, settings);
+    const setupPackText = [
+        '# Understory Agent Setup Pack',
+        '',
+        '## Vault identity',
+        '',
+        `- Vault name: ${vaultIdentity.vaultName}`,
+        `- Vault path: ${vaultIdentity.vaultPath ? normalizeMcpPath(vaultIdentity.vaultPath) : 'not available'}`,
+        `- MCP server key: ${vaultIdentity.serverKey}`,
+        `- Use case: ${usageMode.label}`,
+        `- Agent profile: ${agentProfile.label}`,
+        '',
+        '## Install notes',
+        '',
+        installNotesText,
+        '',
+        '## MCP config',
+        '',
+        '```json',
+        mcpConfigText,
+        '```',
+        '',
+        '## Understory Skill',
+        '',
+        skillText,
+        '',
+    ].join('\n');
+
+    return {
+        agentProfile,
+        diagnosticsText,
+        installNotesText,
+        mcpConfigText,
+        setupPackText,
+        skillText,
+        usageMode,
+        vaultIdentity,
+    };
+}
+
+function stripHashbang(source) {
+    return String(source || '').replace(/^#!.*\r?\n/, '');
+}
+
+function loadBundledSources() {
+    try {
+        return require('./agentAccessBundledSources');
+    } catch (error) {
+        // Source-tree fallback for tests and development builds.
+    }
+
+    if (typeof __dirname === 'undefined') return {};
+    try {
+        const rootDir = path.resolve(__dirname, '..');
+        return {
+            agentApiSource: fs.readFileSync(path.join(rootDir, 'src', 'agentApi.js'), 'utf8'),
+            safetySource: fs.readFileSync(path.join(rootDir, 'src', 'safety.js'), 'utf8'),
+            mcpServerSource: fs.readFileSync(path.join(rootDir, 'scripts', 'understory-mcp-server.js'), 'utf8'),
+        };
+    } catch (error) {
+        return {};
+    }
+}
+
+function moduleSourceBlock(source) {
+    return stripHashbang(source || 'throw new Error("Understory bundled source is unavailable.");');
+}
+
+function createStandaloneMcpServerSource() {
+    const sources = loadBundledSources();
+    const safetySource = moduleSourceBlock(sources.safetySource);
+    const agentApiSource = moduleSourceBlock(sources.agentApiSource);
+    const mcpServerSource = moduleSourceBlock(sources.mcpServerSource);
+
+    return `#!/usr/bin/env node
+// Generated by Understory. This standalone MCP server is local-only and uses stdio.
+(function() {
+const __rootRequire = typeof require === 'function' ? require : null;
+const __modules = {
+  './safety': function(module, exports, require) {
+${safetySource}
+  },
+  './agentApi': function(module, exports, require) {
+${agentApiSource}
+  },
+  './understory-mcp-server': function(module, exports, require) {
+${mcpServerSource}
+  }
+};
+const __cache = {};
+function __normalize(id) {
+  if (id.endsWith('.js')) id = id.slice(0, -3);
+  id = id.replace(/\\\\/g, '/');
+  if (id === '../src/agentApi') return './agentApi';
+  if (id === '../src/safety') return './safety';
+  if (id === './safety') return './safety';
+  return id;
+}
+function __require(id) {
+  const key = __normalize(id);
+  if (Object.prototype.hasOwnProperty.call(__modules, key)) {
+    if (__cache[key]) return __cache[key].exports;
+    const module = { exports: {} };
+    __cache[key] = module;
+    __modules[key](module, module.exports, __require);
+    return module.exports;
+  }
+  if (__rootRequire) return __rootRequire(id);
+  throw new Error('Cannot resolve module: ' + id);
+}
+const server = __require('./understory-mcp-server');
+server.startServer(process.argv.slice(2), process.stdin, process.stdout, process.stderr);
+})();
+`;
+}
+
+async function writeAgentAccessFile(filePath, content) {
+    if (!filePath) throw new Error('Missing output path.');
+    await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.promises.writeFile(filePath, content, 'utf8');
+    return filePath;
+}
+
+function checkAgentAccessStatus(options = {}) {
+    const pathExists = (candidate) => !!candidate && fs.existsSync(candidate);
+    const checks = [
+        { key: 'vaultPath', ok: pathExists(options.vaultPath), label: 'Vault path' },
+        { key: 'engineDir', ok: pathExists(options.engineDir), label: 'Engine folder' },
+        { key: 'pythonPath', ok: !!(options.pythonPath || 'python'), label: 'Python path' },
+        { key: 'mcpServerPath', ok: pathExists(options.mcpServerPath), label: 'MCP server export' },
+    ];
+    return {
+        ok: checks.every((check) => check.ok),
+        checks,
+    };
+}
+
+module.exports = {
+    AGENT_DIR,
+    AGENT_PROFILES,
+    MCP_SERVER_FILENAME,
+    SKILL_FILENAME,
+    USAGE_MODES,
+    agentProfilesForLanguage,
+    checkAgentAccessStatus,
+    createAgentAccessPaths,
+    createAgentDiagnostics,
+    createAgentInstallNotes,
+    createMcpConfig,
+    createAgentSetupPack,
+    createServerKey,
+    createStandaloneMcpServerSource,
+    createUnderstorySkill,
+    createVaultIdentity,
+    formatMcpConfig,
+    getVaultBasePath,
+    normalizeMcpPath,
+    resolveAgentProfile,
+    resolveUsageMode,
+    slugifyVaultName,
+    shortHash,
+    writeAgentAccessFile,
 };
 
 },
@@ -2159,7 +3232,17 @@ module.exports = {
 },
 
 "./settings": function(module, exports, require) {
-const { PluginSettingTab, Setting, Notice, TFile } = require('obsidian');
+const { PluginSettingTab, Setting, Notice, TFile, setIcon } = require('obsidian');
+const { UNDERSTORY_SETTINGS_LOGO_DATA_URI } = require('./brandAssets');
+const {
+    USAGE_MODES,
+    agentProfilesForLanguage,
+    checkAgentAccessStatus,
+    createAgentAccessPaths,
+    createAgentSetupPack,
+    createStandaloneMcpServerSource,
+    writeAgentAccessFile,
+} = require('./agentAccess');
 const { getLanguage, t } = require('./i18n');
 
 const ENGINE_DIR_ENV = 'UNDERSTORY_ENGINE_DIR';
@@ -2220,6 +3303,8 @@ const DEFAULT_SETTINGS = {
     linkLog: [],
     uiLanguage: 'en',
     networkMode: 'local',
+    agentProfileId: 'generic',
+    agentUsageModeId: 'memory',
     embeddingProvider: 'zhipu',
     embeddingBaseUrl: PROVIDER_PRESETS.zhipu.baseUrl,
     embeddingModel: PROVIDER_PRESETS.zhipu.embeddingModel,
@@ -2234,7 +3319,6 @@ const DEFAULT_SETTINGS = {
     sidebarShowScores: true,
     sidebarShowConflicts: true,
     sidebarGroupBy: 'concept',
-    openSidebarOnLoad: false,
     // AIC-2104: 持续自动更新开关
     autoRefreshEnabled: false,
     // AIC-2105: 文件夹白名单（空数组表示全部）
@@ -2293,12 +3377,173 @@ class UnderstorySettingTab extends PluginSettingTab {
         this._injectStyles(containerEl);
 
         const header = containerEl.createDiv({ cls: 'understory-settings-header' });
-        header.createDiv({ text: t(this.plugin, 'settings_title'), cls: 'understory-settings-title' });
+        const brand = header.createDiv({ cls: 'understory-settings-brand' });
+        const logo = brand.createEl('img', { cls: 'understory-settings-logo' });
+        logo.setAttribute('src', UNDERSTORY_SETTINGS_LOGO_DATA_URI);
+        logo.setAttribute('alt', 'Understory logo');
+        brand.createDiv({ text: t(this.plugin, 'settings_title'), cls: 'understory-settings-title' });
         this._renderLanguageToggle(header);
+
+        const tabIds = this._settingsTabs().map((tab) => tab.id);
+        const activeTab = tabIds.includes(this._activeSettingsTab) ? this._activeSettingsTab : 'setup';
+        this._activeSettingsTab = activeTab;
+        this._renderSettingsTabs(containerEl, activeTab);
+        const pageEl = containerEl.createDiv({ cls: 'understory-settings-page' });
+
+        if (activeTab === 'models') {
+            this._renderModelsTab(pageEl);
+        } else if (activeTab === 'suggestions') {
+            this._renderSuggestionsTab(pageEl);
+        } else if (activeTab === 'agents') {
+            this._renderAgentAccessTab(pageEl);
+        } else if (activeTab === 'maintenance') {
+            this._renderMaintenanceTab(pageEl);
+        } else {
+            this._activeSettingsTab = 'setup';
+            this._renderSetupTab(pageEl);
+        }
+    }
+
+    _settingsTabs() {
+        return [
+            { id: 'setup', label: t(this.plugin, 'settings_tab_setup') },
+            { id: 'models', label: t(this.plugin, 'settings_tab_models') },
+            { id: 'suggestions', label: t(this.plugin, 'settings_tab_suggestions') },
+            { id: 'maintenance', label: t(this.plugin, 'settings_tab_maintenance') },
+            { id: 'agents', label: t(this.plugin, 'settings_tab_agents') },
+        ];
+    }
+
+    _renderSettingsTabs(containerEl, activeTab) {
+        const toggle = containerEl.createDiv({ cls: 'understory-settings-toggle' });
+        toggle.createDiv({
+            cls: 'understory-settings-toggle-label',
+            text: t(this.plugin, 'settings_page_toggle_label'),
+        });
+
+        const tabs = this._settingsTabs();
+        const tablist = toggle.createDiv({ cls: 'understory-settings-tablist' });
+        tablist.setAttribute('role', 'tablist');
+        tablist.setAttribute('aria-label', t(this.plugin, 'settings_page_toggle_label'));
+
+        for (const tab of tabs) {
+            const isActive = tab.id === activeTab;
+            const button = tablist.createEl('button', {
+                text: tab.label,
+                cls: `understory-settings-toggle-button${isActive ? ' is-active' : ''}`,
+            });
+            button.type = 'button';
+            button.tabIndex = isActive ? 0 : -1;
+            button.setAttribute('role', 'tab');
+            button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            button.setAttribute('data-settings-page', tab.id);
+            button.addEventListener('click', () => {
+                this._activeSettingsTab = tab.id;
+                this.display();
+            });
+            button.addEventListener('keydown', (event) => {
+                const currentIndex = tabs.findIndex((candidate) => candidate.id === tab.id);
+                const delta = event.key === 'ArrowRight' || event.key === 'ArrowDown'
+                    ? 1
+                    : event.key === 'ArrowLeft' || event.key === 'ArrowUp'
+                        ? -1
+                        : 0;
+                if (!delta) return;
+                event.preventDefault?.();
+                const nextIndex = (currentIndex + delta + tabs.length) % tabs.length;
+                this._activeSettingsTab = tabs[nextIndex].id;
+                this.display();
+            });
+        }
+    }
+
+    _renderTabIntro(containerEl, titleKey, descKey) {
+        const intro = containerEl.createDiv({ cls: 'understory-tab-intro' });
+        intro.createDiv({ text: t(this.plugin, titleKey), cls: 'understory-tab-intro-title' });
+        intro.createDiv({ text: t(this.plugin, descKey), cls: 'understory-tab-intro-desc' });
+    }
+
+    _setupStatusInfo() {
+        const health = this.plugin.engineHealth;
+        const engineDir = String(this.plugin.settings.graphifyDir || '').trim();
+        if (!engineDir) {
+            return {
+                status: 'needed',
+                title: t(this.plugin, 'setup_needed_title'),
+                desc: t(this.plugin, 'setup_needed_desc'),
+            };
+        }
+        if (!health) {
+            return {
+                status: 'unchecked',
+                title: t(this.plugin, 'setup_unchecked_title'),
+                desc: t(this.plugin, 'setup_unchecked_desc'),
+            };
+        }
+        if (health.status === 'ready') {
+            return {
+                status: 'ready',
+                title: t(this.plugin, 'setup_ready_title'),
+                desc: t(this.plugin, 'setup_ready_desc'),
+            };
+        }
+        if (health.status === 'warning') {
+            return {
+                status: 'warning',
+                title: t(this.plugin, 'setup_warning_title'),
+                desc: health.message || t(this.plugin, 'setup_warning_desc'),
+            };
+        }
+        return {
+            status: 'error',
+            title: t(this.plugin, 'setup_error_title'),
+            desc: health.message || t(this.plugin, 'setup_error_desc'),
+        };
+    }
+
+    _renderSetupSteps(containerEl) {
+        const steps = [
+            [t(this.plugin, 'setup_step_engine_title'), t(this.plugin, 'setup_step_engine_desc')],
+            [t(this.plugin, 'setup_step_python_title'), t(this.plugin, 'setup_step_python_desc')],
+            [t(this.plugin, 'setup_step_check_title'), t(this.plugin, 'setup_step_check_desc')],
+        ];
+        this._renderNumberedSteps(containerEl, steps);
+    }
+
+    _renderNumberedSteps(containerEl, steps) {
+        const list = containerEl.createDiv({ cls: 'understory-setup-steps' });
+        for (let index = 0; index < steps.length; index += 1) {
+            const [title, desc] = steps[index];
+            const row = list.createDiv({ cls: 'understory-setup-step' });
+            row.createDiv({ text: String(index + 1), cls: 'understory-setup-step-number' });
+            const body = row.createDiv({ cls: 'understory-setup-step-body' });
+            body.createDiv({ text: title, cls: 'understory-setup-step-title' });
+            body.createDiv({ text: desc, cls: 'understory-setup-step-desc' });
+        }
+    }
+
+    _renderAgentMultiVaultSteps(containerEl) {
+        const steps = [
+            [t(this.plugin, 'agent_multi_vault_step_open_title'), t(this.plugin, 'agent_multi_vault_step_open_desc')],
+            [t(this.plugin, 'agent_multi_vault_step_prepare_title'), t(this.plugin, 'agent_multi_vault_step_prepare_desc')],
+            [t(this.plugin, 'agent_multi_vault_step_copy_title'), t(this.plugin, 'agent_multi_vault_step_copy_desc')],
+        ];
+        this._renderNumberedSteps(containerEl, steps);
+    }
+
+    _renderSetupTab(containerEl) {
+        this._renderTabIntro(containerEl, 'setup_page_title', 'setup_page_desc');
+
+        const info = this._setupStatusInfo();
+        const card = containerEl.createDiv({ cls: `understory-setup-card is-${info.status}` });
+        card.createDiv({ text: info.title, cls: 'understory-setup-card-title' });
+        card.createDiv({ text: info.desc, cls: 'understory-setup-card-desc' });
+
+        this._renderSetupSteps(containerEl);
 
         new Setting(containerEl)
             .setName(t(this.plugin, 'engine_dir_name'))
-            .setDesc(t(this.plugin, 'engine_dir_desc'))
+            .setDesc(t(this.plugin, 'engine_dir_user_desc'))
             .addText((text) => text
                 .setPlaceholder(t(this.plugin, 'engine_dir_placeholder'))
                 .setValue(this.plugin.settings.graphifyDir)
@@ -2309,7 +3554,7 @@ class UnderstorySettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName(t(this.plugin, 'python_path_name'))
-            .setDesc(t(this.plugin, 'python_path_desc'))
+            .setDesc(t(this.plugin, 'python_path_user_desc'))
             .addText((text) => text
                 .setPlaceholder('python')
                 .setValue(this.plugin.settings.pythonPath)
@@ -2318,8 +3563,45 @@ class UnderstorySettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
-        this._renderEngineStatus(containerEl);
+        new Setting(containerEl)
+            .setName(t(this.plugin, 'setup_check_name'))
+            .setDesc(t(this.plugin, 'setup_check_desc'))
+            .addButton((button) => button
+                .setButtonText(t(this.plugin, 'engine_check_button'))
+                .setCta()
+                .onClick(async () => {
+                    if (!this.plugin.checkEngineHealth) {
+                        new Notice(t(this.plugin, 'engine_check_unavailable'));
+                        return;
+                    }
+                    await this.plugin.checkEngineHealth(true, true);
+                    this.display();
+                }))
+            .addButton((button) => button
+                .setButtonText(t(this.plugin, 'engine_use_env_button'))
+                .setDisabled(!getDefaultEngineDir())
+                .onClick(async () => {
+                    this.plugin.settings.graphifyDir = getDefaultEngineDir();
+                    this.plugin.settings.pythonPath = getDefaultPythonPath();
+                    await this.plugin.saveSettings();
+                    await this.plugin.checkEngineHealth?.(true, true);
+                    this.display();
+                }))
+            .addButton((button) => button
+                .setButtonText(t(this.plugin, 'setup_open_diagnostics_button'))
+                .onClick(() => {
+                    this._activeSettingsTab = 'maintenance';
+                    this.display();
+                }));
+    }
+
+    _renderModelsTab(containerEl) {
+        this._renderTabIntro(containerEl, 'models_page_title', 'models_page_desc');
         this._renderPrivacySettings(containerEl);
+    }
+
+    _renderSuggestionsTab(containerEl) {
+        this._renderTabIntro(containerEl, 'suggestions_page_title', 'suggestions_page_desc');
 
         new Setting(containerEl)
             .setName(t(this.plugin, 'debounce_name'))
@@ -2333,15 +3615,15 @@ class UnderstorySettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
-        containerEl.createEl('h3', { text: t(this.plugin, 'excluded_folders_title') });
-        containerEl.createEl('div', {
+        containerEl.createDiv({ text: t(this.plugin, 'excluded_folders_title'), cls: 'understory-section-title-text' });
+        containerEl.createDiv({
             text: t(this.plugin, 'excluded_folders_desc'),
             cls: 'setting-item-description'
         }).style.marginBottom = '8px';
         this._renderFolderTree(containerEl, 'excludedFolders', 'refreshFolders', t(this.plugin, 'excluded_selected'));
 
-        containerEl.createEl('h3', { text: t(this.plugin, 'relation_title') });
-        containerEl.createEl('div', {
+        containerEl.createDiv({ text: t(this.plugin, 'relation_title'), cls: 'understory-section-title-text' });
+        containerEl.createDiv({
             text: t(this.plugin, 'relation_desc'),
             cls: 'setting-item-description'
         }).style.marginBottom = '8px';
@@ -2360,16 +3642,6 @@ class UnderstorySettingTab extends PluginSettingTab {
                     if (value === 'sidebar' || value === 'both') {
                         await this.plugin.openSidebar();
                     }
-                }));
-
-        new Setting(containerEl)
-            .setName(t(this.plugin, 'open_sidebar_on_load_name'))
-            .setDesc(t(this.plugin, 'open_sidebar_on_load_desc'))
-            .addToggle((toggle) => toggle
-                .setValue(!!this.plugin.settings.openSidebarOnLoad)
-                .onChange(async (value) => {
-                    this.plugin.settings.openSidebarOnLoad = value;
-                    await this.plugin.saveSettings();
                 }));
 
         new Setting(containerEl)
@@ -2413,6 +3685,10 @@ class UnderstorySettingTab extends PluginSettingTab {
                     this.plugin.settings.ingestEnabled = value;
                     await this.plugin.saveSettings();
                 }));
+    }
+
+    _renderMaintenanceTab(containerEl) {
+        this._renderTabIntro(containerEl, 'maintenance_page_title', 'maintenance_page_desc');
 
         new Setting(containerEl)
             .setName(t(this.plugin, 'lint_name'))
@@ -2506,7 +3782,7 @@ class UnderstorySettingTab extends PluginSettingTab {
             const lastLint = this.plugin.settings.lastLintTime;
             const openHigh = this.plugin._countOpenConflicts ? this.plugin._countOpenConflicts('high') : 0;
             const openAll = this.plugin._countOpenConflicts ? this.plugin._countOpenConflicts() : 0;
-            containerEl.createEl('div', {
+            containerEl.createDiv({
                 text: lastLint > 0
                     ? t(this.plugin, 'last_lint', { time: new Date(lastLint).toLocaleString(), all: openAll, high: openHigh })
                     : t(this.plugin, 'last_lint_never'),
@@ -2538,14 +3814,14 @@ class UnderstorySettingTab extends PluginSettingTab {
                     .onClick(() => this.plugin._openGraphifyIndex()));
         }
 
-        containerEl.createEl('h4', { text: t(this.plugin, 'relation_logs_title') });
-        containerEl.createEl('div', {
+        containerEl.createDiv({ text: t(this.plugin, 'relation_logs_title'), cls: 'understory-section-title-text' });
+        containerEl.createDiv({
             text: t(this.plugin, 'relation_logs_desc'),
             cls: 'setting-item-description'
         }).style.marginBottom = '8px';
         this._renderLogs(containerEl);
 
-        containerEl.createEl('h3', { text: t(this.plugin, 'refresh_title') });
+        containerEl.createDiv({ text: t(this.plugin, 'refresh_title'), cls: 'understory-section-title-text' });
 
         new Setting(containerEl)
             .setName(t(this.plugin, 'auto_refresh_name'))
@@ -2572,16 +3848,16 @@ class UnderstorySettingTab extends PluginSettingTab {
                         await this.plugin.saveSettings();
                     }));
 
-            containerEl.createEl('h4', { text: t(this.plugin, 'refresh_folders_title') });
-            containerEl.createEl('div', {
+            containerEl.createDiv({ text: t(this.plugin, 'refresh_folders_title'), cls: 'understory-section-subtitle-text' });
+            containerEl.createDiv({
                 text: t(this.plugin, 'refresh_folders_desc'),
                 cls: 'setting-item-description'
             }).style.marginBottom = '8px';
             this._renderFolderTree(containerEl, 'refreshFolders', 'excludedFolders', t(this.plugin, 'refresh_selected'));
 
             const lastRefresh = this.plugin.settings.lastRefreshTime;
-            containerEl.createEl('h4', { text: t(this.plugin, 'refresh_status_title') });
-            containerEl.createEl('div', {
+            containerEl.createDiv({ text: t(this.plugin, 'refresh_status_title'), cls: 'understory-section-subtitle-text' });
+            containerEl.createDiv({
                 text: lastRefresh > 0
                     ? t(this.plugin, 'last_refresh', { time: new Date(lastRefresh).toLocaleString() })
                     : t(this.plugin, 'last_refresh_never'),
@@ -2591,7 +3867,7 @@ class UnderstorySettingTab extends PluginSettingTab {
             if (this.plugin.settings.refreshInProgress) {
                 const idx = this.plugin.settings.refreshQueueIndex || 0;
                 const total = (this.plugin.settings.refreshQueue || []).length;
-                containerEl.createEl('div', {
+                containerEl.createDiv({
                     text: t(this.plugin, 'refresh_progress', { current: idx, total }),
                     cls: 'setting-item-description'
                 }).style.marginBottom = '6px';
@@ -2617,8 +3893,8 @@ class UnderstorySettingTab extends PluginSettingTab {
                 });
         }
 
-        containerEl.createEl('h3', { text: t(this.plugin, 'advanced_index_title') });
-        containerEl.createEl('div', {
+        containerEl.createDiv({ text: t(this.plugin, 'advanced_index_title'), cls: 'understory-section-title-text' });
+        containerEl.createDiv({
             text: t(this.plugin, 'advanced_index_desc'),
             cls: 'setting-item-description'
         }).style.marginBottom = '8px';
@@ -2652,7 +3928,7 @@ class UnderstorySettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
-        containerEl.createEl('div', {
+        containerEl.createDiv({
             text: this.plugin.daemonProcess
                 ? t(this.plugin, 'daemon_running')
                 : (this.plugin.settings.daemonEnabled
@@ -2660,6 +3936,249 @@ class UnderstorySettingTab extends PluginSettingTab {
                     : t(this.plugin, 'daemon_stopped')),
             cls: 'setting-item-description'
         }).style.marginBottom = '8px';
+
+        containerEl.createDiv({ text: t(this.plugin, 'maintenance_diagnostics_title'), cls: 'understory-section-title-text' });
+        containerEl.createDiv({
+            text: t(this.plugin, 'maintenance_diagnostics_desc'),
+            cls: 'setting-item-description'
+        }).style.marginBottom = '8px';
+        this._renderEngineStatus(containerEl);
+    }
+
+    _agentAccessContext() {
+        const paths = createAgentAccessPaths(this.app || this.plugin.app);
+        return {
+            ...paths,
+            agentProfileId: this.plugin.settings.agentProfileId || 'generic',
+            usageModeId: this.plugin.settings.agentUsageModeId || 'memory',
+            engineDir: this.plugin.settings.graphifyDir || getDefaultEngineDir(),
+            networkMode: this.plugin.settings.networkMode || 'local',
+            pluginVersion: this.plugin.manifest && this.plugin.manifest.version,
+            pythonPath: this.plugin.settings.pythonPath || getDefaultPythonPath(),
+        };
+    }
+
+    _renderAgentPreview(containerEl, text, language) {
+        const preview = containerEl.createEl('pre', { cls: 'understory-agent-preview' });
+        preview.setAttribute('data-language', language || 'text');
+        const code = preview.createEl('code');
+        code.setText(text);
+        return preview;
+    }
+
+    _renderAgentInstallNotes(containerEl, text) {
+        const notes = containerEl.createDiv({ cls: 'understory-agent-quote-block understory-agent-install-notes' });
+        for (const line of String(text || '').split(/\r?\n/).filter(Boolean)) {
+            notes.createDiv({ text: line, cls: 'understory-agent-install-note-line' });
+        }
+        return notes;
+    }
+
+    _renderAgentStep(containerEl, step, titleKey, descKey) {
+        const section = containerEl.createDiv({ cls: 'understory-agent-step' });
+        section.createDiv({
+            text: t(this.plugin, 'agent_step_label', { step }),
+            cls: 'understory-agent-step-label',
+        });
+        section.createDiv({ text: t(this.plugin, titleKey), cls: 'understory-section-title-text' });
+        section.createDiv({
+            text: t(this.plugin, descKey),
+            cls: 'setting-item-description',
+        }).style.marginBottom = '8px';
+        return section;
+    }
+
+    _renderAgentIdentityGrid(containerEl, context, vaultIdentity) {
+        const status = checkAgentAccessStatus(context);
+        const serverCheck = status.checks.find((check) => check.key === 'mcpServerPath');
+        const items = [
+            {
+                label: t(this.plugin, 'agent_identity_vault_name_label'),
+                value: vaultIdentity.vaultName,
+                ok: !!vaultIdentity.vaultName,
+            },
+            {
+                label: t(this.plugin, 'agent_identity_server_key_label'),
+                value: vaultIdentity.serverKey,
+                ok: !!vaultIdentity.serverKey,
+            },
+            {
+                label: t(this.plugin, 'agent_identity_vault_path_label'),
+                value: vaultIdentity.vaultPath || t(this.plugin, 'agent_status_not_available'),
+                ok: !!vaultIdentity.vaultPath,
+            },
+            {
+                label: t(this.plugin, 'agent_identity_export_status_label'),
+                value: context.mcpServerPath,
+                ok: !!(serverCheck && serverCheck.ok),
+            },
+        ];
+
+        const list = containerEl.createDiv({ cls: 'understory-agent-quote-block understory-agent-identity-list' });
+        for (const item of items) {
+            const row = list.createDiv({ cls: `understory-agent-identity-row${item.ok ? ' is-ok' : ' is-warning'}` });
+            row.createDiv({ text: item.label, cls: 'understory-agent-identity-label' });
+            row.createDiv({ text: item.value, cls: 'understory-agent-identity-value' });
+        }
+    }
+
+    _renderAgentCheckList(containerEl, context) {
+        const status = checkAgentAccessStatus(context);
+        const list = containerEl.createDiv({ cls: 'understory-agent-check-list' });
+        for (const check of status.checks) {
+            const row = list.createDiv({ cls: `understory-agent-check-row${check.ok ? ' is-ok' : ' is-warning'}` });
+            row.createDiv({
+                text: check.ok ? t(this.plugin, 'agent_check_ok_label') : t(this.plugin, 'agent_check_attention_label'),
+                cls: 'understory-agent-check-state',
+            });
+            row.createDiv({ text: check.label, cls: 'understory-agent-check-label' });
+        }
+    }
+
+    _renderAgentAccessTab(containerEl) {
+        this._renderTabIntro(containerEl, 'agents_page_title', 'agents_page_desc');
+
+        const context = this._agentAccessContext();
+        const setupPack = createAgentSetupPack(context, this.plugin.settings);
+        const { agentProfile, diagnosticsText, installNotesText, mcpConfigText, setupPackText, skillText, usageMode, vaultIdentity } = setupPack;
+        const agentProfiles = agentProfilesForLanguage(getLanguage(this.plugin));
+
+        const identityStep = this._renderAgentStep(containerEl, 1, 'agent_current_vault_title', 'agent_current_vault_desc');
+        this._renderAgentIdentityGrid(identityStep, context, vaultIdentity);
+
+        const usageStep = this._renderAgentStep(containerEl, 2, 'agent_choose_use_case_title', 'agent_choose_use_case_desc');
+        new Setting(usageStep)
+            .setName(t(this.plugin, 'agent_usage_mode_select_name'))
+            .setDesc(t(this.plugin, 'agent_usage_mode_select_desc'))
+            .addDropdown((dropdown) => {
+                for (const mode of Object.values(USAGE_MODES)) dropdown.addOption(mode.id, mode.label);
+                dropdown
+                    .setValue(usageMode.id)
+                    .onChange(async (value) => {
+                        this.plugin.settings.agentUsageModeId = value;
+                        await this.plugin.saveSettings();
+                        this.display();
+                    });
+            });
+        usageStep.createDiv({
+            text: t(this.plugin, 'agent_usage_mode_selected_label', { mode: usageMode.label }),
+            cls: 'setting-item-description',
+        });
+        usageStep.createDiv({
+            text: usageMode.installHint,
+            cls: 'setting-item-description',
+        });
+
+        const profileStep = this._renderAgentStep(containerEl, 3, 'agent_choose_agent_title', 'agent_choose_agent_desc');
+        new Setting(profileStep)
+            .setName(t(this.plugin, 'agent_profile_select_name'))
+            .setDesc(t(this.plugin, 'agent_profile_select_desc'))
+            .addDropdown((dropdown) => {
+                for (const profile of Object.values(agentProfiles)) dropdown.addOption(profile.id, profile.label);
+                dropdown
+                    .setValue(agentProfile.id)
+                    .onChange(async (value) => {
+                        this.plugin.settings.agentProfileId = value;
+                        await this.plugin.saveSettings();
+                        this.display();
+                    });
+            });
+        profileStep.createDiv({
+            text: t(this.plugin, 'agent_profile_selected_label', { profile: agentProfile.label }),
+            cls: 'setting-item-description',
+        });
+        this._renderAgentInstallNotes(profileStep, installNotesText);
+
+        const exportStep = this._renderAgentStep(containerEl, 4, 'agent_export_local_title', 'agent_export_local_desc');
+        this._renderAgentCheckList(exportStep, context);
+        new Setting(exportStep)
+            .setName(t(this.plugin, 'agent_export_actions_name'))
+            .setDesc(t(this.plugin, 'agent_export_actions_desc'))
+            .addButton((button) => button
+                .setButtonText(t(this.plugin, 'agent_export_mcp_button'))
+                .onClick(async () => this._exportAgentMcpServer(context)))
+            .addButton((button) => button
+                .setButtonText(t(this.plugin, 'agent_check_mcp_button'))
+                .onClick(() => this._checkAgentAccessStatus(context)))
+            .addButton((button) => button
+                .setButtonText(t(this.plugin, 'agent_copy_diagnostics_button'))
+                .onClick(() => this._copyText(diagnosticsText, t(this.plugin, 'agent_copy_diagnostics_notice'))));
+
+        const copyStep = this._renderAgentStep(containerEl, 5, 'agent_copy_config_title', 'agent_copy_config_desc');
+        new Setting(copyStep)
+            .setName(t(this.plugin, 'agent_copy_setup_pack_name'))
+            .setDesc(t(this.plugin, 'agent_copy_setup_pack_desc'))
+            .addButton((button) => button
+                .setButtonText(t(this.plugin, 'agent_copy_setup_pack_button'))
+                .onClick(() => this._copyText(setupPackText, t(this.plugin, 'agent_copy_setup_pack_notice'))));
+
+        copyStep.createDiv({ text: t(this.plugin, 'agent_mcp_title'), cls: 'understory-section-title-text' });
+        copyStep.createDiv({ text: t(this.plugin, 'agent_mcp_desc'), cls: 'setting-item-description' });
+        this._renderAgentPreview(copyStep, mcpConfigText, 'json');
+        new Setting(copyStep)
+            .setName(t(this.plugin, 'agent_copy_mcp_action_name'))
+            .setDesc(t(this.plugin, 'agent_copy_mcp_action_desc'))
+            .addButton((button) => button
+                .setButtonText(t(this.plugin, 'agent_copy_mcp_button'))
+                .onClick(() => this._copyText(mcpConfigText, t(this.plugin, 'agent_copy_mcp_notice'))));
+
+        copyStep.createDiv({ text: t(this.plugin, 'agent_skill_title'), cls: 'understory-section-title-text' });
+        copyStep.createDiv({ text: t(this.plugin, 'agent_skill_desc'), cls: 'setting-item-description' });
+        this._renderAgentPreview(copyStep, skillText, 'markdown');
+        new Setting(copyStep)
+            .setName(t(this.plugin, 'agent_copy_skill_action_name'))
+            .setDesc(t(this.plugin, 'agent_copy_skill_action_desc'))
+            .addButton((button) => button
+                .setButtonText(t(this.plugin, 'agent_copy_skill_button'))
+                .onClick(() => this._copyText(skillText, t(this.plugin, 'agent_copy_skill_notice'))))
+            .addButton((button) => button
+                .setButtonText(t(this.plugin, 'agent_export_skill_button'))
+                .onClick(async () => this._exportAgentSkill(context, skillText)));
+
+        containerEl.createDiv({ text: t(this.plugin, 'agent_multi_vault_title'), cls: 'understory-section-title-text' });
+        containerEl.createDiv({
+            text: t(this.plugin, 'agent_multi_vault_desc'),
+            cls: 'setting-item-description',
+        });
+        this._renderAgentMultiVaultSteps(containerEl);
+
+        containerEl.createDiv({ text: t(this.plugin, 'agent_safety_title'), cls: 'understory-section-title-text' });
+        const safetyList = containerEl.createDiv({ cls: 'understory-agent-safety-list' });
+        for (const key of ['agent_safety_local', 'agent_safety_private', 'agent_safety_confirm']) {
+            safetyList.createDiv({ text: t(this.plugin, key), cls: 'understory-agent-safety-item' });
+        }
+    }
+
+    async _exportAgentMcpServer(context) {
+        try {
+            await writeAgentAccessFile(context.mcpServerPath, createStandaloneMcpServerSource());
+            new Notice(t(this.plugin, 'agent_export_mcp_notice', { path: context.mcpServerPath }));
+            this.display();
+        } catch (error) {
+            new Notice(t(this.plugin, 'agent_export_failed_notice', { message: error && error.message ? error.message : String(error || '') }));
+        }
+    }
+
+    async _exportAgentSkill(context, skillText) {
+        try {
+            await writeAgentAccessFile(context.skillPath, skillText);
+            new Notice(t(this.plugin, 'agent_export_skill_notice', { path: context.skillPath }));
+        } catch (error) {
+            new Notice(t(this.plugin, 'agent_export_failed_notice', { message: error && error.message ? error.message : String(error || '') }));
+        }
+    }
+
+    _checkAgentAccessStatus(context) {
+        const status = checkAgentAccessStatus(context);
+        if (status.ok) {
+            new Notice(t(this.plugin, 'agent_check_ready_notice'));
+            return;
+        }
+        const missing = status.checks
+            .filter((check) => !check.ok)
+            .map((check) => check.label)
+            .join(', ');
+        new Notice(t(this.plugin, 'agent_check_attention_notice', { items: missing }));
     }
 
     _renderLanguageToggle(parent) {
@@ -2669,7 +4188,8 @@ class UnderstorySettingTab extends PluginSettingTab {
         button.type = 'button';
         button.setAttribute('aria-label', current === 'en' ? 'Switch UI to Chinese' : '切换到英文界面');
         button.setAttribute('title', current === 'en' ? 'Switch to Chinese' : 'Switch to English');
-        button.createSpan({ cls: 'understory-language-toggle-icon', text: '🌐' });
+        const icon = button.createSpan({ cls: 'understory-language-toggle-icon' });
+        setIcon(icon, 'globe-2');
         button.createSpan({ cls: 'understory-language-toggle-label', text: current === 'en' ? 'EN' : '中文' });
         button.addEventListener('click', async () => {
             this.plugin.settings.uiLanguage = next;
@@ -2708,10 +4228,10 @@ class UnderstorySettingTab extends PluginSettingTab {
 
     _renderPrivacySettings(containerEl) {
         containerEl.createEl('h3', { text: t(this.plugin, 'privacy_title') });
-        containerEl.createEl('div', {
+        containerEl.createDiv({
             text: t(this.plugin, 'privacy_desc'),
-            cls: 'setting-item-description'
-        }).style.marginBottom = '8px';
+            cls: 'setting-item-description understory-privacy-intro'
+        });
 
         const mode = this.plugin.settings.networkMode || 'local';
         new Setting(containerEl)
@@ -2731,20 +4251,29 @@ class UnderstorySettingTab extends PluginSettingTab {
                     this.display();
                 }));
 
-        containerEl.createEl('div', {
+        containerEl.createDiv({
             text: t(this.plugin, `network_mode_${mode}_summary`),
-            cls: 'setting-item-description understory-privacy-summary'
-        }).style.marginBottom = '12px';
-        containerEl.createEl('div', {
-            text: t(this.plugin, 'api_key_overview'),
-            cls: 'setting-item-description understory-privacy-summary'
-        }).style.marginBottom = '6px';
-        containerEl.createEl('div', {
-            text: mode === 'local' ? t(this.plugin, 'api_key_local_notice') : t(this.plugin, 'provider_terms_notice'),
-            cls: 'setting-item-description understory-privacy-summary'
-        }).style.marginBottom = '12px';
+            cls: 'setting-item-description understory-privacy-note'
+        });
+
+        if (mode === 'local') {
+            containerEl.createDiv({
+                text: t(this.plugin, 'model_config_local_notice'),
+                cls: 'setting-item-description understory-privacy-inline-note'
+            });
+            return;
+        }
+
+        containerEl.createDiv({
+            text: t(this.plugin, 'provider_terms_notice'),
+            cls: 'setting-item-description understory-privacy-note'
+        });
 
         containerEl.createEl('h4', { text: t(this.plugin, 'embedding_section_title') });
+        containerEl.createDiv({
+            text: t(this.plugin, 'embedding_setup_notice'),
+            cls: 'setting-item-description understory-privacy-note'
+        });
         new Setting(containerEl)
             .setName(t(this.plugin, 'embedding_provider_name'))
             .setDesc(t(this.plugin, 'embedding_provider_desc'))
@@ -2760,8 +4289,20 @@ class UnderstorySettingTab extends PluginSettingTab {
                     this.display();
                 }));
 
-        if (mode !== 'local' && (this.plugin.settings.embeddingProvider || 'zhipu') !== 'none') {
+        if ((this.plugin.settings.embeddingProvider || 'zhipu') !== 'none') {
             const embeddingPreset = providerPreset(this.plugin.settings.embeddingProvider || 'zhipu');
+            const keySetting = new Setting(containerEl)
+                .setName(t(this.plugin, 'embedding_api_key_name'))
+                .setDesc(t(this.plugin, 'embedding_api_key_desc'));
+            this._renderPasswordText(
+                keySetting,
+                this.plugin.settings.embeddingApiKey,
+                t(this.plugin, 'api_key_placeholder'),
+                async (value) => {
+                    this.plugin.settings.embeddingApiKey = value.trim();
+                    await this.plugin.saveSettings();
+                }
+            );
             new Setting(containerEl)
                 .setName(t(this.plugin, 'embedding_base_url_name'))
                 .setDesc(t(this.plugin, 'embedding_base_url_desc'))
@@ -2793,43 +4334,60 @@ class UnderstorySettingTab extends PluginSettingTab {
                         this.plugin.settings.embeddingDimensions = Number.isFinite(parsed) ? parsed : '';
                         await this.plugin.saveSettings();
                     }));
-            const keySetting = new Setting(containerEl)
-                .setName(t(this.plugin, 'embedding_api_key_name'))
-                .setDesc(t(this.plugin, 'embedding_api_key_desc'));
-            this._renderPasswordText(
-                keySetting,
-                this.plugin.settings.embeddingApiKey,
-                t(this.plugin, 'api_key_placeholder'),
-                async (value) => {
-                    this.plugin.settings.embeddingApiKey = value.trim();
-                    await this.plugin.saveSettings();
-                }
-            );
-            containerEl.createEl('div', {
+            containerEl.createDiv({
                 text: t(this.plugin, 'api_key_storage_desc'),
-                cls: 'setting-item-description understory-privacy-summary'
-            }).style.marginBottom = '8px';
+                cls: 'setting-item-description understory-privacy-footnote'
+            });
+        } else {
+            containerEl.createDiv({
+                text: t(this.plugin, 'embedding_none_notice'),
+                cls: 'setting-item-description understory-privacy-inline-note'
+            });
+        }
+
+        if (mode !== 'full') {
+            containerEl.createEl('h4', { text: t(this.plugin, 'llm_section_title') });
+            containerEl.createDiv({
+                text: t(this.plugin, 'llm_disabled_desc'),
+                cls: 'setting-item-description understory-privacy-inline-note'
+            });
+            return;
         }
 
         containerEl.createEl('h4', { text: t(this.plugin, 'llm_section_title') });
+        containerEl.createDiv({
+            text: t(this.plugin, 'llm_setup_notice'),
+            cls: 'setting-item-description understory-privacy-note'
+        });
         new Setting(containerEl)
             .setName(t(this.plugin, 'llm_provider_name'))
-            .setDesc(mode === 'full' ? t(this.plugin, 'llm_provider_desc') : t(this.plugin, 'llm_disabled_desc'))
+            .setDesc(t(this.plugin, 'llm_provider_desc'))
             .addDropdown((dropdown) => dropdown
                 .addOption('zhipu', t(this.plugin, 'provider_zhipu'))
                 .addOption('openai', t(this.plugin, 'provider_openai'))
                 .addOption('custom', t(this.plugin, 'provider_custom'))
                 .addOption('none', t(this.plugin, 'provider_none'))
                 .setValue(this.plugin.settings.llmProvider || 'zhipu')
-                .setDisabled(mode !== 'full')
                 .onChange(async (value) => {
                     this._applyProviderPreset('llm', value);
                     await this.plugin.saveSettings();
                     this.display();
                 }));
 
-        if (mode === 'full' && (this.plugin.settings.llmProvider || 'zhipu') !== 'none') {
+        if ((this.plugin.settings.llmProvider || 'zhipu') !== 'none') {
             const llmPreset = providerPreset(this.plugin.settings.llmProvider || 'zhipu');
+            const keySetting = new Setting(containerEl)
+                .setName(t(this.plugin, 'llm_api_key_name'))
+                .setDesc(t(this.plugin, 'llm_api_key_desc'));
+            this._renderPasswordText(
+                keySetting,
+                this.plugin.settings.llmApiKey,
+                t(this.plugin, 'api_key_placeholder'),
+                async (value) => {
+                    this.plugin.settings.llmApiKey = value.trim();
+                    await this.plugin.saveSettings();
+                }
+            );
             new Setting(containerEl)
                 .setName(t(this.plugin, 'llm_base_url_name'))
                 .setDesc(t(this.plugin, 'llm_base_url_desc'))
@@ -2850,22 +4408,15 @@ class UnderstorySettingTab extends PluginSettingTab {
                         this.plugin.settings.llmModel = value.trim();
                         await this.plugin.saveSettings();
                     }));
-            const keySetting = new Setting(containerEl)
-                .setName(t(this.plugin, 'llm_api_key_name'))
-                .setDesc(t(this.plugin, 'llm_api_key_desc'));
-            this._renderPasswordText(
-                keySetting,
-                this.plugin.settings.llmApiKey,
-                t(this.plugin, 'api_key_placeholder'),
-                async (value) => {
-                    this.plugin.settings.llmApiKey = value.trim();
-                    await this.plugin.saveSettings();
-                }
-            );
-            containerEl.createEl('div', {
+            containerEl.createDiv({
                 text: t(this.plugin, 'api_key_storage_desc'),
-                cls: 'setting-item-description understory-privacy-summary'
-            }).style.marginBottom = '8px';
+                cls: 'setting-item-description understory-privacy-footnote'
+            });
+        } else {
+            containerEl.createDiv({
+                text: t(this.plugin, 'llm_none_notice'),
+                cls: 'setting-item-description understory-privacy-inline-note'
+            });
         }
     }
 
@@ -5077,7 +6628,20 @@ class SettingsStyleMethods {
     gap: 12px;
     margin-bottom: 12px;
 }
+.understory-settings-brand {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: 9px;
+}
+.understory-settings-logo {
+    flex: 0 0 auto;
+    width: 30px;
+    height: 30px;
+    object-fit: contain;
+}
 .understory-settings-title {
+    min-width: 0;
     margin: 0;
     font-size: var(--font-ui-large);
     font-weight: 600;
@@ -5106,6 +6670,166 @@ class SettingsStyleMethods {
 }
 .understory-language-toggle-label {
     font-weight: 600;
+}
+.understory-settings-toggle {
+    margin: 8px 0 16px;
+}
+.understory-settings-toggle-label {
+    margin-bottom: 6px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    font-weight: 600;
+}
+.understory-settings-tablist {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    gap: 2px;
+    overflow-x: auto;
+    padding: 3px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 999px;
+    background: var(--background-secondary);
+}
+.understory-settings-toggle-button {
+    flex: 0 0 auto;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    padding: 6px 12px;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: var(--font-ui-small);
+    line-height: 1.2;
+    white-space: nowrap;
+}
+.understory-settings-toggle-button:hover,
+.understory-settings-toggle-button:focus-visible {
+    color: var(--text-normal);
+    background: var(--background-modifier-hover);
+}
+.understory-settings-toggle-button.is-active {
+    border-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    background: var(--interactive-accent);
+    font-weight: 600;
+}
+.understory-settings-page {
+    padding-bottom: 12px;
+}
+.understory-tab-intro {
+    margin: 0 0 14px;
+}
+.understory-tab-intro-title {
+    font-size: var(--font-ui-large);
+    font-weight: 650;
+    margin-bottom: 4px;
+    color: var(--text-normal);
+}
+.understory-tab-intro-desc {
+    color: var(--text-muted);
+    line-height: 1.45;
+    max-width: 720px;
+}
+.understory-section-title-text {
+    margin: 18px 0 4px;
+    font-size: var(--font-ui-medium);
+    font-weight: 650;
+    color: var(--text-normal);
+}
+.understory-section-subtitle-text {
+    margin: 12px 0 4px;
+    font-weight: 600;
+    color: var(--text-normal);
+}
+.understory-privacy-intro {
+    margin-bottom: 10px;
+    line-height: 1.45;
+}
+.understory-privacy-note {
+    margin: 6px 0 10px;
+    color: var(--text-muted);
+    line-height: 1.45;
+}
+.understory-privacy-inline-note {
+    margin: 6px 0 12px;
+    color: var(--text-muted);
+    line-height: 1.45;
+}
+.understory-privacy-footnote {
+    margin: 4px 0 12px;
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
+    line-height: 1.4;
+}
+.understory-setup-card {
+    border: 1px solid var(--background-modifier-border);
+    border-left: 3px solid var(--interactive-accent);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+    background: var(--background-secondary);
+}
+.understory-setup-card.is-ready {
+    border-left-color: var(--text-success);
+}
+.understory-setup-card.is-warning,
+.understory-setup-card.is-needed,
+.understory-setup-card.is-unchecked {
+    border-left-color: var(--text-warning);
+}
+.understory-setup-card.is-error {
+    border-left-color: var(--text-error);
+}
+.understory-setup-card-title {
+    font-size: var(--font-ui-medium);
+    font-weight: 650;
+    margin-bottom: 4px;
+}
+.understory-setup-card-desc {
+    color: var(--text-muted);
+    line-height: 1.45;
+}
+.understory-setup-steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 8px;
+    margin: 0 0 12px;
+}
+.understory-setup-step {
+    display: flex;
+    gap: 8px;
+    min-width: 0;
+    padding: 10px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    background: var(--background-primary);
+}
+.understory-setup-step-number {
+    flex: 0 0 auto;
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--background-secondary);
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    font-weight: 700;
+}
+.understory-setup-step-body {
+    min-width: 0;
+}
+.understory-setup-step-title {
+    font-weight: 650;
+    color: var(--text-normal);
+    margin-bottom: 2px;
+}
+.understory-setup-step-desc {
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    line-height: 1.4;
 }
 .understory-dashboard {
     display: grid;
@@ -5442,6 +7166,113 @@ class SettingsStyleMethods {
 }
 .understory-engine-command-row button {
     flex: 0 0 auto;
+}
+.understory-agent-step {
+    margin: 16px 0 18px;
+    padding-top: 12px;
+    border-top: 1px solid var(--background-modifier-border);
+}
+.understory-agent-step-label {
+    margin-bottom: 4px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    font-weight: 700;
+    text-transform: uppercase;
+}
+.understory-agent-quote-block {
+    margin: 8px 0 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-left: 3px solid var(--interactive-accent);
+    border-radius: 8px;
+    background: var(--background-secondary);
+    line-height: 1.45;
+}
+.understory-agent-identity-list {
+    display: grid;
+    gap: 7px;
+}
+.understory-agent-identity-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    min-width: 0;
+}
+.understory-agent-identity-label {
+    flex: 0 0 118px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    font-weight: 700;
+}
+.understory-agent-identity-row.is-warning .understory-agent-identity-label {
+    color: var(--text-warning);
+}
+.understory-agent-identity-value {
+    flex: 1 1 180px;
+    min-width: 0;
+    color: var(--text-normal);
+    overflow-wrap: anywhere;
+}
+.understory-agent-check-list {
+    display: grid;
+    gap: 6px;
+    margin: 8px 0 12px;
+}
+.understory-agent-check-row {
+    display: grid;
+    grid-template-columns: minmax(88px, auto) 1fr;
+    gap: 8px;
+    align-items: center;
+    min-width: 0;
+    padding: 6px 8px;
+    border-left: 3px solid var(--text-warning);
+    background: var(--background-secondary);
+}
+.understory-agent-check-row.is-ok {
+    border-left-color: var(--text-success);
+}
+.understory-agent-check-state {
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    font-weight: 700;
+}
+.understory-agent-check-label {
+    color: var(--text-normal);
+    overflow-wrap: anywhere;
+}
+.understory-agent-preview {
+    max-height: 260px;
+    overflow: auto;
+    margin: 8px 0 10px;
+    padding: 10px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    background: var(--background-primary);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+.understory-agent-preview code {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+.understory-agent-install-notes {
+    color: var(--text-muted);
+}
+.understory-agent-install-note-line {
+    margin-top: 4px;
+    overflow-wrap: anywhere;
+}
+.understory-agent-install-note-line:first-child {
+    margin-top: 0;
+}
+.understory-agent-safety-list {
+    display: grid;
+    gap: 6px;
+    margin: 8px 0 12px;
+}
+.understory-agent-safety-item {
+    color: var(--text-muted);
+    line-height: 1.45;
 }
 `;
     }
@@ -6425,6 +8256,10 @@ class UnderstorySidebarView extends ItemView {
 
 module.exports = { UnderstorySidebarView, VIEW_TYPE_UNDERSTORY_SIDEBAR, UNDERSTORY_ICON };
 
+},
+
+"./agentAccessBundledSources": function(module, exports, require) {
+module.exports = {"agentApiSource": "const crypto = require('crypto');\nconst { spawn } = require('child_process');\nconst fs = require('fs');\nconst path = require('path');\nconst {\n    redactSensitiveText,\n    safeErrorDetail,\n    safeNetworkMode,\n} = require('./safety');\n\nconst API_VERSION = '1';\nconst RELATIONS_PATH = '.understory/relations.json';\nconst OVERRIDES_PATH = '.understory/link_overrides.json';\nconst CONFLICTS_PATH = '.understory/conflicts.json';\nconst INDEX_PATH = '.understory/index.md';\n\nconst ERROR_MESSAGES = {\n    VAULT_NOT_FOUND: 'Vault path was not found.',\n    UNSAFE_PATH: 'Path must stay inside the vault.',\n    NOTE_NOT_FOUND: 'Note was not found in vault.',\n    RELATION_NOT_FOUND: 'Relation was not found.',\n    STORE_NOT_FOUND: 'Relations store was not found.',\n    ENGINE_NOT_READY: 'Understory engine is not ready.',\n    ENGINE_FAILED: 'Understory engine failed.',\n    PARSE_FAILED: 'Could not parse Understory data.',\n    INVALID_ARGUMENT: 'Required argument is missing or invalid.',\n    INTERNAL_ERROR: 'Internal Agent API error.',\n};\n\nclass AgentApiError extends Error {\n    constructor(code, message, detail) {\n        super(message || ERROR_MESSAGES[code] || ERROR_MESSAGES.INTERNAL_ERROR);\n        this.name = 'AgentApiError';\n        this.code = ERROR_MESSAGES[code] ? code : 'INTERNAL_ERROR';\n        this.detail = detail || '';\n    }\n}\n\nfunction toPosixPath(value) {\n    return String(value || '').replace(/\\\\/g, '/');\n}\n\nfunction isObject(value) {\n    return !!value && typeof value === 'object' && !Array.isArray(value);\n}\n\nfunction hasPathTraversal(relativePath) {\n    return relativePath === '..' || relativePath.startsWith('../') || relativePath.includes('/../');\n}\n\nfunction isInsidePath(root, candidate) {\n    const relative = path.relative(root, candidate);\n    return relative === '' || (!!relative && !relative.startsWith('..') && !path.isAbsolute(relative));\n}\n\nfunction normalizeVaultRoot(vaultPath) {\n    if (!vaultPath) return '';\n    return path.resolve(String(vaultPath));\n}\n\nfunction hashContent(content) {\n    return crypto.createHash('sha256').update(String(content || '')).digest('hex').slice(0, 16);\n}\n\nfunction configuredSecrets(settings) {\n    if (!settings || typeof settings !== 'object') return [];\n    return [\n        settings.embeddingApiKey,\n        settings.llmApiKey,\n        settings.apiKey,\n        settings.webhookUrl,\n        settings.customEndpoint,\n    ].map((value) => String(value || '').trim()).filter((value) => value.length >= 4);\n}\n\nfunction redactConfiguredSecrets(text, settings) {\n    let output = String(text || '');\n    for (const secret of configuredSecrets(settings)) {\n        output = output.split(secret).join(secret.startsWith('http') ? '[REDACTED_WEBHOOK_URL]' : '[REDACTED_SECRET]');\n    }\n    return output;\n}\n\nfunction countLinesBefore(content, index) {\n    if (index <= 0) return 1;\n    return String(content).slice(0, index).split(/\\r?\\n/).length;\n}\n\nfunction clampLimit(value, fallback = 8, max = 25) {\n    const number = Number(value);\n    if (!Number.isFinite(number) || number <= 0) return fallback;\n    return Math.min(Math.floor(number), max);\n}\n\nfunction searchTerms(query) {\n    return String(query || '')\n        .toLowerCase()\n        .split(/[\\s,，。.;；:：!?！？()[\\]{}\"'`]+/)\n        .map((term) => term.trim())\n        .filter((term) => term.length >= 2)\n        .slice(0, 8);\n}\n\nfunction stripMarkdownNoise(content) {\n    return String(content || '')\n        .replace(/^---[\\s\\S]*?---\\s*/m, '')\n        .replace(/```[\\s\\S]*?```/g, ' ')\n        .replace(/!\\[[^\\]]*\\]\\([^)]+\\)/g, ' ')\n        .replace(/\\[([^\\]]+)\\]\\([^)]+\\)/g, '$1')\n        .replace(/[#>*_`~-]/g, ' ')\n        .replace(/\\s+/g, ' ')\n        .trim();\n}\n\nfunction compactSnippet(content, query, maxLength = 220) {\n    const clean = stripMarkdownNoise(content);\n    if (!clean) return '';\n    const lower = clean.toLowerCase();\n    const terms = searchTerms(query);\n    const firstHit = terms\n        .map((term) => lower.indexOf(term))\n        .filter((index) => index >= 0)\n        .sort((a, b) => a - b)[0];\n    const start = firstHit > 60 ? firstHit - 60 : 0;\n    const snippet = clean.slice(start, start + maxLength);\n    return `${start > 0 ? '...' : ''}${snippet}${start + maxLength < clean.length ? '...' : ''}`;\n}\n\nfunction noteTitleFromPath(notePath) {\n    return titleFromTarget(notePath);\n}\n\nfunction relationText(relation) {\n    if (!relation) return '';\n    return [\n        relation.title,\n        relation.target,\n        relation.type,\n        relation.group,\n        relation.source,\n    ].filter(Boolean).join(' ');\n}\n\nfunction createMeta(context, settings) {\n    const meta = {\n        apiVersion: API_VERSION,\n        timestamp: new Date().toISOString(),\n    };\n    const vaultPath = context && context.getVaultPath && context.getVaultPath();\n    if (vaultPath) meta.vaultPath = redactConfiguredSecrets(toPosixPath(vaultPath), settings);\n    return meta;\n}\n\nfunction ok(data, context, settings) {\n    return {\n        ok: true,\n        data,\n        error: null,\n        meta: createMeta(context, settings),\n    };\n}\n\nfunction errorEnvelope(error, context, settings) {\n    const apiError = error instanceof AgentApiError\n        ? error\n        : new AgentApiError('INTERNAL_ERROR', ERROR_MESSAGES.INTERNAL_ERROR, safeErrorDetail({\n            message: error && error.message ? error.message : String(error || ''),\n            settings,\n        }));\n\n    const detail = redactSensitiveText(apiError.detail || '', settings);\n    return {\n        ok: false,\n        data: null,\n        error: {\n            code: apiError.code,\n            message: apiError.message,\n            detail,\n        },\n        meta: createMeta(context, settings),\n    };\n}\n\nfunction cleanLinkTitle(value) {\n    return String(value || '')\n        .replace(/\\[\\[/g, '')\n        .replace(/\\]\\]/g, '')\n        .replace(/[\\r\\n]+/g, ' ')\n        .trim();\n}\n\nfunction titleFromTarget(target) {\n    const normalized = toPosixPath(target);\n    const base = normalized.split('/').filter(Boolean).pop() || normalized;\n    return cleanLinkTitle(base.replace(/\\.md$/i, ''));\n}\n\nfunction relationSectionHeadings() {\n    return [\n        '## Related notes',\n        '## Related Notes',\n        '## Manually related notes',\n        '## Related',\n        '## 关联文件',\n        '## 相关笔记',\n        '## 🏷️ Related notes',\n        '## 🏷️关联文件',\n    ];\n}\n\nfunction findRelationSection(content) {\n    let best = null;\n    for (const heading of relationSectionHeadings()) {\n        const index = content.indexOf(heading);\n        if (index !== -1 && (!best || index < best.index)) {\n            best = { index, heading };\n        }\n    }\n    return best;\n}\n\nfunction insertLinkIntoContent(content, link) {\n    if (content.includes(link)) {\n        return {\n            content,\n            inserted: false,\n            alreadyExists: true,\n            sectionHeading: null,\n            line: null,\n        };\n    }\n\n    const section = findRelationSection(content);\n    let nextContent;\n    let insertIndex;\n    let sectionHeading;\n\n    if (!section) {\n        const trimmed = content.replace(/\\s+$/, '');\n        const prefix = `${trimmed}\\n\\n## Related notes\\n\\n### Manually added\\n\\n`;\n        nextContent = `${prefix}${link}\\n`;\n        insertIndex = prefix.length;\n        sectionHeading = '## Related notes';\n    } else {\n        const after = content.slice(section.index + section.heading.length);\n        const nextHeading = after.search(/\\n## /);\n        sectionHeading = section.heading;\n        if (nextHeading === -1) {\n            const prefix = `${content.replace(/\\s+$/, '')}\\n`;\n            nextContent = `${prefix}${link}\\n`;\n            insertIndex = prefix.length;\n        } else {\n            insertIndex = section.index + section.heading.length + nextHeading;\n            const prefix = `${content.slice(0, insertIndex).replace(/\\s+$/, '')}\\n`;\n            nextContent = `${prefix}${link}\\n${content.slice(insertIndex)}`;\n            insertIndex = prefix.length;\n        }\n    }\n\n    return {\n        content: nextContent,\n        inserted: true,\n        alreadyExists: false,\n        sectionHeading,\n        line: countLinesBefore(nextContent, insertIndex),\n    };\n}\n\nfunction normalizeInputPath(input, context, label) {\n    if (typeof input !== 'string' || !input.trim()) {\n        throw new AgentApiError('INVALID_ARGUMENT', `${label} is required.`);\n    }\n    if (input.includes('\\0')) {\n        throw new AgentApiError('UNSAFE_PATH', `${label} contains an unsafe null byte.`);\n    }\n\n    const raw = toPosixPath(input.trim());\n    const root = context.getVaultPath();\n\n    if (root && path.isAbsolute(raw)) {\n        const absolute = path.resolve(raw);\n        if (!isInsidePath(root, absolute)) {\n            throw new AgentApiError('UNSAFE_PATH', `${label} must stay inside the vault.`);\n        }\n        const relative = toPosixPath(path.relative(root, absolute));\n        if (!relative || hasPathTraversal(relative)) {\n            throw new AgentApiError('UNSAFE_PATH', `${label} must stay inside the vault.`);\n        }\n        return relative;\n    }\n\n    if (path.posix.isAbsolute(raw) || /^[A-Za-z]:\\//.test(raw)) {\n        throw new AgentApiError('UNSAFE_PATH', `${label} must be relative to the vault.`);\n    }\n\n    const normalized = path.posix.normalize(raw).replace(/^\\/+/, '');\n    if (!normalized || normalized === '.' || hasPathTraversal(normalized)) {\n        throw new AgentApiError('UNSAFE_PATH', `${label} must stay inside the vault.`);\n    }\n\n    if (root) {\n        const absolute = path.resolve(root, normalized);\n        if (!isInsidePath(root, absolute)) {\n            throw new AgentApiError('UNSAFE_PATH', `${label} must stay inside the vault.`);\n        }\n    }\n\n    return normalized;\n}\n\nfunction maybeNormalizeTargetPath(input, context) {\n    const raw = String(input || '').trim();\n    if (!raw) {\n        throw new AgentApiError('INVALID_ARGUMENT', 'target is required.');\n    }\n    if (/[\\\\/]/.test(raw) || /\\.md$/i.test(raw) || path.isAbsolute(raw) || /^[A-Za-z]:[\\\\/]/.test(raw)) {\n        return normalizeInputPath(raw, context, 'target');\n    }\n    return raw;\n}\n\nfunction createFsAdapter(vaultPath) {\n    const vaultRoot = normalizeVaultRoot(vaultPath);\n    return {\n        getVaultPath() {\n            return vaultRoot;\n        },\n        async ensureVault() {\n            if (!vaultRoot) {\n                throw new AgentApiError('INVALID_ARGUMENT', 'vaultPath is required.');\n            }\n            try {\n                const stat = await fs.promises.stat(vaultRoot);\n                if (!stat.isDirectory()) {\n                    throw new AgentApiError('VAULT_NOT_FOUND', ERROR_MESSAGES.VAULT_NOT_FOUND);\n                }\n            } catch (error) {\n                if (error instanceof AgentApiError) throw error;\n                throw new AgentApiError('VAULT_NOT_FOUND', ERROR_MESSAGES.VAULT_NOT_FOUND, error.message);\n            }\n        },\n        resolve(relativePath) {\n            const normalized = normalizeInputPath(relativePath, this, 'path');\n            return path.resolve(vaultRoot, normalized);\n        },\n        getAbsolutePath(relativePath) {\n            return this.resolve(relativePath);\n        },\n        async exists(relativePath) {\n            await this.ensureVault();\n            try {\n                await fs.promises.access(this.resolve(relativePath));\n                return true;\n            } catch (error) {\n                return false;\n            }\n        },\n        async readText(relativePath) {\n            await this.ensureVault();\n            return fs.promises.readFile(this.resolve(relativePath), 'utf8');\n        },\n        async writeText(relativePath, content) {\n            await this.ensureVault();\n            const absolute = this.resolve(relativePath);\n            await fs.promises.mkdir(path.dirname(absolute), { recursive: true });\n            await fs.promises.writeFile(absolute, String(content), 'utf8');\n        },\n        async mkdir(relativePath) {\n            await this.ensureVault();\n            await fs.promises.mkdir(this.resolve(relativePath), { recursive: true });\n        },\n        async stat(relativePath) {\n            await this.ensureVault();\n            const stat = await fs.promises.stat(this.resolve(relativePath));\n            return { mtime: stat.mtimeMs };\n        },\n        trigger() {},\n    };\n}\n\nfunction createObsidianAdapter(app, vaultPath) {\n    const adapter = app && app.vault && app.vault.adapter;\n    const vaultRoot = normalizeVaultRoot(vaultPath || (adapter && adapter.getBasePath && adapter.getBasePath()) || '');\n    return {\n        getVaultPath() {\n            return vaultRoot;\n        },\n        async ensureVault() {\n            if (!app || !app.vault || !adapter) {\n                throw new AgentApiError('INVALID_ARGUMENT', 'Obsidian app/vault adapter is required.');\n            }\n        },\n        async exists(relativePath) {\n            await this.ensureVault();\n            const normalized = normalizeInputPath(relativePath, this, 'path');\n            if (adapter.exists) return !!(await adapter.exists(normalized));\n            if (app.vault.getAbstractFileByPath && app.vault.getAbstractFileByPath(normalized)) return true;\n            try {\n                await adapter.read(normalized);\n                return true;\n            } catch (error) {\n                return false;\n            }\n        },\n        async readText(relativePath) {\n            await this.ensureVault();\n            const normalized = normalizeInputPath(relativePath, this, 'path');\n            return adapter.read(normalized);\n        },\n        getAbsolutePath(relativePath) {\n            const normalized = normalizeInputPath(relativePath, this, 'path');\n            if (adapter.getFullPath) return adapter.getFullPath(normalized);\n            return vaultRoot ? path.resolve(vaultRoot, normalized) : normalized;\n        },\n        async writeText(relativePath, content) {\n            await this.ensureVault();\n            const normalized = normalizeInputPath(relativePath, this, 'path');\n            const file = app.vault.getAbstractFileByPath && app.vault.getAbstractFileByPath(normalized);\n            if (file && app.vault.modify) {\n                await app.vault.modify(file, String(content));\n                return;\n            }\n            if (adapter.write) {\n                await adapter.write(normalized, String(content));\n                return;\n            }\n            throw new AgentApiError('INTERNAL_ERROR', 'Vault adapter does not support writes.');\n        },\n        async mkdir(relativePath) {\n            await this.ensureVault();\n            const normalized = normalizeInputPath(relativePath, this, 'path');\n            if (adapter.exists && await adapter.exists(normalized)) return;\n            if (adapter.mkdir) await adapter.mkdir(normalized);\n        },\n        async stat(relativePath) {\n            await this.ensureVault();\n            const normalized = normalizeInputPath(relativePath, this, 'path');\n            const file = app.vault.getAbstractFileByPath && app.vault.getAbstractFileByPath(normalized);\n            if (file && file.stat) return { mtime: file.stat.mtime || 0 };\n            if (adapter.stat) {\n                const stat = await adapter.stat(normalized);\n                return { mtime: stat && (stat.mtime || stat.mtimeMs) || 0 };\n            }\n            return { mtime: 0 };\n        },\n        trigger(eventName, payload) {\n            if (app.workspace && app.workspace.trigger) {\n                app.workspace.trigger(eventName, payload);\n            }\n        },\n    };\n}\n\nfunction groupMap(grouped) {\n    const map = new Map();\n    for (const [group, titles] of Object.entries(grouped || {})) {\n        for (const title of Array.isArray(titles) ? titles : []) {\n            map.set(String(title), group);\n        }\n    }\n    return map;\n}\n\nfunction relationType(relation) {\n    if (relation.type) return relation.type;\n    if (relation.reason) return relation.reason;\n    if (relation.source === 'backlink') return 'backlink';\n    return 'semantic';\n}\n\nfunction relationSource(relation) {\n    if (relation.source) return relation.source;\n    if (relation.reason) return relation.reason;\n    return 'understory';\n}\n\nfunction normalizeRelations(result) {\n    const grouped = groupMap(result && result.grouped || {});\n    const now = new Date().toISOString();\n    const relations = Array.isArray(result && result.relations) ? result.relations : [];\n    return relations.map((relation) => {\n        const target = toPosixPath(relation.target || relation.path || relation.file || relation.title).replace(/^\\/+/, '');\n        const title = relation.title || target.split('/').pop().replace(/\\.md$/i, '') || target;\n        return {\n            target,\n            title,\n            type: relationType(relation),\n            score: Number(relation.score ?? relation.similarity ?? 0),\n            group: relation.group || grouped.get(title) || grouped.get(target) || relationType(relation),\n            status: relation.status || 'suggested',\n            source: relationSource(relation),\n            createdAt: relation.createdAt || now,\n            updatedAt: now,\n        };\n    }).filter((relation) => relation.target && relation.title);\n}\n\nfunction parseProcessJson(stdout) {\n    const text = String(stdout || '').trim();\n    if (!text) {\n        throw new AgentApiError('PARSE_FAILED', ERROR_MESSAGES.PARSE_FAILED, 'Engine produced no JSON output.');\n    }\n    try {\n        return JSON.parse(text);\n    } catch (error) {\n        const lines = text.split(/\\r?\\n/).map((line) => line.trim()).filter(Boolean).reverse();\n        for (const line of lines) {\n            try {\n                return JSON.parse(line);\n            } catch (lineError) {\n                // Keep looking for a JSON line.\n            }\n        }\n        throw new AgentApiError('PARSE_FAILED', ERROR_MESSAGES.PARSE_FAILED, safeErrorDetail({\n            message: error.message,\n            stdout,\n        }));\n    }\n}\n\nfunction localEngineEnv(vaultPath) {\n    return {\n        ...process.env,\n        PYTHONIOENCODING: 'utf-8',\n        OBSIDIAN_VAULT_PATH: vaultPath || process.env.OBSIDIAN_VAULT_PATH || '',\n        UNDERSTORY_NETWORK_MODE: 'local',\n        UNDERSTORY_WEBHOOK_ENABLED: '0',\n        UNDERSTORY_WEBHOOK_URL: '',\n        UNDERSTORY_OPENAI_API_KEY: '',\n        UNDERSTORY_ZHIPU_API_KEY: '',\n        UNDERSTORY_LLM_API_KEY: '',\n        UNDERSTORY_EMBEDDING_API_KEY: '',\n        OPENAI_API_KEY: '',\n        ZHIPU_API_KEY: '',\n        ANTHROPIC_API_KEY: '',\n    };\n}\n\nfunction runPythonJson({ pythonPath, engineDir, apiPath, args, vaultPath, timeoutMs, settings }) {\n    return new Promise((resolve, reject) => {\n        const child = spawn(pythonPath, [apiPath, ...args], {\n            cwd: engineDir,\n            env: localEngineEnv(vaultPath),\n            windowsHide: true,\n        });\n        let stdout = '';\n        let stderr = '';\n        const timer = timeoutMs ? setTimeout(() => {\n            child.kill();\n            reject(new AgentApiError('ENGINE_FAILED', 'Understory engine timed out.', safeErrorDetail({\n                stdout,\n                stderr,\n                message: `Timed out after ${timeoutMs}ms`,\n                settings,\n            })));\n        }, timeoutMs) : null;\n\n        child.stdout.on('data', (chunk) => {\n            stdout += chunk.toString('utf8');\n        });\n        child.stderr.on('data', (chunk) => {\n            stderr += chunk.toString('utf8');\n        });\n        child.on('error', (error) => {\n            if (timer) clearTimeout(timer);\n            reject(new AgentApiError('ENGINE_FAILED', ERROR_MESSAGES.ENGINE_FAILED, safeErrorDetail({\n                message: error.message,\n                settings,\n            })));\n        });\n        child.on('close', (code) => {\n            if (timer) clearTimeout(timer);\n            if (code !== 0) {\n                reject(new AgentApiError('ENGINE_FAILED', ERROR_MESSAGES.ENGINE_FAILED, safeErrorDetail({\n                    stdout,\n                    stderr,\n                    message: `api.py exited with code ${code}`,\n                    settings,\n                })));\n                return;\n            }\n            try {\n                resolve(parseProcessJson(stdout));\n            } catch (error) {\n                reject(error);\n            }\n        });\n    });\n}\n\nfunction createAgentApi(options = {}) {\n    const settings = options.settings || {};\n    const adapter = options.adapter\n        || (options.app ? createObsidianAdapter(options.app, options.vaultPath) : createFsAdapter(options.vaultPath));\n    const plugin = options.plugin || null;\n    const engineDir = options.engineDir || process.env.UNDERSTORY_ENGINE_DIR || '';\n    const pythonPath = options.pythonPath || process.env.UNDERSTORY_PYTHON_PATH || 'python';\n    const refreshTimeoutMs = Number(options.refreshTimeoutMs || 120000);\n\n    async function readJson(relativePath, fallback) {\n        if (!(await adapter.exists(relativePath))) {\n            return { exists: false, value: fallback };\n        }\n        try {\n            const raw = await adapter.readText(relativePath);\n            return { exists: true, value: raw ? JSON.parse(raw) : fallback };\n        } catch (error) {\n            if (error instanceof SyntaxError) {\n                throw new AgentApiError('PARSE_FAILED', ERROR_MESSAGES.PARSE_FAILED, safeErrorDetail({\n                    message: error.message,\n                    settings,\n                }));\n            }\n            throw error;\n        }\n    }\n\n    async function writeJson(relativePath, data) {\n        await adapter.mkdir('.understory');\n        await adapter.writeText(relativePath, JSON.stringify(data, null, 2));\n    }\n\n    function emptyStore() {\n        return { version: 1, indexedAt: new Date().toISOString(), files: {} };\n    }\n\n    async function readStore() {\n        const result = await readJson(RELATIONS_PATH, emptyStore());\n        const store = isObject(result.value) ? result.value : emptyStore();\n        if (!isObject(store.files)) store.files = {};\n        if (!store.version) store.version = 1;\n        return { exists: result.exists, store };\n    }\n\n    async function writeStore(store) {\n        store.indexedAt = new Date().toISOString();\n        await writeJson(RELATIONS_PATH, store);\n    }\n\n    async function assertNoteExists(notePath) {\n        const normalized = normalizeInputPath(notePath, adapter, 'notePath');\n        if (!(await adapter.exists(normalized))) {\n            throw new AgentApiError('NOTE_NOT_FOUND', ERROR_MESSAGES.NOTE_NOT_FOUND);\n        }\n        return normalized;\n    }\n\n    function findRelation(entry, target) {\n        const relations = Array.isArray(entry && entry.relations) ? entry.relations : [];\n        return relations.find((relation) => relation && (\n            relation.title === target || relation.target === target\n        )) || null;\n    }\n\n    async function setRelationStatus(notePath, target, status) {\n        if (typeof target !== 'string' || !target.trim()) {\n            throw new AgentApiError('INVALID_ARGUMENT', 'target is required.');\n        }\n        const normalized = await assertNoteExists(notePath);\n        const { exists, store } = await readStore();\n        if (!exists) throw new AgentApiError('STORE_NOT_FOUND', ERROR_MESSAGES.STORE_NOT_FOUND);\n        const entry = store.files[normalized];\n        if (!entry) throw new AgentApiError('RELATION_NOT_FOUND', ERROR_MESSAGES.RELATION_NOT_FOUND);\n\n        const relation = findRelation(entry, target);\n        if (!relation) throw new AgentApiError('RELATION_NOT_FOUND', ERROR_MESSAGES.RELATION_NOT_FOUND);\n\n        const now = new Date().toISOString();\n        relation.status = status;\n        relation.updatedAt = now;\n        await writeStore(store);\n        adapter.trigger('understory:relations-updated', normalized);\n        return {\n            notePath: normalized,\n            target,\n            matchedTitle: relation.title,\n            matchedTarget: relation.target,\n            status,\n            updated: true,\n        };\n    }\n\n    async function trySetRelationStatus(notePath, target, status) {\n        try {\n            return await setRelationStatus(notePath, target, status);\n        } catch (error) {\n            if (error instanceof AgentApiError && (\n                error.code === 'STORE_NOT_FOUND' || error.code === 'RELATION_NOT_FOUND'\n            )) {\n                return null;\n            }\n            throw error;\n        }\n    }\n\n    async function refreshWithExternalEngine(normalized) {\n        if (!engineDir) {\n            throw new AgentApiError('ENGINE_NOT_READY', ERROR_MESSAGES.ENGINE_NOT_READY, 'No engineDir or UNDERSTORY_ENGINE_DIR configured.');\n        }\n        const absoluteEngineDir = path.resolve(String(engineDir));\n        const apiPath = path.join(absoluteEngineDir, 'api.py');\n        try {\n            await fs.promises.access(apiPath);\n        } catch (error) {\n            throw new AgentApiError('ENGINE_NOT_READY', ERROR_MESSAGES.ENGINE_NOT_READY, `api.py not found: ${apiPath}`);\n        }\n\n        const absoluteNotePath = adapter.getAbsolutePath\n            ? adapter.getAbsolutePath(normalized)\n            : path.resolve(adapter.getVaultPath(), normalized);\n        const result = await runPythonJson({\n            pythonPath,\n            engineDir: absoluteEngineDir,\n            apiPath,\n            args: ['refresh-link', absoluteNotePath, '--no-auto-write'],\n            vaultPath: adapter.getVaultPath(),\n            timeoutMs: refreshTimeoutMs,\n            settings,\n        });\n        if (!result || result.status !== 'ok') {\n            throw new AgentApiError('ENGINE_FAILED', ERROR_MESSAGES.ENGINE_FAILED, safeErrorDetail({\n                message: result && result.error || 'Engine did not return ok status.',\n                settings,\n            }));\n        }\n\n        const [content, stat] = await Promise.all([\n            adapter.readText(normalized),\n            adapter.stat(normalized),\n        ]);\n        const relations = normalizeRelations(result);\n        const { store } = await readStore();\n        const indexedAt = new Date().toISOString();\n        store.files[normalized] = {\n            hash: hashContent(content),\n            mtime: stat.mtime,\n            indexedAt,\n            relations,\n        };\n        await writeStore(store);\n        adapter.trigger('understory:relations-updated', normalized);\n        return {\n            notePath: normalized,\n            status: 'ok',\n            dryRun: false,\n            relationsCount: relations.length,\n            entry: store.files[normalized],\n        };\n    }\n\n    async function run(operation) {\n        try {\n            await adapter.ensureVault();\n            const data = await operation();\n            return ok(data, adapter, settings);\n        } catch (error) {\n            return errorEnvelope(error, adapter, settings);\n        }\n    }\n\n    function safeVaultPath() {\n        return adapter.getVaultPath()\n            ? redactConfiguredSecrets(toPosixPath(adapter.getVaultPath()), settings)\n            : '';\n    }\n\n    async function listMarkdownNotePaths() {\n        const seen = new Set();\n        const vault = options.app && options.app.vault;\n        if (vault && typeof vault.getMarkdownFiles === 'function') {\n            for (const file of vault.getMarkdownFiles()) {\n                if (file && file.path && !file.path.startsWith('.understory/')) seen.add(toPosixPath(file.path));\n            }\n        }\n\n        const vaultRoot = adapter.getVaultPath && adapter.getVaultPath();\n        if (vaultRoot) {\n            async function walk(relativeDir = '') {\n                const absoluteDir = path.join(vaultRoot, ...relativeDir.split('/').filter(Boolean));\n                let entries = [];\n                try {\n                    entries = await fs.promises.readdir(absoluteDir, { withFileTypes: true });\n                } catch (error) {\n                    return;\n                }\n                for (const entry of entries) {\n                    const relativePath = relativeDir ? `${relativeDir}/${entry.name}` : entry.name;\n                    if (entry.isDirectory()) {\n                        if (entry.name === '.obsidian' || entry.name === '.understory') continue;\n                        await walk(relativePath);\n                    } else if (entry.isFile() && /\\.md$/i.test(entry.name)) {\n                        seen.add(toPosixPath(relativePath));\n                    }\n                }\n            }\n            await walk('');\n        }\n\n        return [...seen].sort((a, b) => a.localeCompare(b));\n    }\n\n    function relationMatches(entry, terms) {\n        const relations = Array.isArray(entry && entry.relations) ? entry.relations : [];\n        const matches = [];\n        for (const relation of relations) {\n            const text = relationText(relation).toLowerCase();\n            if (terms.some((term) => text.includes(term))) matches.push(relation);\n        }\n        return matches;\n    }\n\n    async function buildNoteBrief(notePath, store, query) {\n        const normalized = normalizeInputPath(notePath, adapter, 'notePath');\n        const [content, stat] = await Promise.all([\n            adapter.readText(normalized),\n            adapter.stat(normalized).catch(() => ({ mtime: 0 })),\n        ]);\n        const entry = store.files[normalized] || null;\n        const relations = Array.isArray(entry && entry.relations) ? entry.relations : [];\n        return {\n            path: normalized,\n            title: noteTitleFromPath(normalized),\n            snippet: compactSnippet(content, query),\n            relationCount: relations.length,\n            relations: relations.slice(0, 8).map((relation) => ({\n                target: relation.target || '',\n                title: relation.title || titleFromTarget(relation.target || ''),\n                type: relation.type || '',\n                status: relation.status || 'suggested',\n                score: relation.score,\n            })),\n            indexedAt: entry && entry.indexedAt || '',\n            mtime: stat.mtime || 0,\n        };\n    }\n\n    async function searchLocal({ query, limit } = {}) {\n        const terms = searchTerms(query);\n        if (!terms.length) {\n            throw new AgentApiError('INVALID_ARGUMENT', 'query must contain at least one searchable term.');\n        }\n        const maxResults = clampLimit(limit);\n        const { store } = await readStore();\n        const paths = new Set([\n            ...Object.keys(store.files || {}),\n            ...(await listMarkdownNotePaths()),\n        ]);\n        const results = [];\n\n        for (const notePath of paths) {\n            let content = '';\n            try {\n                if (!(await adapter.exists(notePath))) continue;\n                content = await adapter.readText(notePath);\n            } catch (error) {\n                continue;\n            }\n            const entry = store.files[notePath] || null;\n            const title = noteTitleFromPath(notePath);\n            const haystacks = {\n                title: title.toLowerCase(),\n                path: notePath.toLowerCase(),\n                body: stripMarkdownNoise(content).toLowerCase(),\n            };\n            let score = 0;\n            const reasons = [];\n            for (const term of terms) {\n                if (haystacks.title.includes(term)) {\n                    score += 6;\n                    reasons.push('title');\n                }\n                if (haystacks.path.includes(term)) {\n                    score += 3;\n                    reasons.push('path');\n                }\n                if (haystacks.body.includes(term)) {\n                    score += 2;\n                    reasons.push('content snippet');\n                }\n            }\n            const relationHits = relationMatches(entry, terms);\n            if (relationHits.length) {\n                score += relationHits.length * 4;\n                reasons.push('relations graph');\n            }\n            if (!score) continue;\n            const brief = await buildNoteBrief(notePath, store, query);\n            results.push({\n                path: brief.path,\n                title: brief.title,\n                snippet: brief.snippet,\n                why: [...new Set(reasons)].join(', '),\n                score,\n                relationCount: brief.relationCount,\n                matchedRelations: relationHits.slice(0, 5).map((relation) => ({\n                    target: relation.target || '',\n                    title: relation.title || titleFromTarget(relation.target || ''),\n                    type: relation.type || '',\n                    status: relation.status || 'suggested',\n                })),\n            });\n        }\n\n        results.sort((a, b) => b.score - a.score || a.path.localeCompare(b.path));\n        return {\n            query,\n            mode: 'local_keyword_relations',\n            limit: maxResults,\n            results: results.slice(0, maxResults),\n        };\n    }\n\n    return {\n        async getCapabilities() {\n            return run(async () => ({\n                apiVersion: API_VERSION,\n                transport: 'cli_or_mcp_stdio',\n                privacy: {\n                    networkMode: safeNetworkMode(settings.networkMode),\n                    opensHttpPort: false,\n                    sendsDataToBondieLabs: false,\n                    returnsFullNoteBodiesByDefault: false,\n                },\n                tools: {\n                    read: [\n                        'understory_status',\n                        'understory_get_capabilities',\n                        'understory_graph_summary',\n                        'understory_get_relations',\n                        'understory_search',\n                        'understory_get_context',\n                        'understory_get_note_brief',\n                    ],\n                    write: [\n                        'understory_refresh_relations',\n                        'understory_accept_relation',\n                        'understory_reject_relation',\n                        'understory_insert_relation',\n                    ],\n                },\n                writeSafety: 'Write tools modify local vault metadata or note content and require user confirmation.',\n            }));\n        },\n\n        async status() {\n            return run(async () => {\n                const { exists, store } = await readStore();\n                const files = isObject(store.files) ? Object.values(store.files) : [];\n                const relationCount = files.reduce((count, entry) => (\n                    count + (Array.isArray(entry && entry.relations) ? entry.relations.length : 0)\n                ), 0);\n                const engineHealth = plugin && plugin.engineHealth ? plugin.engineHealth : null;\n                return {\n                    status: 'ok',\n                    vaultPath: safeVaultPath(),\n                    networkMode: safeNetworkMode(settings.networkMode),\n                    relationsStore: {\n                        exists,\n                        fileCount: files.length,\n                        relationCount,\n                    },\n                    engine: engineHealth ? {\n                        status: engineHealth.status || (engineHealth.ok ? 'ready' : 'problem'),\n                        message: redactSensitiveText(engineHealth.message || '', settings),\n                    } : {\n                        status: 'not_checked',\n                    },\n                };\n            });\n        },\n\n        async getRelations({ notePath } = {}) {\n            return run(async () => {\n                const normalized = await assertNoteExists(notePath);\n                const { store } = await readStore();\n                const entry = store.files[normalized] || null;\n                if (!entry) {\n                    return {\n                        notePath: normalized,\n                        status: 'missing',\n                        stale: true,\n                        relations: [],\n                        entry: null,\n                    };\n                }\n                let stale = false;\n                try {\n                    const [content, stat] = await Promise.all([\n                        adapter.readText(normalized),\n                        adapter.stat(normalized),\n                    ]);\n                    stale = entry.hash !== hashContent(content)\n                        || Number(entry.mtime || 0) !== Number(stat.mtime || 0);\n                } catch (error) {\n                    stale = false;\n                }\n                return {\n                    notePath: normalized,\n                    status: 'ok',\n                    stale,\n                    relations: Array.isArray(entry.relations) ? entry.relations : [],\n                    entry,\n                };\n            });\n        },\n\n        async search({ query, limit } = {}) {\n            return run(async () => searchLocal({ query, limit }));\n        },\n\n        async getNoteBrief({ notePath } = {}) {\n            return run(async () => {\n                const normalized = await assertNoteExists(notePath);\n                const { store } = await readStore();\n                const brief = await buildNoteBrief(normalized, store, '');\n                return {\n                    ...brief,\n                    bodyIncluded: false,\n                };\n            });\n        },\n\n        async getContext({ query, notePath, limit } = {}) {\n            return run(async () => {\n                const maxResults = clampLimit(limit, 6, 12);\n                if (notePath) {\n                    const normalized = await assertNoteExists(notePath);\n                    const { store } = await readStore();\n                    const source = await buildNoteBrief(normalized, store, query || '');\n                    const related = [];\n                    for (const relation of source.relations) {\n                        if (!relation.target) continue;\n                        try {\n                            if (await adapter.exists(relation.target)) {\n                                related.push(await buildNoteBrief(relation.target, store, query || ''));\n                            }\n                        } catch (error) {\n                            // Relations may point to aliases or notes that are not present locally.\n                        }\n                        if (related.length >= maxResults - 1) break;\n                    }\n                    return {\n                        mode: 'note_relations_context',\n                        query: query || '',\n                        source,\n                        items: [source, ...related].slice(0, maxResults),\n                        bodyIncluded: false,\n                    };\n                }\n\n                const search = await searchLocal({ query, limit: maxResults });\n                return {\n                    mode: 'search_context',\n                    query,\n                    items: search.results,\n                    bodyIncluded: false,\n                };\n            });\n        },\n\n        async refreshRelations({ notePath, dryRun = false } = {}) {\n            return run(async () => {\n                const normalized = await assertNoteExists(notePath);\n                if (dryRun) {\n                    return {\n                        notePath: normalized,\n                        dryRun: true,\n                        status: 'skipped',\n                    };\n                }\n                if (options.relationsStore && options.app && options.app.vault && options.app.vault.getAbstractFileByPath) {\n                    const file = options.app.vault.getAbstractFileByPath(normalized);\n                    if (!file) throw new AgentApiError('NOTE_NOT_FOUND', ERROR_MESSAGES.NOTE_NOT_FOUND);\n                    const result = await options.relationsStore.discoverAndCache(file, true);\n                    return {\n                        notePath: normalized,\n                        status: result && result.status || 'ok',\n                        result,\n                    };\n                }\n                return refreshWithExternalEngine(normalized);\n            });\n        },\n\n        async acceptRelation({ notePath, target } = {}) {\n            return run(async () => setRelationStatus(notePath, target, 'accepted'));\n        },\n\n        async rejectRelation({ notePath, target } = {}) {\n            return run(async () => {\n                const mutation = await setRelationStatus(notePath, target, 'rejected');\n                const overridesResult = await readJson(OVERRIDES_PATH, {});\n                const overrides = isObject(overridesResult.value) ? overridesResult.value : {};\n                if (!overrides[mutation.notePath]) overrides[mutation.notePath] = {};\n                if (!isObject(overrides[mutation.notePath].tombstones)) {\n                    overrides[mutation.notePath].tombstones = {};\n                }\n                overrides[mutation.notePath].tombstones[mutation.matchedTitle || target] = {\n                    action: 'deleted',\n                    at: new Date().toISOString(),\n                    ttl_days: 30,\n                    target_hash: '',\n                };\n                await writeJson(OVERRIDES_PATH, overrides);\n                return {\n                    ...mutation,\n                    tombstone: true,\n                };\n            });\n        },\n\n        async insertRelation({ notePath, target, title } = {}) {\n            return run(async () => {\n                const normalized = await assertNoteExists(notePath);\n                const safeTarget = maybeNormalizeTargetPath(target, adapter);\n                const linkTitle = cleanLinkTitle(title) || titleFromTarget(safeTarget);\n                if (!linkTitle) {\n                    throw new AgentApiError('INVALID_ARGUMENT', 'title or target must produce a link title.');\n                }\n                const link = `[[${linkTitle}]]`;\n                const content = await adapter.readText(normalized);\n                const insertion = insertLinkIntoContent(content, link);\n                if (insertion.inserted) {\n                    await adapter.writeText(normalized, insertion.content);\n                }\n                const relationMutation = insertion.inserted\n                    ? await trySetRelationStatus(normalized, safeTarget, 'accepted')\n                        || await trySetRelationStatus(normalized, linkTitle, 'accepted')\n                    : null;\n                return {\n                    notePath: normalized,\n                    target: safeTarget,\n                    title: linkTitle,\n                    link,\n                    inserted: insertion.inserted,\n                    alreadyExists: insertion.alreadyExists,\n                    sectionHeading: insertion.sectionHeading,\n                    line: insertion.line,\n                    relationUpdated: !!relationMutation,\n                };\n            });\n        },\n\n        async getGraphSummary() {\n            return run(async () => {\n                const relations = await readStore();\n                const files = isObject(relations.store.files) ? Object.values(relations.store.files) : [];\n                const relationCount = files.reduce((count, entry) => (\n                    count + (Array.isArray(entry && entry.relations) ? entry.relations.length : 0)\n                ), 0);\n                const conflictsResult = await readJson(CONFLICTS_PATH, null);\n                const conflicts = summarizeConflicts(conflictsResult.value);\n                const indexExists = await adapter.exists(INDEX_PATH);\n                return {\n                    vaultPath: safeVaultPath(),\n                    relationsStore: {\n                        exists: relations.exists,\n                        fileCount: files.length,\n                        relationCount,\n                        updatedAt: relations.store.indexedAt || '',\n                    },\n                    conflicts: {\n                        exists: conflictsResult.exists,\n                        openCount: conflicts.openCount,\n                        highCount: conflicts.highCount,\n                    },\n                    index: {\n                        exists: indexExists,\n                        path: INDEX_PATH,\n                    },\n                };\n            });\n        },\n    };\n}\n\nfunction summarizeConflicts(value) {\n    const items = [];\n    if (Array.isArray(value)) {\n        items.push(...value);\n    } else if (isObject(value)) {\n        if (Array.isArray(value.conflicts)) items.push(...value.conflicts);\n        for (const [key, item] of Object.entries(value)) {\n            if (key === 'conflicts') continue;\n            if (Array.isArray(item)) items.push(...item);\n            else if (isObject(item) && (item.status || item.severity)) items.push(item);\n        }\n    }\n\n    let openCount = 0;\n    let highCount = 0;\n    for (const item of items) {\n        const status = String(item && item.status || '').toLowerCase();\n        const severity = String(item && (item.severity || item.level) || '').toLowerCase();\n        if (status !== 'resolved' && status !== 'closed') openCount += 1;\n        if (severity === 'high' || severity === 'critical') highCount += 1;\n    }\n    return { openCount, highCount };\n}\n\nmodule.exports = {\n    AgentApiError,\n    ERROR_MESSAGES,\n    OVERRIDES_PATH,\n    RELATIONS_PATH,\n    createAgentApi,\n};\n", "safetySource": "const MAX_ERROR_DETAIL_LENGTH = 400;\nconst MAX_LOG_STRING_LENGTH = 500;\nconst VALID_NETWORK_MODES = new Set(['local', 'embedding', 'full']);\nconst VALID_PROVIDERS = new Set(['none', 'openai', 'zhipu', 'custom']);\n\nfunction safeNetworkMode(mode) {\n    const value = String(mode || '').trim();\n    return VALID_NETWORK_MODES.has(value) ? value : 'local';\n}\n\nfunction safeProvider(provider, fallback = 'none') {\n    const value = String(provider || '').trim();\n    if (VALID_PROVIDERS.has(value)) return value;\n    return VALID_PROVIDERS.has(fallback) ? fallback : 'none';\n}\n\nfunction truncateText(text, maxLength = MAX_LOG_STRING_LENGTH) {\n    const value = String(text || '');\n    if (value.length <= maxLength) return value;\n    return `${value.slice(0, Math.max(0, maxLength - 14))}...[truncated]`;\n}\n\nfunction collectSecrets(source) {\n    if (!source) return [];\n    if (Array.isArray(source)) return source;\n    const settings = source.settings && typeof source.settings === 'object' ? source.settings : source;\n    return [\n        settings.embeddingApiKey,\n        settings.llmApiKey,\n        settings.webhookUrl,\n    ];\n}\n\nfunction escapeRegExp(value) {\n    return String(value).replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');\n}\n\nfunction redactSensitiveText(text, source) {\n    if (text === null || text === undefined) return '';\n    let output = String(text);\n    const secrets = collectSecrets(source)\n        .map((secret) => String(secret || '').trim())\n        .filter((secret) => secret.length >= 4);\n\n    for (const secret of secrets) {\n        const marker = secret.startsWith('http') ? '[REDACTED_WEBHOOK_URL]' : '[REDACTED_SECRET]';\n        output = output.replace(new RegExp(escapeRegExp(secret), 'g'), marker);\n    }\n\n    output = output.replace(/(authorization\\s*[:=]\\s*)(bearer\\s+)?[^\\s,;'\"`]+/gi, '$1[REDACTED_AUTH]');\n    output = output.replace(/\\bbearer\\s+[a-z0-9._~+/=-]{12,}/gi, 'Bearer [REDACTED_TOKEN]');\n    output = output.replace(/\\bsk-[a-z0-9_-]{16,}/gi, '[REDACTED_SECRET]');\n    output = output.replace(/([?&](?:api[_-]?key|key|token|password|secret)=)[^&#\\s]+/gi, '$1[REDACTED_SECRET]');\n    output = output.replace(/((?:api[_-]?key|key|token|password|secret)\\s*[:=]\\s*)(\"[^\"]+\"|'[^']+'|[^\\s,;]+)/gi, '$1[REDACTED_SECRET]');\n    output = output.replace(/\\b[A-Za-z0-9_-]{32,}\\.[A-Za-z0-9_-]{16,}\\.[A-Za-z0-9_-]{16,}\\b/g, '[REDACTED_TOKEN]');\n    output = output.replace(/\\b[A-Za-z0-9_/-]{40,}\\b/g, '[REDACTED_SECRET]');\n\n    return output;\n}\n\nfunction safeErrorDetail({ stdout = '', stderr = '', message = '', settings = null, includeStdout = false, maxLength = MAX_ERROR_DETAIL_LENGTH } = {}) {\n    const parts = [];\n    const redactedMessage = redactSensitiveText(message, settings).trim();\n    const redactedStderr = redactSensitiveText(stderr, settings).trim();\n\n    if (redactedMessage) parts.push(`message: ${redactedMessage}`);\n    if (redactedStderr) parts.push(`stderr: ${redactedStderr}`);\n    if (includeStdout && stdout) {\n        parts.push(`stdout: ${redactSensitiveText(stdout, settings).trim()}`);\n    } else if (stdout) {\n        parts.push('stdout: [omitted]');\n    }\n\n    const detail = parts.join('\\n') || 'No diagnostic detail available.';\n    return truncateText(detail, maxLength);\n}\n\nfunction normalizeLogEntry(entry, settings) {\n    const input = entry && typeof entry === 'object' ? entry : {};\n    const normalized = { ...input };\n    for (const [key, value] of Object.entries(normalized)) {\n        if (typeof value === 'string') {\n            normalized[key] = truncateText(redactSensitiveText(value, settings));\n        } else if (Array.isArray(value)) {\n            normalized[key] = value.map((item) => (\n                typeof item === 'string' ? truncateText(redactSensitiveText(item, settings), 180) : item\n            ));\n        }\n    }\n    if (normalized.errorDetail) {\n        normalized.errorDetail = truncateText(redactSensitiveText(normalized.errorDetail, settings), MAX_ERROR_DETAIL_LENGTH);\n    }\n    return normalized;\n}\n\nfunction normalizeSettings(data, defaults = {}, options = {}) {\n    const settings = Object.assign({}, defaults, data || {});\n    settings.networkMode = safeNetworkMode(settings.networkMode);\n    settings.embeddingProvider = safeProvider(settings.embeddingProvider, defaults.embeddingProvider || 'none');\n    settings.llmProvider = safeProvider(settings.llmProvider, defaults.llmProvider || 'none');\n\n    if (settings.networkMode === 'local') {\n        settings.webhookEnabled = false;\n    } else {\n        settings.webhookEnabled = !!settings.webhookEnabled;\n    }\n\n    if (options.resetRuntimeState !== false) {\n        settings.lintInProgress = false;\n        settings.refreshInProgress = false;\n    }\n\n    if (!Array.isArray(settings.refreshQueue)) settings.refreshQueue = [];\n    if (!Number.isFinite(Number(settings.refreshQueueIndex))) settings.refreshQueueIndex = 0;\n    if (!settings.notificationCooldown || typeof settings.notificationCooldown !== 'object') settings.notificationCooldown = {};\n    if (!Array.isArray(settings.linkLog)) settings.linkLog = [];\n    settings.linkLog = settings.linkLog.slice(0, options.maxLogEntries || 200)\n        .map((entry) => normalizeLogEntry(entry, settings));\n\n    return settings;\n}\n\nfunction canUseWebhook(settings) {\n    return safeNetworkMode(settings && settings.networkMode) !== 'local'\n        && !!(settings && settings.webhookEnabled)\n        && !!String(settings && settings.webhookUrl || '').trim();\n}\n\nmodule.exports = {\n    canUseWebhook,\n    normalizeLogEntry,\n    normalizeSettings,\n    redactSensitiveText,\n    safeErrorDetail,\n    safeNetworkMode,\n};\n", "mcpServerSource": "#!/usr/bin/env node\n\nconst { createAgentApi } = require('../src/agentApi');\nconst { safeErrorDetail } = require('../src/safety');\n\nconst PROTOCOL_VERSION = '2025-11-25';\n\nconst TOOL_DEFINITIONS = [\n    {\n        name: 'understory_status',\n        title: 'Understory status',\n        description: 'Read local Understory Agent API status for a vault.',\n        inputSchema: schema({\n            vaultPath: optionalString('Vault path override. Defaults to the server --vault argument.'),\n        }),\n        call: (api) => api.status(),\n    },\n    {\n        name: 'understory_get_capabilities',\n        title: 'Get Understory Agent API capabilities',\n        description: 'Describe available local MCP tools, privacy defaults, and write-safety boundaries.',\n        inputSchema: schema({\n            vaultPath: optionalString('Vault path override. Defaults to the server --vault argument.'),\n        }),\n        call: (api) => api.getCapabilities(),\n    },\n    {\n        name: 'understory_get_relations',\n        title: 'Get Understory relations',\n        description: 'Read suggested/accepted/rejected relations for one note without returning note body text.',\n        inputSchema: schema({\n            notePath: requiredString('Vault-relative note path.'),\n            vaultPath: optionalString('Vault path override.'),\n        }, ['notePath']),\n        call: (api, args) => api.getRelations({ notePath: args.notePath }),\n    },\n    {\n        name: 'understory_search',\n        title: 'Search Understory vault context',\n        description: 'Search vault notes with local keyword and relations-graph signals. Returns snippets, not full note bodies.',\n        inputSchema: schema({\n            query: requiredString('Search query.'),\n            limit: { type: 'number', description: 'Maximum results. Defaults to 8, maximum 25.' },\n            vaultPath: optionalString('Vault path override.'),\n        }, ['query']),\n        call: (api, args) => api.search({ query: args.query, limit: args.limit }),\n    },\n    {\n        name: 'understory_get_context',\n        title: 'Get Understory context package',\n        description: 'Build a scoped context package from a query or known note path without returning full note bodies.',\n        inputSchema: schema({\n            query: optionalString('Optional search query. Required when notePath is not supplied.'),\n            notePath: optionalString('Vault-relative note path for relation-centered context.'),\n            limit: { type: 'number', description: 'Maximum context items. Defaults to 6, maximum 12.' },\n            vaultPath: optionalString('Vault path override.'),\n        }),\n        call: (api, args) => api.getContext({ query: args.query, notePath: args.notePath, limit: args.limit }),\n    },\n    {\n        name: 'understory_get_note_brief',\n        title: 'Get Understory note brief',\n        description: 'Read a note brief with title, snippet, and top relations without returning the full body.',\n        inputSchema: schema({\n            notePath: requiredString('Vault-relative note path.'),\n            vaultPath: optionalString('Vault path override.'),\n        }, ['notePath']),\n        call: (api, args) => api.getNoteBrief({ notePath: args.notePath }),\n    },\n    {\n        name: 'understory_refresh_relations',\n        title: 'Refresh Understory relations',\n        description: 'Refresh relations for one note. Use dryRun to avoid running the local engine.',\n        inputSchema: schema({\n            notePath: requiredString('Vault-relative note path.'),\n            dryRun: { type: 'boolean', description: 'When true, validate inputs without running the engine.' },\n            engineDir: optionalString('Local Understory engine directory override.'),\n            pythonPath: optionalString('Python executable override.'),\n            vaultPath: optionalString('Vault path override.'),\n        }, ['notePath']),\n        call: (api, args) => api.refreshRelations({ notePath: args.notePath, dryRun: !!args.dryRun }),\n    },\n    {\n        name: 'understory_accept_relation',\n        title: 'Accept Understory relation',\n        description: 'Modifies local vault metadata by marking a relation accepted.',\n        inputSchema: schema({\n            notePath: requiredString('Vault-relative note path.'),\n            target: requiredString('Relation title or target path.'),\n            vaultPath: optionalString('Vault path override.'),\n        }, ['notePath', 'target']),\n        call: (api, args) => api.acceptRelation({ notePath: args.notePath, target: args.target }),\n    },\n    {\n        name: 'understory_reject_relation',\n        title: 'Reject Understory relation',\n        description: 'Modifies local vault metadata by marking a relation rejected and writing a tombstone.',\n        inputSchema: schema({\n            notePath: requiredString('Vault-relative note path.'),\n            target: requiredString('Relation title or target path.'),\n            vaultPath: optionalString('Vault path override.'),\n        }, ['notePath', 'target']),\n        call: (api, args) => api.rejectRelation({ notePath: args.notePath, target: args.target }),\n    },\n    {\n        name: 'understory_insert_relation',\n        title: 'Insert Understory relation link',\n        description: 'Modifies local vault note content by inserting an Obsidian link and accepting the relation when present.',\n        inputSchema: schema({\n            notePath: requiredString('Vault-relative note path to modify.'),\n            target: requiredString('Vault-relative target note path or relation target.'),\n            title: optionalString('Link title. Defaults to the target basename.'),\n            vaultPath: optionalString('Vault path override.'),\n        }, ['notePath', 'target']),\n        call: (api, args) => api.insertRelation({\n            notePath: args.notePath,\n            target: args.target,\n            title: args.title,\n        }),\n    },\n    {\n        name: 'understory_graph_summary',\n        title: 'Get Understory graph summary',\n        description: 'Read local graph summary counts from .understory files.',\n        inputSchema: schema({\n            vaultPath: optionalString('Vault path override.'),\n        }),\n        call: (api) => api.getGraphSummary(),\n    },\n];\n\nconst TOOL_MAP = new Map(TOOL_DEFINITIONS.map((tool) => [tool.name, tool]));\n\nfunction requiredString(description) {\n    return { type: 'string', description };\n}\n\nfunction optionalString(description) {\n    return { type: 'string', description };\n}\n\nfunction schema(properties, required = []) {\n    return {\n        type: 'object',\n        properties,\n        required,\n        additionalProperties: false,\n    };\n}\n\nfunction parseArgs(argv) {\n    const options = {};\n    for (let index = 0; index < argv.length; index += 1) {\n        const arg = argv[index];\n        if (!arg.startsWith('--')) continue;\n        const eqIndex = arg.indexOf('=');\n        const key = eqIndex === -1 ? arg.slice(2) : arg.slice(2, eqIndex);\n        const value = eqIndex === -1 ? argv[index + 1] : arg.slice(eqIndex + 1);\n        if (eqIndex === -1) index += 1;\n        options[key] = value;\n    }\n    return options;\n}\n\nfunction response(id, result) {\n    return { jsonrpc: '2.0', id, result };\n}\n\nfunction rpcError(id, code, message, data) {\n    const error = { code, message };\n    if (data !== undefined) error.data = data;\n    return { jsonrpc: '2.0', id: id === undefined ? null : id, error };\n}\n\nfunction toolResult(envelope) {\n    const text = JSON.stringify(envelope);\n    return {\n        content: [{ type: 'text', text }],\n        structuredContent: envelope,\n        isError: !envelope.ok,\n    };\n}\n\nasync function handleRequest(message, serverOptions) {\n    if (!message || message.jsonrpc !== '2.0' || !message.method) {\n        return rpcError(message && message.id, -32600, 'Invalid JSON-RPC request.');\n    }\n\n    const id = message.id;\n    const params = message.params || {};\n\n    if (message.method === 'notifications/initialized') {\n        return null;\n    }\n\n    if (id === undefined || id === null) {\n        return null;\n    }\n\n    if (message.method === 'initialize') {\n        return response(id, {\n            protocolVersion: params.protocolVersion || PROTOCOL_VERSION,\n            capabilities: {\n                tools: {},\n            },\n            serverInfo: {\n                name: 'understory-agent-api',\n                version: '1.0.0',\n            },\n        });\n    }\n\n    if (message.method === 'ping') {\n        return response(id, {});\n    }\n\n    if (message.method === 'tools/list') {\n        return response(id, {\n            tools: TOOL_DEFINITIONS.map(({ call, ...tool }) => tool),\n        });\n    }\n\n    if (message.method === 'tools/call') {\n        const name = params.name;\n        const args = params.arguments || {};\n        const tool = TOOL_MAP.get(name);\n        if (!tool) {\n            return rpcError(id, -32602, `Unknown tool: ${name || ''}`);\n        }\n        const vaultPath = args.vaultPath || serverOptions.vault;\n        const api = createAgentApi({\n            vaultPath,\n            engineDir: args.engineDir || serverOptions['engine-dir'] || serverOptions.engineDir,\n            pythonPath: args.pythonPath || serverOptions.python || serverOptions['python-path'] || serverOptions.pythonPath,\n        });\n        const envelope = await tool.call(api, args);\n        return response(id, toolResult(envelope));\n    }\n\n    return rpcError(id, -32601, `Method not found: ${message.method}`);\n}\n\nfunction writeMessage(message, stdout = process.stdout) {\n    stdout.write(`${JSON.stringify(message)}\\n`);\n}\n\nfunction startServer(argv = process.argv.slice(2), stdin = process.stdin, stdout = process.stdout, stderr = process.stderr) {\n    const serverOptions = parseArgs(argv);\n    let buffer = '';\n    stdin.setEncoding('utf8');\n    stdin.on('data', (chunk) => {\n        buffer += chunk;\n        const lines = buffer.split(/\\r?\\n/);\n        buffer = lines.pop() || '';\n        for (const line of lines) {\n            if (!line.trim()) continue;\n            let message;\n            try {\n                message = JSON.parse(line);\n            } catch (error) {\n                writeMessage(rpcError(null, -32700, 'Parse error.'), stdout);\n                continue;\n            }\n            handleRequest(message, serverOptions)\n                .then((reply) => {\n                    if (reply) writeMessage(reply, stdout);\n                })\n                .catch((error) => {\n                    const detail = safeErrorDetail({\n                        message: error && error.message ? error.message : String(error || ''),\n                    });\n                    stderr.write(`Understory MCP error: ${detail}\\n`);\n                    writeMessage(rpcError(message.id, -32603, 'Internal error.'), stdout);\n                });\n        }\n    });\n}\n\nif (require.main === module) {\n    startServer();\n}\n\nmodule.exports = {\n    TOOL_DEFINITIONS,\n    handleRequest,\n    parseArgs,\n    startServer,\n};\n"};
 }
 };
 const __cache = {};

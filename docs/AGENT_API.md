@@ -5,8 +5,16 @@ Understory exposes local automation surfaces for Agents:
 - JSON CLI: `scripts/understory-agent-cli.js`
 - MCP stdio server: `scripts/understory-mcp-server.js`
 - Plugin service: `this.agentApi` inside the Obsidian plugin instance
+- Obsidian settings: **Settings -> Understory -> AI agents**
 
 The API is local-only. It does not start an HTTP server or open a port.
+
+For regular plugin users, the **AI agents** settings page is the recommended entry point. It provides a vault-specific MCP JSON configuration, a local MCP server file at `.understory/agent/understory-mcp-server.js`, a Query-only or Agent memory model Skill prompt, and agent-specific setup notes. The local MCP server file is not a cloud server and does not open an HTTP port. Understory identifies the currently open vault only; it does not scan all Obsidian vaults on the computer.
+
+The Skill mode controls agent behavior:
+
+- **Query-only**: use Understory only when the user explicitly asks to query, search, cite, summarize, or inspect the current vault. Treat this mode as read-only.
+- **Agent memory model**: use Understory as active local context and a long-term memory layer. The agent may retrieve relevant context before planning and propose durable memory, relation, decision, or project-state updates after substantial work, but write operations still require user confirmation.
 
 ## Response Envelope
 
@@ -64,6 +72,10 @@ Every command writes exactly one JSON envelope to stdout. Failed commands exit w
 
 ```powershell
 node scripts/understory-agent-cli.js status --vault "C:\path\to\vault" --json
+node scripts/understory-agent-cli.js capabilities --vault "C:\path\to\vault" --json
+node scripts/understory-agent-cli.js search --vault "C:\path\to\vault" --query "memory graph" --json
+node scripts/understory-agent-cli.js get-context --vault "C:\path\to\vault" --note "Notes/A.md" --json
+node scripts/understory-agent-cli.js get-note-brief --vault "C:\path\to\vault" --note "Notes/A.md" --json
 node scripts/understory-agent-cli.js get-relations --vault "C:\path\to\vault" --note "Notes/A.md" --json
 node scripts/understory-agent-cli.js refresh-relations --vault "C:\path\to\vault" --note "Notes/A.md" --engine-dir "C:\path\to\Understory-graphify-engine" --json
 node scripts/understory-agent-cli.js refresh-relations --vault "C:\path\to\vault" --note "Notes/A.md" --dry-run --json
@@ -79,6 +91,8 @@ Supported flags:
 | :--- | :--- |
 | `--vault <path>` | Required vault path for CLI calls. |
 | `--note <path>` | Vault-relative note path. |
+| `--query <text>` | Query text for `search` or query-based `get-context`. |
+| `--limit <number>` | Result or context item limit. |
 | `--target <title-or-path>` | Relation title or target path. |
 | `--title <title>` | Link title for `insert-relation`. |
 | `--dry-run` | Validate refresh inputs without running the local engine. |
@@ -90,17 +104,27 @@ Supported flags:
 
 ## MCP Stdio
 
-Configure an MCP client to launch the stdio server:
+Regular plugin users should copy the config from **Settings -> Understory -> AI agents** after exporting the standalone MCP server. The generated key is vault-specific, so one agent config can contain multiple Understory vaults:
 
 ```json
 {
   "mcpServers": {
-    "understory": {
+    "understory-work-notes": {
       "command": "node",
       "args": [
-        "<path-to-repo>/scripts/understory-mcp-server.js",
+        "C:/path/to/work-vault/.understory/agent/understory-mcp-server.js",
         "--vault",
-        "C:/path/to/vault",
+        "C:/path/to/work-vault",
+        "--engine-dir",
+        "C:/path/to/Understory-graphify-engine"
+      ]
+    },
+    "understory-research-vault": {
+      "command": "node",
+      "args": [
+        "C:/path/to/research-vault/.understory/agent/understory-mcp-server.js",
+        "--vault",
+        "C:/path/to/research-vault",
         "--engine-dir",
         "C:/path/to/Understory-graphify-engine"
       ]
@@ -109,6 +133,10 @@ Configure an MCP client to launch the stdio server:
 }
 ```
 
+For ordinary onboarding, bind each MCP server entry with `--vault` and use the matching Understory Skill for that vault. Do not ask an agent to switch vaults by passing another `vaultPath` to the same server unless the user explicitly asks for advanced troubleshooting.
+
+Developer builds can launch `scripts/understory-mcp-server.js` from the repository instead of the exported server path.
+
 The server speaks newline-delimited JSON-RPC over stdin/stdout and does not write logs to stdout.
 
 ### Tools
@@ -116,7 +144,11 @@ The server speaks newline-delimited JSON-RPC over stdin/stdout and does not writ
 | Tool | Arguments | Effect |
 | :--- | :--- | :--- |
 | `understory_status` | `{ vaultPath? }` | Read API, vault, relation-store, and basic engine status. |
+| `understory_get_capabilities` | `{ vaultPath? }` | Read available tools, privacy defaults, and write-safety boundaries. |
 | `understory_get_relations` | `{ notePath, vaultPath? }` | Read relations for one note. |
+| `understory_search` | `{ query, limit?, vaultPath? }` | Search notes with local keyword and relations-graph signals. Returns paths, titles, snippets, and why each result matched. |
+| `understory_get_context` | `{ query?, notePath?, limit?, vaultPath? }` | Build a scoped context package from a query or known note path without returning full note bodies. |
+| `understory_get_note_brief` | `{ notePath, vaultPath? }` | Return a note title, snippet, relation count, and top relations. |
 | `understory_refresh_relations` | `{ notePath, dryRun?, engineDir?, pythonPath?, vaultPath? }` | Refresh relations through local engine `api.py refresh-link --no-auto-write`. Use `dryRun: true` when no engine should run. |
 | `understory_accept_relation` | `{ notePath, target, vaultPath? }` | Modifies local vault metadata by accepting a relation. |
 | `understory_reject_relation` | `{ notePath, target, vaultPath? }` | Modifies local vault metadata and writes a tombstone. |
@@ -144,6 +176,8 @@ Tool responses return:
 ```
 
 If the Understory operation fails, `isError` is `true` and `structuredContent.error.code` contains the stable Agent API code.
+
+`understory_search`, `understory_get_context`, and `understory_get_note_brief` are read-only. They return snippets and relationship metadata, not full note bodies. The current implementation uses local keyword plus relations graph signals; vector/hybrid retrieval can be added later without changing the tool names.
 
 ## Data Models
 

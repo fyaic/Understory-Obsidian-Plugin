@@ -160,7 +160,11 @@ test('MCP server initializes, lists tools, and calls read tools', async (t) => {
     const listed = await client.request('tools/list');
     const names = listed.result.tools.map((tool) => tool.name);
     assert.ok(names.includes('understory_status'));
+    assert.ok(names.includes('understory_get_capabilities'));
     assert.ok(names.includes('understory_get_relations'));
+    assert.ok(names.includes('understory_search'));
+    assert.ok(names.includes('understory_get_context'));
+    assert.ok(names.includes('understory_get_note_brief'));
     assert.ok(names.includes('understory_insert_relation'));
     assert.ok(listed.result.tools.find((tool) => tool.name === 'understory_insert_relation').description.includes('Modifies local vault'));
 
@@ -179,6 +183,22 @@ test('MCP server initializes, lists tools, and calls read tools', async (t) => {
     assert.equal(relations.result.isError, false);
     assert.equal(relations.result.structuredContent.data.relations[0].title, 'Target');
     assert.deepEqual(JSON.parse(relations.result.content[0].text), relations.result.structuredContent);
+
+    const capabilities = await client.request('tools/call', {
+        name: 'understory_get_capabilities',
+        arguments: {},
+    });
+    assert.equal(capabilities.result.isError, false);
+    assert.equal(capabilities.result.structuredContent.data.privacy.opensHttpPort, false);
+
+    const search = await client.request('tools/call', {
+        name: 'understory_search',
+        arguments: { query: 'target' },
+    });
+    assert.equal(search.result.isError, false);
+    assert.ok(search.result.structuredContent.data.results.length >= 1);
+    assert.equal(search.result.structuredContent.data.results[0].path, 'Notes/Source.md');
+    assert.ok(search.result.structuredContent.data.results[0].snippet);
 });
 
 test('MCP tool errors stay structured and redact fake secrets', async (t) => {

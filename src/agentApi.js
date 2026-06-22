@@ -86,6 +86,61 @@ function countLinesBefore(content, index) {
     return String(content).slice(0, index).split(/\r?\n/).length;
 }
 
+function clampLimit(value, fallback = 8, max = 25) {
+    const number = Number(value);
+    if (!Number.isFinite(number) || number <= 0) return fallback;
+    return Math.min(Math.floor(number), max);
+}
+
+function searchTerms(query) {
+    return String(query || '')
+        .toLowerCase()
+        .split(/[\s,，。.;；:：!?！？()[\]{}"'`]+/)
+        .map((term) => term.trim())
+        .filter((term) => term.length >= 2)
+        .slice(0, 8);
+}
+
+function stripMarkdownNoise(content) {
+    return String(content || '')
+        .replace(/^---[\s\S]*?---\s*/m, '')
+        .replace(/```[\s\S]*?```/g, ' ')
+        .replace(/!\[[^\]]*\]\([^)]+\)/g, ' ')
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+        .replace(/[#>*_`~-]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function compactSnippet(content, query, maxLength = 220) {
+    const clean = stripMarkdownNoise(content);
+    if (!clean) return '';
+    const lower = clean.toLowerCase();
+    const terms = searchTerms(query);
+    const firstHit = terms
+        .map((term) => lower.indexOf(term))
+        .filter((index) => index >= 0)
+        .sort((a, b) => a - b)[0];
+    const start = firstHit > 60 ? firstHit - 60 : 0;
+    const snippet = clean.slice(start, start + maxLength);
+    return `${start > 0 ? '...' : ''}${snippet}${start + maxLength < clean.length ? '...' : ''}`;
+}
+
+function noteTitleFromPath(notePath) {
+    return titleFromTarget(notePath);
+}
+
+function relationText(relation) {
+    if (!relation) return '';
+    return [
+        relation.title,
+        relation.target,
+        relation.type,
+        relation.group,
+        relation.source,
+    ].filter(Boolean).join(' ');
+}
+
 function createMeta(context, settings) {
     const meta = {
         apiVersion: API_VERSION,
@@ -416,7 +471,7 @@ function relationType(relation) {
 function relationSource(relation) {
     if (relation.source) return relation.source;
     if (relation.reason) return relation.reason;
-    return 'graphify';
+    return 'understory';
 }
 
 function normalizeRelations(result) {
@@ -709,7 +764,184 @@ function createAgentApi(options = {}) {
             : '';
     }
 
+    async function listMarkdownNotePaths() {
+        const seen = new Set();
+        const vault = options.app && options.app.vault;
+        if (vault && typeof vault.getMarkdownFiles === 'function') {
+            for (const file of vault.getMarkdownFiles()) {
+                if (file && file.path && !file.path.startsWith('.understory/')) seen.add(toPosixPath(file.path));
+            }
+        }
+
+        const vaultRoot = adapter.getVaultPath && adapter.getVaultPath();
+        if (vaultRoot) {
+            async function walk(relativeDir = '') {
+                const absoluteDir = path.join(vaultRoot, ...relativeDir.split('/').filter(Boolean));
+                let entries = [];
+                try {
+                    entries = await fs.promises.readdir(absoluteDir, { withFileTypes: true });
+                } catch (error) {
+                    return;
+                }
+                for (const entry of entries) {
+                    const relativePath = relativeDir ? `${relativeDir}/${entry.name}` : entry.name;
+                    if (entry.isDirectory()) {
+                        if (entry.name === '.obsidian' || entry.name === '.understory') continue;
+                        await walk(relativePath);
+                    } else if (entry.isFile() && /\.md$/i.test(entry.name)) {
+                        seen.add(toPosixPath(relativePath));
+                    }
+                }
+            }
+            await walk('');
+        }
+
+        return [...seen].sort((a, b) => a.localeCompare(b));
+    }
+
+    function relationMatches(entry, terms) {
+        const relations = Array.isArray(entry && entry.relations) ? entry.relations : [];
+        const matches = [];
+        for (const relation of relations) {
+            const text = relationText(relation).toLowerCase();
+            if (terms.some((term) => text.includes(term))) matches.push(relation);
+        }
+        return matches;
+    }
+
+    async function buildNoteBrief(notePath, store, query) {
+        const normalized = normalizeInputPath(notePath, adapter, 'notePath');
+        const [content, stat] = await Promise.all([
+            adapter.readText(normalized),
+            adapter.stat(normalized).catch(() => ({ mtime: 0 })),
+        ]);
+        const entry = store.files[normalized] || null;
+        const relations = Array.isArray(entry && entry.relations) ? entry.relations : [];
+        return {
+            path: normalized,
+            title: noteTitleFromPath(normalized),
+            snippet: compactSnippet(content, query),
+            relationCount: relations.length,
+            relations: relations.slice(0, 8).map((relation) => ({
+                target: relation.target || '',
+                title: relation.title || titleFromTarget(relation.target || ''),
+                type: relation.type || '',
+                status: relation.status || 'suggested',
+                score: relation.score,
+            })),
+            indexedAt: entry && entry.indexedAt || '',
+            mtime: stat.mtime || 0,
+        };
+    }
+
+    async function searchLocal({ query, limit } = {}) {
+        const terms = searchTerms(query);
+        if (!terms.length) {
+            throw new AgentApiError('INVALID_ARGUMENT', 'query must contain at least one searchable term.');
+        }
+        const maxResults = clampLimit(limit);
+        const { store } = await readStore();
+        const paths = new Set([
+            ...Object.keys(store.files || {}),
+            ...(await listMarkdownNotePaths()),
+        ]);
+        const results = [];
+
+        for (const notePath of paths) {
+            let content = '';
+            try {
+                if (!(await adapter.exists(notePath))) continue;
+                content = await adapter.readText(notePath);
+            } catch (error) {
+                continue;
+            }
+            const entry = store.files[notePath] || null;
+            const title = noteTitleFromPath(notePath);
+            const haystacks = {
+                title: title.toLowerCase(),
+                path: notePath.toLowerCase(),
+                body: stripMarkdownNoise(content).toLowerCase(),
+            };
+            let score = 0;
+            const reasons = [];
+            for (const term of terms) {
+                if (haystacks.title.includes(term)) {
+                    score += 6;
+                    reasons.push('title');
+                }
+                if (haystacks.path.includes(term)) {
+                    score += 3;
+                    reasons.push('path');
+                }
+                if (haystacks.body.includes(term)) {
+                    score += 2;
+                    reasons.push('content snippet');
+                }
+            }
+            const relationHits = relationMatches(entry, terms);
+            if (relationHits.length) {
+                score += relationHits.length * 4;
+                reasons.push('relations graph');
+            }
+            if (!score) continue;
+            const brief = await buildNoteBrief(notePath, store, query);
+            results.push({
+                path: brief.path,
+                title: brief.title,
+                snippet: brief.snippet,
+                why: [...new Set(reasons)].join(', '),
+                score,
+                relationCount: brief.relationCount,
+                matchedRelations: relationHits.slice(0, 5).map((relation) => ({
+                    target: relation.target || '',
+                    title: relation.title || titleFromTarget(relation.target || ''),
+                    type: relation.type || '',
+                    status: relation.status || 'suggested',
+                })),
+            });
+        }
+
+        results.sort((a, b) => b.score - a.score || a.path.localeCompare(b.path));
+        return {
+            query,
+            mode: 'local_keyword_relations',
+            limit: maxResults,
+            results: results.slice(0, maxResults),
+        };
+    }
+
     return {
+        async getCapabilities() {
+            return run(async () => ({
+                apiVersion: API_VERSION,
+                transport: 'cli_or_mcp_stdio',
+                privacy: {
+                    networkMode: safeNetworkMode(settings.networkMode),
+                    opensHttpPort: false,
+                    sendsDataToBondieLabs: false,
+                    returnsFullNoteBodiesByDefault: false,
+                },
+                tools: {
+                    read: [
+                        'understory_status',
+                        'understory_get_capabilities',
+                        'understory_graph_summary',
+                        'understory_get_relations',
+                        'understory_search',
+                        'understory_get_context',
+                        'understory_get_note_brief',
+                    ],
+                    write: [
+                        'understory_refresh_relations',
+                        'understory_accept_relation',
+                        'understory_reject_relation',
+                        'understory_insert_relation',
+                    ],
+                },
+                writeSafety: 'Write tools modify local vault metadata or note content and require user confirmation.',
+            }));
+        },
+
         async status() {
             return run(async () => {
                 const { exists, store } = await readStore();
@@ -768,6 +1000,60 @@ function createAgentApi(options = {}) {
                     stale,
                     relations: Array.isArray(entry.relations) ? entry.relations : [],
                     entry,
+                };
+            });
+        },
+
+        async search({ query, limit } = {}) {
+            return run(async () => searchLocal({ query, limit }));
+        },
+
+        async getNoteBrief({ notePath } = {}) {
+            return run(async () => {
+                const normalized = await assertNoteExists(notePath);
+                const { store } = await readStore();
+                const brief = await buildNoteBrief(normalized, store, '');
+                return {
+                    ...brief,
+                    bodyIncluded: false,
+                };
+            });
+        },
+
+        async getContext({ query, notePath, limit } = {}) {
+            return run(async () => {
+                const maxResults = clampLimit(limit, 6, 12);
+                if (notePath) {
+                    const normalized = await assertNoteExists(notePath);
+                    const { store } = await readStore();
+                    const source = await buildNoteBrief(normalized, store, query || '');
+                    const related = [];
+                    for (const relation of source.relations) {
+                        if (!relation.target) continue;
+                        try {
+                            if (await adapter.exists(relation.target)) {
+                                related.push(await buildNoteBrief(relation.target, store, query || ''));
+                            }
+                        } catch (error) {
+                            // Relations may point to aliases or notes that are not present locally.
+                        }
+                        if (related.length >= maxResults - 1) break;
+                    }
+                    return {
+                        mode: 'note_relations_context',
+                        query: query || '',
+                        source,
+                        items: [source, ...related].slice(0, maxResults),
+                        bodyIncluded: false,
+                    };
+                }
+
+                const search = await searchLocal({ query, limit: maxResults });
+                return {
+                    mode: 'search_context',
+                    query,
+                    items: search.results,
+                    bodyIncluded: false,
                 };
             });
         },

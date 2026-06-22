@@ -5,7 +5,11 @@ const { safeErrorDetail } = require('../src/safety');
 
 const COMMANDS = new Set([
     'status',
+    'capabilities',
     'get-relations',
+    'search',
+    'get-context',
+    'get-note-brief',
     'refresh-relations',
     'accept-relation',
     'reject-relation',
@@ -69,8 +73,16 @@ async function dispatch(command, options) {
     switch (command) {
         case 'status':
             return api.status();
+        case 'capabilities':
+            return api.getCapabilities();
         case 'get-relations':
             return api.getRelations({ notePath: options.note });
+        case 'search':
+            return api.search({ query: options.query, limit: options.limit });
+        case 'get-context':
+            return api.getContext({ query: options.query, notePath: options.note, limit: options.limit });
+        case 'get-note-brief':
+            return api.getNoteBrief({ notePath: options.note });
         case 'refresh-relations':
             return api.refreshRelations({ notePath: options.note, dryRun: !!options['dry-run'] });
         case 'accept-relation':

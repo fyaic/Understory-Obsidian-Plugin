@@ -101,10 +101,19 @@ class PluginSettingTab {
 class Setting {
     constructor(containerEl) {
         this.containerEl = containerEl;
+        this.settingEl = containerEl.createDiv({ cls: 'setting-item' });
     }
 
-    setName() { return this; }
-    setDesc() { return this; }
+    setName(name) {
+        this.settingEl.createDiv({ cls: 'setting-item-name', text: name });
+        return this;
+    }
+
+    setDesc(desc) {
+        this.settingEl.createDiv({ cls: 'setting-item-description', text: desc });
+        return this;
+    }
+
     setHeading() { return this; }
     addButton(callback) { callback(chainableControl()); return this; }
     addDropdown(callback) { callback(chainableControl()); return this; }
@@ -119,7 +128,7 @@ function chainableControl() {
     const methods = [
         'addOption', 'setButtonText', 'setCta', 'setDisabled', 'setDynamicTooltip',
         'setLimits', 'setPlaceholder', 'setTooltip', 'setValue', 'onChange',
-        'onClick',
+        'onClick', 'setWarning',
     ];
     for (const method of methods) control[method] = () => control;
     return control;
@@ -131,7 +140,21 @@ function createElementMock() {
         style: {},
         classList: { add() {}, remove() {} },
         addClass() {},
-        addEventListener() {},
+        eventListeners: {},
+        addEventListener(type, handler) {
+            this.eventListeners[type] = this.eventListeners[type] || [];
+            this.eventListeners[type].push(handler);
+        },
+        click() {
+            this.dispatchEvent({ type: 'click', target: this, preventDefault() {} });
+        },
+        dispatchEvent(event) {
+            for (const handler of this.eventListeners[event.type] || []) handler(event);
+        },
+        setAttribute(name, value) {
+            this.attributes = this.attributes || {};
+            this.attributes[name] = value;
+        },
         createDiv(options = {}) {
             const child = createElementMock();
             child.options = options;
@@ -145,6 +168,13 @@ function createElementMock() {
             this.children.push(child);
             return child;
         },
+        createSpan(options = {}) {
+            const child = createElementMock();
+            child.tag = 'span';
+            child.options = options;
+            this.children.push(child);
+            return child;
+        },
         empty() {
             this.children = [];
         },
@@ -152,6 +182,11 @@ function createElementMock() {
             this.text = text;
         },
     };
+}
+
+function setIcon(element, icon) {
+    element.icon = icon;
+    if (element.setAttribute) element.setAttribute('data-icon', icon);
 }
 
 const obsidianMock = {
@@ -162,6 +197,7 @@ const obsidianMock = {
     Plugin,
     PluginSettingTab,
     Setting,
+    setIcon,
     TFile,
 };
 

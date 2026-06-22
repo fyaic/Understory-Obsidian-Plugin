@@ -121,6 +121,23 @@ test('CLI status and graph-summary return stable JSON envelopes', async (t) => {
     assert.equal(graph.envelope.data.index.exists, true);
 });
 
+test('CLI capabilities and search return scoped Agent API data', async (t) => {
+    const vaultPath = await createVault(t);
+    await seedRelations(vaultPath);
+
+    const capabilities = runCli(['capabilities', '--vault', vaultPath, '--json']);
+    assert.equal(capabilities.status, 0);
+    assert.equal(capabilities.envelope.ok, true);
+    assert.ok(capabilities.envelope.data.tools.read.includes('understory_get_context'));
+
+    const search = runCli(['search', '--vault', vaultPath, '--query', 'Target', '--json']);
+    assert.equal(search.status, 0);
+    assert.equal(search.envelope.ok, true);
+    assert.equal(search.envelope.data.mode, 'local_keyword_relations');
+    assert.ok(search.envelope.data.results.length >= 1);
+    assert.equal(search.envelope.data.results[0].path, 'Notes/Source.md');
+});
+
 test('CLI get/accept/reject relation commands mutate the store', async (t) => {
     const vaultPath = await createVault(t);
     await seedRelations(vaultPath);

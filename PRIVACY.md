@@ -36,6 +36,12 @@ Understory may write local cache, report, and relationship data under `.understo
 
 The Agent API is local-only by design. It is exposed through a JSON command-line entry point and an MCP stdio server. It does not start an HTTP server, does not open a local network port, and does not send data to Bondie Labs.
 
+The **AI agents** settings page can create a local MCP server file and save an Understory Skill prompt into `.understory/agent` inside your vault. These files are local configuration artifacts. The MCP server file is a local stdio entrypoint, not a cloud server, and it does not open an HTTP port. The Skill prompt is an instruction document for your agent; saving or copying it does not upload vault content.
+
+The Skill can be generated in Query-only mode or Agent memory model mode. Query-only mode is conservative and read-only by instruction. Agent memory model mode tells the agent to retrieve relevant local context proactively and propose durable memory updates, but it does not grant permission to upload vault content or make local writes without user confirmation.
+
+For multi-vault use, Understory identifies only the currently open vault and generates a separate MCP server key for that vault. It does not scan your computer for every Obsidian vault, and it does not write Codex, Claude Desktop, Cursor, OpenClaw, or other agent configuration files automatically.
+
 Agent API calls require an explicit vault path. Note paths are normalized and rejected if they try to leave that vault. Read operations return relationship metadata, graph summary counts, status fields, and file paths. They do not return full note bodies by default. Write operations such as accepting, rejecting, or inserting a relation modify local vault files only.
 
 The Agent API reuses Understory redaction for API keys, bearer tokens, webhook URLs, and similar secrets in JSON error details. As with any local automation, review MCP/Agent client logs before sharing them.
@@ -53,7 +59,7 @@ Webhook features are off by default and are blocked in Local only mode. If enabl
 | Full AI analysis | Off unless selected | Reports/cache metadata | Selected snippets, prompts, or extracted facts to your provider | Enable only with consent and provider key |
 | Webhooks | Off | Notification/log metadata | Summary payload to configured URL | Explicit opt-in and URL |
 | Diagnostics | Manual | Local report/output | None unless you share it | Review and redact before sharing |
-| Agent API CLI/MCP | Off unless launched locally | Relationship metadata and note edits when requested | None | Launch with an explicit vault path and review client logs |
+| Agent API CLI/MCP | Off unless launched locally | Relationship metadata, local MCP server/Skill prompt files, and note edits when requested | None | Launch with an explicit vault path, copy Skill intentionally, and review client logs |
 
 ## 中文摘要
 

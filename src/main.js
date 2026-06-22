@@ -62,8 +62,6 @@ class UnderstoryPlugin extends Plugin {
                 this.startDaemon().catch((error) => console.warn('[Understory] Failed to start daemon:', error));
             }
 
-            this.ensureSidebarLeaf({ reveal: !!this.settings.openSidebarOnLoad })
-                .catch((error) => console.warn('[Understory] Failed to attach sidebar view:', error));
         });
 
         new Notice(t(this, 'plugin_enabled'));

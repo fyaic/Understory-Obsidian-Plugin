@@ -1,6 +1,8 @@
 # Understory
 
-![Understory hero](assets/understory-hero.png)
+<p align="center">
+  <img src="assets/understory-logo.png" alt="Understory logo" width="220">
+</p>
 
 [Chinese README](README.zh-CN.md) | [Website](https://bondie.io/research/understory) | [Privacy](PRIVACY.md)
 
@@ -28,6 +30,8 @@ Understory starts local-first.
 | Full AI analysis | Allows both vector and reasoning model requests for semantic indexing, concept extraction, explanations, and conflict checks. |
 
 Optional cloud features can use OpenAI, Zhipu, or a custom OpenAI-compatible endpoint. You provide your own API keys. Bondie Labs does not receive or manage your notes, prompts, embeddings, responses, logs, or API keys.
+
+The **Network & privacy** settings page lets you choose a provider, paste your API key, and edit the endpoint/base URL and model name. OpenAI and Zhipu presets fill the common endpoints for you, but custom proxies and compatible services are supported.
 
 Plugin logs and short diagnostics redact known API keys, bearer tokens, webhook URLs, and similar secrets. Raw process stdout is not stored in plugin logs by default.
 
@@ -76,9 +80,11 @@ $env:UNDERSTORY_ENGINE_DIR="C:\path\to\Understory-graphify-engine"
 $env:UNDERSTORY_PYTHON_PATH="python"
 ```
 
-You can also set the engine folder and Python path inside the Understory settings page. After changing system environment variables, restart Obsidian so the desktop app can read them.
+You can also set the engine folder and Python path in **Settings -> Understory -> Start here**. After changing system environment variables, restart Obsidian so the desktop app can read them.
 
-The **Check setup** button now opens a local diagnostic panel. It shows the plugin version, engine version or git commit, Python version, selected paths, required engine scripts, Python dependency checks, vault `.understory` deployment status, and permission issues. Each problem includes a suggested fix and, when useful, a command you can copy. The panel does not run `pip install`, `git pull`, or other repair commands automatically.
+The settings page is split into tabs. Most users only need **Start here**, **Network & privacy**, **Relation discovery**, and **Relation maintenance**. **AI agents** comes after the relation workflow, so first-run setup stays focused on the required steps.
+
+The **Check setup** button checks the local engine, Python, scripts, vault `.understory` deployment, and permissions. Each problem includes a suggested fix and, when useful, a command you can copy. The panel does not run `pip install`, `git pull`, or other repair commands automatically.
 
 Common manual fixes:
 
@@ -93,13 +99,34 @@ Use **Copy diagnostics** when you need to share setup details with a maintainer.
 ## First Run
 
 1. Open **Settings -> Understory**.
-2. Click **Check setup** to confirm the local engine, Python, scripts, dependencies, vault deployment, and permissions are available.
-3. Keep **Network mode** on **Local only**, or explicitly choose a cloud mode and configure your own provider key.
-4. Open the command palette and run **Show Understory**.
+2. In **Start here**, choose the local Understory engine folder and confirm Python.
+3. Click **Check setup**.
+4. In **Network & privacy**, keep **Network mode** on **Local only**, or explicitly choose a cloud mode and configure your own provider key, endpoint/base URL, and model name.
+5. In **AI agents**, create the local MCP server file, copy the MCP JSON into your agent's MCP settings, and copy the matching Skill prompt if you want an external agent to use this vault as a local knowledge API.
+6. Open the command palette and run **Show Understory**.
 
 ## Agent API
 
-Understory also exposes a local Agent API for automation. It is not an HTTP server and does not open a port. Agents can call it through a JSON CLI or an MCP stdio server:
+Understory also exposes a local Agent API for automation. It is not an HTTP server and does not open a port. Agents can call it through a JSON CLI or an MCP stdio server.
+
+For regular Obsidian plugin users, open **Settings -> Understory -> AI agents**. That page provides:
+
+- A copyable, vault-specific MCP JSON configuration with a server key such as `understory-work-notes`.
+- A local MCP server file created at `.understory/agent/understory-mcp-server.js`; this is not a cloud server and does not open an HTTP port.
+- A use-case selector for **Query-only** or **Agent memory model**.
+- Agent-specific setup notes for Generic MCP, Codex, Claude Desktop, Cursor, and OpenClaw.
+- A copyable Skill prompt that binds the agent to this vault and the selected use case.
+- A setup pack that combines the MCP config, Skill, vault identity, and install notes.
+- A local diagnostics summary that is designed to avoid API keys, webhook URLs, and vault note content.
+
+Understory identifies only the currently open vault. If you use multiple Obsidian vaults, repeat this flow in each vault and add each generated MCP server entry to your agent config. Do not reuse a single global `understory` key for every vault.
+
+The Skill has two variants:
+
+- **Query-only**: the agent calls Understory only when you explicitly ask it to query, search, cite, summarize, or inspect this vault. This mode is read-only and conservative.
+- **Agent memory model**: the agent treats Understory as active local context and a long-term memory layer. For relevant ongoing work, it can retrieve context before planning and propose durable memory or relation updates at the end, but local writes still require user confirmation.
+
+Developer commands are still available from this repository:
 
 ```powershell
 node scripts/understory-agent-cli.js status --vault "C:\path\to\vault" --json
@@ -108,17 +135,27 @@ node scripts/understory-agent-cli.js refresh-relations --vault "C:\path\to\vault
 node scripts/understory-agent-cli.js insert-relation --vault "C:\path\to\vault" --note "Notes/A.md" --target "Notes/B.md" --title "B" --json
 ```
 
-MCP configuration example:
+Multi-vault MCP configuration example after using **Create local MCP server file** in each vault:
 
 ```json
 {
   "mcpServers": {
-    "understory": {
+    "understory-work-notes": {
       "command": "node",
       "args": [
-        "<path-to-repo>/scripts/understory-mcp-server.js",
+        "C:/path/to/work-vault/.understory/agent/understory-mcp-server.js",
         "--vault",
-        "C:/path/to/vault",
+        "C:/path/to/work-vault",
+        "--engine-dir",
+        "C:/path/to/Understory-graphify-engine"
+      ]
+    },
+    "understory-research-vault": {
+      "command": "node",
+      "args": [
+        "C:/path/to/research-vault/.understory/agent/understory-mcp-server.js",
+        "--vault",
+        "C:/path/to/research-vault",
         "--engine-dir",
         "C:/path/to/Understory-graphify-engine"
       ]
@@ -127,7 +164,11 @@ MCP configuration example:
 }
 ```
 
+Developers working from this repository can use `scripts/understory-mcp-server.js` instead of the exported server path.
+
 All Agent API responses use a JSON envelope with `ok`, `data`, `error`, and `meta`. The API keeps paths inside the selected vault, does not return full note bodies by default, and reuses Understory secret redaction. See [docs/AGENT_API.md](docs/AGENT_API.md) for the full tool contract.
+
+Current MCP read tools include status, capabilities, graph summary, note relations, local keyword/relations search, scoped context packages, and note briefs. Write tools remain local-only and should be used only after user confirmation.
 
 ## Build From Source
 
@@ -148,7 +189,7 @@ Each GitHub release must attach:
 - `main.js`
 - `styles.css`
 
-The release tag must match `manifest.json` version exactly, for example `1.7.2`.
+The release tag must match `manifest.json` version exactly, for example `1.8.1`.
 
 ## Links
 

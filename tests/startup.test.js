@@ -9,6 +9,7 @@ const UnderstoryPlugin = require('../src/main');
 test('onload defers vault event listeners until workspace layout is ready', async () => {
     const layoutCallbacks = [];
     const vaultEvents = [];
+    let rightLeafCalls = 0;
     const originalWindow = global.window;
     global.window = {
         setTimeout: () => 0,
@@ -31,7 +32,10 @@ test('onload defers vault event listeners until workspace layout is ready', asyn
                 },
                 getActiveFile: () => null,
                 getLeavesOfType: () => [],
-                getRightLeaf: () => ({ setViewState: async () => {} }),
+                getRightLeaf: () => {
+                    rightLeafCalls += 1;
+                    return { setViewState: async () => {} };
+                },
                 revealLeaf() {},
             },
         };
@@ -49,6 +53,55 @@ test('onload defers vault event listeners until workspace layout is ready', asyn
         for (const callback of layoutCallbacks) callback();
 
         assert.deepEqual(vaultEvents.sort(), ['create', 'create', 'delete', 'modify', 'rename']);
+        assert.equal(rightLeafCalls, 0);
+    } finally {
+        global.window = originalWindow;
+    }
+});
+
+test('onload does not open the sidebar even if old settings opted in', async () => {
+    const layoutCallbacks = [];
+    let rightLeafCalls = 0;
+    let revealCalls = 0;
+    const originalWindow = global.window;
+    global.window = {
+        setTimeout: () => 0,
+        setInterval: () => 0,
+    };
+
+    try {
+        const app = {
+            vault: {
+                adapter: { getBasePath: () => 'C:/vault' },
+                on(eventName, callback) {
+                    return { eventName, callback };
+                },
+                getAbstractFileByPath: () => null,
+            },
+            workspace: {
+                onLayoutReady(callback) {
+                    layoutCallbacks.push(callback);
+                },
+                getActiveFile: () => null,
+                getLeavesOfType: () => [],
+                getRightLeaf: () => {
+                    rightLeafCalls += 1;
+                    return { setViewState: async () => {} };
+                },
+                revealLeaf() {
+                    revealCalls += 1;
+                },
+            },
+        };
+        const plugin = new UnderstoryPlugin(app, { version: 'test' });
+        plugin.loadData = async () => ({ openSidebarOnLoad: true });
+        plugin.checkEngineHealth = async () => ({ ok: false });
+
+        await plugin.onload();
+        for (const callback of layoutCallbacks) await callback();
+
+        assert.equal(rightLeafCalls, 0);
+        assert.equal(revealCalls, 0);
     } finally {
         global.window = originalWindow;
     }

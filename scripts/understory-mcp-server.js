@@ -16,6 +16,15 @@ const TOOL_DEFINITIONS = [
         call: (api) => api.status(),
     },
     {
+        name: 'understory_get_capabilities',
+        title: 'Get Understory Agent API capabilities',
+        description: 'Describe available local MCP tools, privacy defaults, and write-safety boundaries.',
+        inputSchema: schema({
+            vaultPath: optionalString('Vault path override. Defaults to the server --vault argument.'),
+        }),
+        call: (api) => api.getCapabilities(),
+    },
+    {
         name: 'understory_get_relations',
         title: 'Get Understory relations',
         description: 'Read suggested/accepted/rejected relations for one note without returning note body text.',
@@ -24,6 +33,39 @@ const TOOL_DEFINITIONS = [
             vaultPath: optionalString('Vault path override.'),
         }, ['notePath']),
         call: (api, args) => api.getRelations({ notePath: args.notePath }),
+    },
+    {
+        name: 'understory_search',
+        title: 'Search Understory vault context',
+        description: 'Search vault notes with local keyword and relations-graph signals. Returns snippets, not full note bodies.',
+        inputSchema: schema({
+            query: requiredString('Search query.'),
+            limit: { type: 'number', description: 'Maximum results. Defaults to 8, maximum 25.' },
+            vaultPath: optionalString('Vault path override.'),
+        }, ['query']),
+        call: (api, args) => api.search({ query: args.query, limit: args.limit }),
+    },
+    {
+        name: 'understory_get_context',
+        title: 'Get Understory context package',
+        description: 'Build a scoped context package from a query or known note path without returning full note bodies.',
+        inputSchema: schema({
+            query: optionalString('Optional search query. Required when notePath is not supplied.'),
+            notePath: optionalString('Vault-relative note path for relation-centered context.'),
+            limit: { type: 'number', description: 'Maximum context items. Defaults to 6, maximum 12.' },
+            vaultPath: optionalString('Vault path override.'),
+        }),
+        call: (api, args) => api.getContext({ query: args.query, notePath: args.notePath, limit: args.limit }),
+    },
+    {
+        name: 'understory_get_note_brief',
+        title: 'Get Understory note brief',
+        description: 'Read a note brief with title, snippet, and top relations without returning the full body.',
+        inputSchema: schema({
+            notePath: requiredString('Vault-relative note path.'),
+            vaultPath: optionalString('Vault path override.'),
+        }, ['notePath']),
+        call: (api, args) => api.getNoteBrief({ notePath: args.notePath }),
     },
     {
         name: 'understory_refresh_relations',

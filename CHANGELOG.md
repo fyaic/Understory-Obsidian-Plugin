@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.8.1
+
+- Localize Agent profile labels and install guidance in the Chinese Agent access settings UI and setup pack.
+- Finalize the Agent Access release metadata for `manifest.json`, `package.json`, `versions.json`, `CHANGELOG.md`, and `RELEASE_NOTES.md`.
+
+## 1.8.0
+
+- Add an **AI agents** settings tab that pairs MCP configuration with the matching Understory Skill.
+- Add two Understory Skill usage modes: Query-only for explicit vault lookup and Agent memory model for proactive local context and memory maintenance.
+- Add copy/create/check actions for Agent access, including local MCP server file creation at `.understory/agent/understory-mcp-server.js`.
+- Add Understory Skill prompt generation and save-to-vault support at `.understory/agent/understory-skill.md`, binding agents to the selected vault and usage mode.
+- Keep plugin enablement non-disruptive: Understory no longer opens the sidebar or steals focus from the plugin README/settings flow during startup.
+- Refine the Agent access settings layout with quote-style blocks for current vault identity and Agent install guidance.
+- Rename **AI & privacy** to **Network & privacy** and simplify the page layout so network/model notes read as lightweight text instead of stacked callout blocks.
+- Rename settings tabs to **Relation discovery** and **Relation maintenance**, keeping those relation workflow pages adjacent before **AI agents**.
+- Add Vault-as-API read tools for capabilities, local keyword/relations search, scoped context packages, and note briefs.
+- Extend JSON CLI and MCP stdio server with the new read tools while keeping responses scoped to snippets and relationship metadata.
+- Update Agent API, README, Chinese README, and privacy documentation for the local-only MCP/Skill workflow.
+- Add tests for Agent access generation, settings UI, CLI, MCP, and local context retrieval.
+
 ## 1.7.2
 
 - Add `package-lock.json` for Obsidian build verification reproducibility.

@@ -1,6 +1,8 @@
 # Understory
 
-![Understory hero](assets/understory-hero.png)
+<p align="center">
+  <img src="assets/understory-logo.png" alt="Understory logo" width="220">
+</p>
 
 [English README](README.md) · [官网](https://bondie.io/research/understory) · [隐私说明](PRIVACY.md)
 
@@ -28,6 +30,8 @@ Understory 默认本地优先。
 | 完整 AI 分析 | 允许向量模型和推理模型，用于语义索引、概念提取、解释和冲突检查。 |
 
 可选云功能支持 OpenAI、智谱或自定义 OpenAI-compatible endpoint。密钥由你自己提供。Bondie Labs 不会接收或代管你的笔记、prompt、embedding、模型响应、日志或 API key。
+
+**联网与隐私** 设置页可以选择服务商、填写 API key，并修改 Endpoint / Base URL 和模型名称。OpenAI 与智谱会自动预填常见 endpoint，但你仍然可以改成兼容网关、自建服务或其他兼容服务。
 
 插件日志和短诊断会脱敏已知 API key、Bearer token、Webhook URL 等敏感信息。默认不会把 raw process stdout 存入插件日志。
 
@@ -76,9 +80,11 @@ $env:UNDERSTORY_ENGINE_DIR="C:\path\to\Understory-graphify-engine"
 $env:UNDERSTORY_PYTHON_PATH="python"
 ```
 
-也可以在 Understory 设置页里填写 Understory 文件夹和 Python 路径。修改系统环境变量后，需要重启 Obsidian，让桌面进程重新读取环境。
+也可以在 **设置 -> Understory -> 开始使用** 中填写 Understory 文件夹和 Python 路径。修改系统环境变量后，需要重启 Obsidian，让桌面进程重新读取环境。
 
-**检查设置（Check setup）** 按钮现在会打开本地诊断面板。它会显示插件版本、engine 版本或 git commit、Python 版本、已选择路径、必要 engine 脚本、Python 依赖、vault `.understory` 部署状态和权限问题。每个问题都会给出修复建议，必要时附带可复制命令。面板不会自动执行 `pip install`、`git pull` 或其他修复命令。
+设置页已经拆成多个 tab。多数用户只需要看 **开始使用**、**联网与隐私**、**关联发现** 和 **关联维护**。**Agent访问** 放在关联工作流之后，首次配置时不会直接把版本、路径和检查矩阵堆在第一屏。
+
+**检查设置（Check setup）** 会检查本地引擎、Python、脚本、vault `.understory` 部署和权限问题。每个问题都会给出修复建议，必要时附带可复制命令。面板不会自动执行 `pip install`、`git pull` 或其他修复命令。
 
 常见手动修复命令：
 
@@ -93,13 +99,34 @@ $env:UNDERSTORY_PYTHON_PATH="python"
 ## 首次使用
 
 1. 打开 **设置 -> Understory**。
-2. 点击 **检查设置（Check setup）**，确认本地引擎、Python、脚本、依赖、vault 部署和权限可用。
-3. 保持 **Network mode** 为 **Local only**，或主动选择云模型模式并配置自己的模型服务密钥。
-4. 打开命令面板，运行 **Show Understory**。
+2. 在 **开始使用** 中选择本地 Understory 引擎文件夹，并确认 Python。
+3. 点击 **检查设置（Check setup）**。
+4. 在 **联网与隐私** 中保持 **Network mode** 为 **Local only**，或主动选择云模型模式并配置自己的模型服务密钥、Endpoint / Base URL 和模型名称。
+5. 如果要让外部 Agent 把这个 vault 当作本地知识 API 使用，打开 **Agent访问**，先创建本地 MCP server 文件，再把 MCP JSON 复制到 Agent 的 MCP 设置，并复制配套的 Skill prompt。
+6. 打开命令面板，运行 **Show Understory**。
 
 ## Agent API
 
-Understory 也提供本地 Agent API，方便自动化工具读取和维护关系数据。它不是 HTTP server，不会打开端口；agent 可以通过 JSON CLI 或 MCP stdio server 调用。
+Understory 也提供本地 Agent API，方便自动化工具读取和维护关系数据。它不是 HTTP server，不会打开端口；Agent 可以通过 JSON CLI 或 MCP stdio server 调用。
+
+普通 Obsidian 插件用户请打开 **设置 -> Understory -> Agent访问**。这个页面会提供：
+
+- 可复制的、绑定当前 vault 的 MCP JSON 配置，server key 例如 `understory-work-notes`。
+- 创建到 `.understory/agent/understory-mcp-server.js` 的本地 MCP server 文件；它不是云端 server，也不会打开 HTTP 端口。
+- 用途选择：**Query-only** 或 **Agent memory model**。
+- 面向 Generic MCP、Codex、Claude Desktop、Cursor、OpenClaw 的安装说明。
+- 可复制的 Skill prompt，用来把 Agent 绑定到当前 vault 和所选用途。
+- 包含 MCP config、Skill、vault identity 和安装说明的 setup pack。
+- 不含 API key、Webhook URL 和 vault 笔记正文的本地诊断摘要。
+
+Understory 只识别当前打开的 vault。如果你有多个 Obsidian vault，请分别在每个 vault 内重复这个流程，并把每次生成的 MCP server entry 加入 Agent 配置。不要让所有 vault 都复用一个全局 `understory` key。
+
+Skill 有两个版本：
+
+- **Query-only**：只有当你明确要求查询、搜索、引用、总结或检查当前 vault 时，Agent 才调用 Understory。这个模式更保守，默认只读。
+- **Agent memory model**：Agent 把 Understory 当作主动上下文和长期记忆层。遇到相关的长期任务或项目工作时，它可以先获取上下文再规划，并在结束时提出值得沉淀的记忆或关系更新；但本地写入仍需要用户确认。
+
+开发者仍可在本仓库中直接使用以下命令：
 
 ```powershell
 node scripts/understory-agent-cli.js status --vault "C:\path\to\vault" --json
@@ -108,17 +135,27 @@ node scripts/understory-agent-cli.js refresh-relations --vault "C:\path\to\vault
 node scripts/understory-agent-cli.js insert-relation --vault "C:\path\to\vault" --note "Notes/A.md" --target "Notes/B.md" --title "B" --json
 ```
 
-MCP 配置示例：
+分别在每个 vault 点击 **创建本地 MCP server 文件** 后，多 vault MCP 配置示例：
 
 ```json
 {
   "mcpServers": {
-    "understory": {
+    "understory-work-notes": {
       "command": "node",
       "args": [
-        "<path-to-repo>/scripts/understory-mcp-server.js",
+        "C:/path/to/work-vault/.understory/agent/understory-mcp-server.js",
         "--vault",
-        "C:/path/to/vault",
+        "C:/path/to/work-vault",
+        "--engine-dir",
+        "C:/path/to/Understory-graphify-engine"
+      ]
+    },
+    "understory-research-vault": {
+      "command": "node",
+      "args": [
+        "C:/path/to/research-vault/.understory/agent/understory-mcp-server.js",
+        "--vault",
+        "C:/path/to/research-vault",
         "--engine-dir",
         "C:/path/to/Understory-graphify-engine"
       ]
@@ -127,7 +164,11 @@ MCP 配置示例：
 }
 ```
 
+开发者从本仓库运行时，也可以把 server path 改成 `scripts/understory-mcp-server.js`。
+
 所有 Agent API 响应都使用包含 `ok`、`data`、`error`、`meta` 的 JSON envelope。API 会把路径限制在指定 vault 内，默认不返回完整笔记正文，并复用 Understory 的敏感信息脱敏逻辑。完整工具契约见 [docs/AGENT_API.md](docs/AGENT_API.md)。
+
+当前 MCP 读工具包括 status、capabilities、graph summary、note relations、本地关键词/关系搜索、上下文包和 note brief。写入类工具仍然只作用于本地 vault，并应在用户确认后使用。
 
 ## 从源码构建
 
