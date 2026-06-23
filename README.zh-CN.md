@@ -37,6 +37,12 @@ Understory 默认本地优先。
 
 付费状态建议为 **Optional payments**。插件可以免费安装，本地模式不需要 API key。模型服务商账号、密钥、价格、额度、隐私条款和账单由你选择的服务商负责。
 
+## 许可证
+
+Understory 以 [PolyForm Perimeter License 1.0.0](LICENSE) 形式 source-available。你可以使用、审阅、修改和再分发源码，但不能用它向他人提供与 Understory 竞争的产品。
+
+如果需要把 Understory 封装进竞品、产品包或其他超出 PolyForm Perimeter 条款的商业用途，请联系 Bondie Labs 获取商业授权。
+
 ## 运行要求
 
 - Obsidian 桌面版。
