@@ -41,7 +41,7 @@ Payment status: **Optional payments**. The plugin is free to install. Local mode
 
 Understory is source-available under the [PolyForm Perimeter License 1.0.0](LICENSE). You may use, inspect, modify, and redistribute the source, but you may not use it to provide a product that competes with Understory.
 
-Commercial licenses are available from Bondie Labs for competing products, redistributed product bundles, or other uses outside the PolyForm Perimeter terms.
+Commercial licenses are available from Fuyo AI Tech Co. Limited for competing products, redistributed product bundles, or other uses outside the PolyForm Perimeter terms.
 
 ## Requirements
 
