@@ -26,7 +26,7 @@ DEFAULT_ENTITY_PATHS = [
     "concepts/**/*.md",
 ]
 
-IGNORED_DIR_NAMES = {".git", ".understory", ".cache", "node_modules", "__pycache__"}
+IGNORED_DIR_NAMES = {".git", ".obsidian", ".understory", ".cache", ".trash", "node_modules", "__pycache__"}
 FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*(?:\n|$)", re.DOTALL)
 
 

@@ -28,7 +28,10 @@ async function createFakeEngine(t) {
         await fs.promises.rm(enginePath, { recursive: true, force: true });
     });
     await fs.promises.writeFile(path.join(enginePath, 'api.py'), [
-        'import json',
+        'import json, sys',
+        'if "--vault" not in sys.argv or sys.argv.index("--vault") + 1 >= len(sys.argv) or not sys.argv[sys.argv.index("--vault") + 1]:',
+        '    print("missing --vault", file=sys.stderr)',
+        '    sys.exit(17)',
         'print(json.dumps({"status":"ok","relations":[{"title":"Target","path":"Notes/Target.md","score":0.88,"source":"fake-engine"}],"grouped":{"concept":["Target"]}}))',
         '',
     ].join('\n'), 'utf8');
@@ -44,6 +47,22 @@ async function createFailingFakeEngine(t, secret) {
         'import sys',
         `sys.stderr.write("engine failed ${secret}")`,
         'sys.exit(2)',
+        '',
+    ].join('\n'), 'utf8');
+    return enginePath;
+}
+
+async function createSkippedFakeEngine(t) {
+    const enginePath = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'understory-skipped-engine-'));
+    t.after(async () => {
+        await fs.promises.rm(enginePath, { recursive: true, force: true });
+    });
+    await fs.promises.writeFile(path.join(enginePath, 'api.py'), [
+        'import json, sys',
+        'if "--vault" not in sys.argv:',
+        '    print("missing --vault", file=sys.stderr)',
+        '    sys.exit(17)',
+        'print(json.dumps({"status":"skipped","reason":"unchanged","unchanged":True}))',
         '',
     ].join('\n'), 'utf8');
     return enginePath;
@@ -220,6 +239,39 @@ test('CLI refresh-relations can use a local engine and update the relation cache
     const store = await readVaultJson(vaultPath, RELATIONS_PATH);
     assert.equal(store.files['Notes/Source.md'].hash.length, 16);
     assert.equal(store.files['Notes/Source.md'].relations[0].source, 'fake-engine');
+});
+
+test('CLI refresh-relations treats skipped local engine results as successful no-ops', async (t) => {
+    const vaultPath = await createVault(t);
+    const enginePath = await createSkippedFakeEngine(t);
+    await seedRelations(vaultPath);
+    const seededStore = await readVaultJson(vaultPath, RELATIONS_PATH);
+    seededStore.files['Notes/Source.md'].relations.push({
+        target: '.obsidian/plugins/understory/understory-graphify-engine/SKILL.md',
+        title: 'SKILL',
+        type: 'semantic',
+        score: 0.1,
+        group: 'internal',
+        status: 'suggested',
+        source: 'old-cache',
+    });
+    await writeVaultFile(vaultPath, RELATIONS_PATH, JSON.stringify(seededStore));
+
+    const refresh = runCli([
+        'refresh-relations',
+        '--vault', vaultPath,
+        '--note', 'Notes/Source.md',
+        '--engine-dir', enginePath,
+        '--json',
+    ]);
+    assert.equal(refresh.status, 0);
+    assert.equal(refresh.envelope.ok, true);
+    assert.equal(refresh.envelope.data.status, 'skipped');
+    assert.equal(refresh.envelope.data.relationsCount, 1);
+    assert.equal(refresh.envelope.data.entry.relations[0].source, 'test');
+    const store = await readVaultJson(vaultPath, RELATIONS_PATH);
+    assert.equal(store.files['Notes/Source.md'].relations.length, 1);
+    assert.equal(store.files['Notes/Source.md'].relations[0].target, 'Notes/Target.md');
 });
 
 

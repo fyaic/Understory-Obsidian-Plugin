@@ -70,11 +70,11 @@ def _collect_backlinks(title: str, vault: Path, doc_rel_path: str, max_snippets:
 
     doc_dir = (vault / doc_rel_path).parent if doc_rel_path else vault
 
-    def _scan_dir(directory: Path):
+    all_markdown_files = list_markdown_files(vault)
+
+    def _scan_files(files: list[Path]):
         nonlocal snippets
-        for f in directory.rglob("*.md"):
-            if not f.is_file():
-                continue
+        for f in files:
             rel = str(f.relative_to(vault)).replace("\\", "/")
             if rel == doc_rel_path or rel in seen:
                 continue
@@ -91,14 +91,21 @@ def _collect_backlinks(title: str, vault: Path, doc_rel_path: str, max_snippets:
         return False
 
     # 1. 优先扫描同文件夹
-    if _scan_dir(doc_dir):
+    try:
+        doc_dir_resolved = doc_dir.resolve()
+        same_folder_files = [
+            f for f in all_markdown_files
+            if f.resolve() == doc_dir_resolved or doc_dir_resolved in f.resolve().parents
+        ]
+    except Exception:
+        same_folder_files = []
+
+    if _scan_files(same_folder_files):
         return snippets
 
     # 2. 同文件夹不足时扫描全库（限制读取数量以控制性能）
     # 从 vault 根开始，但跳过已经扫描过的同文件夹路径
-    for f in vault.rglob("*.md"):
-        if not f.is_file():
-            continue
+    for f in all_markdown_files:
         rel = str(f.relative_to(vault)).replace("\\", "/")
         if rel == doc_rel_path or rel in seen:
             continue

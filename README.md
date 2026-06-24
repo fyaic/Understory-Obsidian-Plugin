@@ -208,7 +208,7 @@ Each GitHub release must attach:
 
 The release `main.js` embeds the bundled engine payload used by standard Obsidian installs.
 
-The release tag must match `manifest.json` version exactly, for example `1.8.2`.
+The release tag must match `manifest.json` version exactly, for example `1.8.3`.
 
 ## Links
 

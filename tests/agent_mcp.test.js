@@ -28,7 +28,10 @@ async function createFakeEngine(t) {
         await fs.promises.rm(enginePath, { recursive: true, force: true });
     });
     await fs.promises.writeFile(path.join(enginePath, 'api.py'), [
-        'import json',
+        'import json, sys',
+        'if "--vault" not in sys.argv or sys.argv.index("--vault") + 1 >= len(sys.argv) or not sys.argv[sys.argv.index("--vault") + 1]:',
+        '    print("missing --vault", file=sys.stderr)',
+        '    sys.exit(17)',
         'print(json.dumps({"status":"ok","relations":[{"title":"Target","path":"Notes/Target.md","score":0.88,"source":"fake-engine"}],"grouped":{"concept":["Target"]}}))',
         '',
     ].join('\n'), 'utf8');

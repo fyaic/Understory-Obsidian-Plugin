@@ -1,17 +1,12 @@
-# Understory 1.8.2
+# Understory 1.8.3
 
-Self-contained engine release for the Understory Obsidian plugin.
+Patch release for the self-contained engine install.
 
-- Bundles the local Understory engine in this repository under `understory-graphify-engine/`.
-- Embeds the engine payload into the release `main.js`, so standard Obsidian installs using `manifest.json`, `main.js`, and `styles.css` can extract the engine on first load.
-- Defaults new installs to the bundled engine path inside the plugin folder instead of asking users to locate an engine directory.
-- Preserves explicit user engine overrides when a saved or environment-provided engine path is present.
-- Adds Kimi/Moonshot reasoning presets:
-  - `kimi-cn`: `https://api.moonshot.cn/v1`, model `kimi-k2.5`
-  - `kimi-global`: `https://api.moonshot.ai/v1`, model `kimi-k2.5`
-- Updates English and Chinese settings copy for bundled engine setup and provider fields.
-- Strengthens release checks so builds fail if required engine files are missing or the built `main.js` does not include the bundled engine payload.
-- Updates privacy copy to disclose local engine extraction into the plugin folder.
+- Fixes Agent/MCP refresh runs by passing the vault path explicitly to the bundled `api.py` engine.
+- Treats normal engine `skipped` responses, such as unchanged notes, as successful no-op refreshes instead of surfacing an engine failure.
+- Excludes `.obsidian`, `.understory`, `.trash`, and other internal folders from bundled engine markdown scans.
+- Cleans old relation cache entries that pointed at plugin-internal markdown files after users upgrade from `1.8.2`.
+- Keeps the self-contained bundled engine install path introduced in `1.8.2`; users still only need the three standard Obsidian release assets.
 
 Release assets:
 

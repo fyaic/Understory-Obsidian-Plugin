@@ -474,6 +474,36 @@ function relationSource(relation) {
     return 'understory';
 }
 
+const INTERNAL_RELATION_TARGET_PREFIXES = [
+    '.obsidian/',
+    '.understory/',
+    '.trash/',
+];
+
+function isInternalRelationTarget(target) {
+    const normalized = toPosixPath(target).replace(/^\/+/, '').toLowerCase();
+    return INTERNAL_RELATION_TARGET_PREFIXES.some((prefix) => normalized === prefix.slice(0, -1) || normalized.startsWith(prefix));
+}
+
+function sanitizeRelations(relations) {
+    if (!Array.isArray(relations)) return [];
+    return relations.filter((relation) => relation && relation.target && !isInternalRelationTarget(relation.target));
+}
+
+function sanitizeStoreRelations(store) {
+    let changed = false;
+    if (!isObject(store.files)) return false;
+    for (const entry of Object.values(store.files)) {
+        if (!isObject(entry) || !Array.isArray(entry.relations)) continue;
+        const sanitized = sanitizeRelations(entry.relations);
+        if (sanitized.length !== entry.relations.length) {
+            entry.relations = sanitized;
+            changed = true;
+        }
+    }
+    return changed;
+}
+
 function normalizeRelations(result) {
     const grouped = groupMap(result && result.grouped || {});
     const now = new Date().toISOString();
@@ -492,7 +522,7 @@ function normalizeRelations(result) {
             createdAt: relation.createdAt || now,
             updatedAt: now,
         };
-    }).filter((relation) => relation.target && relation.title);
+    }).filter((relation) => relation.target && relation.title && !isInternalRelationTarget(relation.target));
 }
 
 function parseProcessJson(stdout) {
@@ -629,7 +659,8 @@ function createAgentApi(options = {}) {
         const store = isObject(result.value) ? result.value : emptyStore();
         if (!isObject(store.files)) store.files = {};
         if (!store.version) store.version = 1;
-        return { exists: result.exists, store };
+        const sanitized = sanitizeStoreRelations(store);
+        return { exists: result.exists, store, sanitized };
     }
 
     async function writeStore(store) {
@@ -708,15 +739,36 @@ function createAgentApi(options = {}) {
         const absoluteNotePath = adapter.getAbsolutePath
             ? adapter.getAbsolutePath(normalized)
             : path.resolve(adapter.getVaultPath(), normalized);
+        const vaultPath = adapter.getVaultPath();
+        const args = ['refresh-link', absoluteNotePath, '--no-auto-write'];
+        if (vaultPath) args.push('--vault', vaultPath);
         const result = await runPythonJson({
             pythonPath,
             engineDir: absoluteEngineDir,
             apiPath,
-            args: ['refresh-link', absoluteNotePath, '--no-auto-write'],
-            vaultPath: adapter.getVaultPath(),
+            args,
+            vaultPath,
             timeoutMs: refreshTimeoutMs,
             settings,
         });
+        if (result && result.status === 'skipped') {
+            const { store, sanitized } = await readStore();
+            if (sanitized) {
+                await writeStore(store);
+                adapter.trigger('understory:relations-updated', normalized);
+            }
+            const entry = store.files[normalized] || null;
+            const relations = entry && Array.isArray(entry.relations) ? entry.relations : [];
+            return {
+                notePath: normalized,
+                status: 'skipped',
+                reason: result.reason || '',
+                unchanged: !!result.unchanged,
+                dryRun: false,
+                relationsCount: relations.length,
+                entry,
+            };
+        }
         if (!result || result.status !== 'ok') {
             throw new AgentApiError('ENGINE_FAILED', ERROR_MESSAGES.ENGINE_FAILED, safeErrorDetail({
                 message: result && result.error || 'Engine did not return ok status.',

@@ -20,6 +20,15 @@ NOISY_PATH_KEYWORDS = (
     ".understory/",
     ".obsidian/",
 )
+IGNORED_MARKDOWN_DIR_NAMES = {
+    ".git",
+    ".obsidian",
+    ".understory",
+    ".trash",
+    ".cache",
+    "node_modules",
+    "__pycache__",
+}
 PRIORITY_PATH_KEYWORDS = (
     "obsidian-remote",
     "openclaw",
@@ -170,8 +179,21 @@ def ensure_within_vault(vault: Path, target: Path) -> Path:
     return resolved
 
 
+def _is_ignored_markdown_path(path: Path, vault: Path) -> bool:
+    try:
+        rel = path.resolve().relative_to(vault)
+    except ValueError:
+        return True
+    return any(part in IGNORED_MARKDOWN_DIR_NAMES for part in rel.parts)
+
+
 def list_markdown_files(vault: Path):
-    return sorted(path for path in vault.rglob("*.md") if path.is_file())
+    root = Path(vault).expanduser().resolve()
+    return sorted(
+        path
+        for path in root.rglob("*.md")
+        if path.is_file() and not _is_ignored_markdown_path(path, root)
+    )
 
 
 def should_include_repo_docs(query: str) -> bool:

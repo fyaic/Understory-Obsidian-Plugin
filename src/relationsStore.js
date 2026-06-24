@@ -6,6 +6,11 @@ const { safeErrorDetail } = require('./safety');
 
 const RELATIONS_PATH = '.understory/relations.json';
 const OVERRIDES_PATH = '.understory/link_overrides.json';
+const INTERNAL_RELATION_TARGET_PREFIXES = [
+    '.obsidian/',
+    '.understory/',
+    '.trash/',
+];
 
 class RelationsStore {
     constructor(plugin) {
@@ -48,6 +53,7 @@ class RelationsStore {
         const data = await this._readJson(RELATIONS_PATH, this._emptyStore());
         if (!data.files || typeof data.files !== 'object') data.files = {};
         if (!data.version) data.version = 1;
+        this._sanitizeStore(data);
         return data;
     }
 
@@ -70,6 +76,29 @@ class RelationsStore {
 
     _normalizePath(path) {
         return String(path || '').replace(/\\/g, '/').replace(/^\/+/, '');
+    }
+
+    _isInternalRelationTarget(target) {
+        const normalized = this._normalizePath(target).toLowerCase();
+        return INTERNAL_RELATION_TARGET_PREFIXES.some((prefix) => normalized === prefix.slice(0, -1) || normalized.startsWith(prefix));
+    }
+
+    _sanitizeRelations(relations) {
+        if (!Array.isArray(relations)) return [];
+        return relations.filter((relation) => relation && relation.target && !this._isInternalRelationTarget(relation.target));
+    }
+
+    _sanitizeStore(data) {
+        let changed = false;
+        for (const entry of Object.values(data.files || {})) {
+            if (!entry || !Array.isArray(entry.relations)) continue;
+            const sanitized = this._sanitizeRelations(entry.relations);
+            if (sanitized.length !== entry.relations.length) {
+                entry.relations = sanitized;
+                changed = true;
+            }
+        }
+        return changed;
     }
 
     _groupMap(grouped) {
@@ -119,7 +148,7 @@ class RelationsStore {
                 createdAt: relation.createdAt || now,
                 updatedAt: now,
             };
-        }).filter((relation) => relation.target && relation.title);
+        }).filter((relation) => relation.target && relation.title && !this._isInternalRelationTarget(relation.target));
     }
 
     async _readOverrides() {
