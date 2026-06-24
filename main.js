@@ -112,17 +112,38 @@ class UnderstoryPlugin extends Plugin {
         }
     }
 
+    _isRightSidebarLeaf(leaf) {
+        const workspace = this.app?.workspace;
+        const root = leaf?.getRoot?.();
+        if (!root) return false;
+        if (workspace?.rightSplit && root === workspace.rightSplit) return true;
+
+        const sideText = String(root.side || root.type || root.id || root.constructor?.name || '').toLowerCase();
+        if (sideText.includes('right')) return true;
+
+        const container = root.containerEl || root.container || root.el;
+        const classList = container?.classList;
+        if (classList?.contains?.('mod-right-split')) return true;
+        const className = String(container?.className || '').toLowerCase();
+        return className.includes('mod-right-split') || className.includes('right');
+    }
+
     async ensureSidebarLeaf({ reveal = false } = {}) {
-        let leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_UNDERSTORY_SIDEBAR)[0];
+        const workspace = this.app.workspace;
+        const existingLeaves = workspace.getLeavesOfType(VIEW_TYPE_UNDERSTORY_SIDEBAR);
+        let leaf = existingLeaves.find((candidate) => this._isRightSidebarLeaf(candidate));
         if (!leaf) {
-            leaf = this.app.workspace.getRightLeaf(false) || this.app.workspace.getRightLeaf(true);
+            leaf = workspace.getRightLeaf(false) || workspace.getRightLeaf(true);
             if (!leaf) {
                 if (reveal) new Notice(t(this, 'open_sidebar_failed'));
                 return null;
             }
             await leaf.setViewState({ type: VIEW_TYPE_UNDERSTORY_SIDEBAR, active: true });
         }
-        if (reveal) this.app.workspace.revealLeaf(leaf);
+        await Promise.all(existingLeaves
+            .filter((candidate) => candidate !== leaf && candidate.detach)
+            .map((candidate) => candidate.detach()));
+        if (reveal) workspace.revealLeaf(leaf);
         return leaf;
     }
 

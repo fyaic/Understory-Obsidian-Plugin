@@ -208,7 +208,7 @@ npm run check
 
 release 中的 `main.js` 会内嵌标准 Obsidian 安装所需的 engine payload。
 
-release tag 必须和 `manifest.json` 中的 version 完全一致，例如 `1.8.3`。
+release tag 必须和 `manifest.json` 中的 version 完全一致，例如 `1.8.4`。
 
 ## 链接
 

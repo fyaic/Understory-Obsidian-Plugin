@@ -1,7 +1,7 @@
 {
   "id": "understory",
   "name": "Understory",
-  "version": "1.8.3",
+  "version": "1.8.4",
   "minAppVersion": "0.15.0",
   "description": "Local-first knowledge layer for relationship discovery, ER facts, graph analysis, and optional model-powered insights.",
   "author": "Bondie Labs",
