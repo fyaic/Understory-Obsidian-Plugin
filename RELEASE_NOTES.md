@@ -1,18 +1,17 @@
-# Understory 1.8.1
+# Understory 1.8.2
 
-Agent Access release for the Understory Obsidian plugin.
+Self-contained engine release for the Understory Obsidian plugin.
 
-- Adds **Settings -> Understory -> AI agents** with MCP JSON, Skill prompt preview, copy buttons, local file creation, status checks, and safety copy.
-- Adds Query-only and Agent memory model Skill modes so users can choose conservative lookup or proactive local context/memory behavior.
-- Keeps install/enable non-disruptive: Understory stays on the plugin page and only shows a notice instead of opening the sidebar automatically.
-- Improves Agent access readability with quote-style blocks for current vault identity and Agent install guidance.
-- Renames **AI & privacy** to **Network & privacy** and reduces stacked callout blocks on that page.
-- Renames and reorders relation tabs as **Relation discovery** -> **Relation maintenance** -> **AI agents**.
-- Localizes Agent profile labels and install guidance in the Chinese Agent access UI and setup pack.
-- Creates a local MCP server file at `.understory/agent/understory-mcp-server.js` so regular plugin users do not need a repository `scripts/` path.
-- Saves the selected Understory Skill prompt to `.understory/agent/understory-skill.md`, binding agents to the current vault and use case.
-- Adds local Vault-as-API read tools for capabilities, search, context packages, and note briefs.
-- Keeps MCP local-only over stdio: no HTTP port, no Bondie Labs data upload, no full note bodies by default.
+- Bundles the local Understory engine in this repository under `understory-graphify-engine/`.
+- Embeds the engine payload into the release `main.js`, so standard Obsidian installs using `manifest.json`, `main.js`, and `styles.css` can extract the engine on first load.
+- Defaults new installs to the bundled engine path inside the plugin folder instead of asking users to locate an engine directory.
+- Preserves explicit user engine overrides when a saved or environment-provided engine path is present.
+- Adds Kimi/Moonshot reasoning presets:
+  - `kimi-cn`: `https://api.moonshot.cn/v1`, model `kimi-k2.5`
+  - `kimi-global`: `https://api.moonshot.ai/v1`, model `kimi-k2.5`
+- Updates English and Chinese settings copy for bundled engine setup and provider fields.
+- Strengthens release checks so builds fail if required engine files are missing or the built `main.js` does not include the bundled engine payload.
+- Updates privacy copy to disclose local engine extraction into the plugin folder.
 
 Release assets:
 
