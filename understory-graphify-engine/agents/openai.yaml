@@ -1,0 +1,4 @@
+interface:
+  display_name: "OpenClaw Obsidian QA"
+  short_description: "基于本地知识库进行检索、问答与来源引用"
+  default_prompt: "Use $obsidian-qa to search the local Obsidian vault and answer with citations. Return Obsidian local links (obsidian://open?vault=...), NOT public share links. Use $obsidian-author for note edits."

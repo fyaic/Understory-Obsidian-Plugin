@@ -8,7 +8,7 @@
 
 Understory 是一个面向 Obsidian 的本地优先知识层。它会在你的 vault 下方构建一个私有维护层，由 Vector、ER 和 Graph analysis 共同驱动，用来长期发现、维护和刷新笔记之间的关系、主张、概念、冲突和孤立页面。
 
-它不是把你的 vault 上传到 Bondie Labs 的服务里分析。默认模式是本地优先；只有当你主动选择云模型模式并填写自己的模型服务密钥时，相关片段才会发送给你选择的服务商。
+它不是把你的 vault 上传到 Bondie Labs 的服务里分析。本仓库已经内置本地 Understory engine。默认模式是本地优先；只有当你主动选择云模型模式并填写自己的模型服务密钥时，相关片段才会发送给你选择的服务商。
 
 ## 它能做什么
 
@@ -29,9 +29,9 @@ Understory 默认本地优先。
 | 只用向量模型 | 只把用于相似度分析的标题或片段发送给你配置的向量模型服务商。不会调用推理模型。 |
 | 完整 AI 分析 | 允许向量模型和推理模型，用于语义索引、概念提取、解释和冲突检查。 |
 
-可选云功能支持 OpenAI、智谱或自定义 OpenAI-compatible endpoint。密钥由你自己提供。Bondie Labs 不会接收或代管你的笔记、prompt、embedding、模型响应、日志或 API key。
+可选云功能支持 OpenAI、智谱、Kimi/Moonshot 或自定义 OpenAI-compatible endpoint。密钥由你自己提供。Bondie Labs 不会接收或代管你的笔记、prompt、embedding、模型响应、日志或 API key。
 
-**联网与隐私** 设置页可以选择服务商、填写 API key，并修改 Endpoint / Base URL 和模型名称。OpenAI 与智谱会自动预填常见 endpoint，但你仍然可以改成兼容网关、自建服务或其他兼容服务。
+**联网与隐私** 设置页可以选择服务商、填写 API key，并修改 Endpoint / Base URL 和模型名称。OpenAI、智谱和 Kimi/Moonshot 会自动预填常见 endpoint，但你仍然可以改成兼容网关、自建服务或其他兼容服务。
 
 插件日志和短诊断会脱敏已知 API key、Bearer token、Webhook URL 等敏感信息。默认不会把 raw process stdout 存入插件日志。
 
@@ -46,47 +46,58 @@ Understory 以 [PolyForm Perimeter License 1.0.0](LICENSE) 形式 source-availab
 ## 运行要求
 
 - Obsidian 桌面版。
-- 本地 Understory engine。
+- 本仓库内置的本地 Understory engine。
 - 本机可用的 Python。
 
 插件使用本地文件、Node API 和 Python 子进程，因此是 desktop-only。
 
 ## 手动安装
 
-在插件进入 Obsidian Community directory 之前，可以从 GitHub release 手动安装。
+插件进入 Obsidian Community directory 之后，官方安装会使用 release assets 中的 `manifest.json`、`main.js` 和 `styles.css`。Understory 会把本地 engine payload 内嵌在 `main.js` 中，并在首次加载插件时释放到插件目录。
 
-1. 下载 release 中的三个文件：
-   - `manifest.json`
-   - `main.js`
-   - `styles.css`
-2. 在你的 vault 中创建目录：
+在 Community directory 同步到最新 release 之前，可以直接从 GitHub release 下载同一组三个 release assets：
+
+1. 在你的 vault 中创建这个文件夹：
 
    ```text
    <你的 Vault>/.obsidian/plugins/understory/
    ```
 
-3. 把三个文件放进去。
-4. 重启 Obsidian。
-5. 在 **设置 -> 社区插件** 中启用 **Understory**。
+2. 从 GitHub release 下载下面三个文件，并放进这个文件夹：
+
+   ```text
+   <你的 Vault>/.obsidian/plugins/understory/manifest.json
+   <你的 Vault>/.obsidian/plugins/understory/main.js
+   <你的 Vault>/.obsidian/plugins/understory/styles.css
+   ```
+
+3. 重启 Obsidian。
+4. 在 **设置 -> 社区插件** 中启用 **Understory**。
+5. 首次加载后，确认内置 engine 已释放：
+
+   ```text
+   <你的 Vault>/.obsidian/plugins/understory/understory-graphify-engine/api.py
+   ```
 
 ## 本地引擎配置
 
-Obsidian 插件是入口。本地分析引擎维护在独立仓库：
+Obsidian 插件和本地分析 engine 现在在同一个仓库中。engine 位于 `understory-graphify-engine/`。release 构建也会把这份 engine 内嵌进 `main.js`，所以标准 Obsidian 安装可以自动在插件目录中释放 engine。
 
 ```powershell
-git clone https://github.com/fyaic/Understory-graphify-engine.git
-cd Understory-graphify-engine
+cd understory-graphify-engine
 python -m pip install -r requirements.txt
 ```
 
-启动 Obsidian 前设置引擎路径：
+Understory 会自动安装并查找内置 engine，搜索范围包括插件目录、仓库目录和常见本地工作区。标准 Obsidian 安装会释放到 `<vault>/.obsidian/plugins/understory/understory-graphify-engine/`。多数用户不需要手动设置引擎路径。
+
+如果你移动过引擎，或想固定使用某一份引擎副本，可以在启动 Obsidian 前设置引擎路径：
 
 ```powershell
-$env:UNDERSTORY_ENGINE_DIR="C:\path\to\Understory-graphify-engine"
+$env:UNDERSTORY_ENGINE_DIR="<你的 Vault>\.obsidian\plugins\understory\understory-graphify-engine"
 $env:UNDERSTORY_PYTHON_PATH="python"
 ```
 
-也可以在 **设置 -> Understory -> 开始使用** 中填写 Understory 文件夹和 Python 路径。修改系统环境变量后，需要重启 Obsidian，让桌面进程重新读取环境。
+也可以在 **设置 -> Understory -> 开始使用** 中覆盖 Understory 引擎文件夹和 Python 路径。修改系统环境变量后，需要重启 Obsidian，让桌面进程重新读取环境。
 
 设置页已经拆成多个 tab。多数用户只需要看 **开始使用**、**联网与隐私**、**关联发现** 和 **关联维护**。**Agent访问** 放在关联工作流之后，首次配置时不会直接把版本、路径和检查矩阵堆在第一屏。
 
@@ -95,8 +106,8 @@ $env:UNDERSTORY_PYTHON_PATH="python"
 常见手动修复命令：
 
 ```powershell
-python -m pip install -r "C:\path\to\Understory-graphify-engine\requirements.txt"
-$env:UNDERSTORY_ENGINE_DIR="C:\path\to\Understory-graphify-engine"
+python -m pip install -r "<你的 Vault>\.obsidian\plugins\understory\understory-graphify-engine\requirements.txt"
+$env:UNDERSTORY_ENGINE_DIR="<你的 Vault>\.obsidian\plugins\understory\understory-graphify-engine"
 $env:UNDERSTORY_PYTHON_PATH="python"
 ```
 
@@ -105,7 +116,7 @@ $env:UNDERSTORY_PYTHON_PATH="python"
 ## 首次使用
 
 1. 打开 **设置 -> Understory**。
-2. 在 **开始使用** 中选择本地 Understory 引擎文件夹，并确认 Python。
+2. 在 **开始使用** 中确认自动识别到的 Understory 引擎文件夹和 Python。
 3. 点击 **检查设置（Check setup）**。
 4. 在 **联网与隐私** 中保持 **Network mode** 为 **Local only**，或主动选择云模型模式并配置自己的模型服务密钥、Endpoint / Base URL 和模型名称。
 5. 如果要让外部 Agent 把这个 vault 当作本地知识 API 使用，打开 **Agent访问**，先创建本地 MCP server 文件，再把 MCP JSON 复制到 Agent 的 MCP 设置，并复制配套的 Skill prompt。
@@ -137,7 +148,7 @@ Skill 有两个版本：
 ```powershell
 node scripts/understory-agent-cli.js status --vault "C:\path\to\vault" --json
 node scripts/understory-agent-cli.js get-relations --vault "C:\path\to\vault" --note "Notes/A.md" --json
-node scripts/understory-agent-cli.js refresh-relations --vault "C:\path\to\vault" --note "Notes/A.md" --engine-dir "C:\path\to\Understory-graphify-engine" --json
+node scripts/understory-agent-cli.js refresh-relations --vault "C:\path\to\vault" --note "Notes/A.md" --engine-dir "C:\path\to\vault\.obsidian\plugins\understory\understory-graphify-engine" --json
 node scripts/understory-agent-cli.js insert-relation --vault "C:\path\to\vault" --note "Notes/A.md" --target "Notes/B.md" --title "B" --json
 ```
 
@@ -153,7 +164,7 @@ node scripts/understory-agent-cli.js insert-relation --vault "C:\path\to\vault" 
         "--vault",
         "C:/path/to/work-vault",
         "--engine-dir",
-        "C:/path/to/Understory-graphify-engine"
+        "C:/path/to/work-vault/.obsidian/plugins/understory/understory-graphify-engine"
       ]
     },
     "understory-research-vault": {
@@ -163,7 +174,7 @@ node scripts/understory-agent-cli.js insert-relation --vault "C:\path\to\vault" 
         "--vault",
         "C:/path/to/research-vault",
         "--engine-dir",
-        "C:/path/to/Understory-graphify-engine"
+        "C:/path/to/research-vault/.obsidian/plugins/understory/understory-graphify-engine"
       ]
     }
   }
@@ -195,10 +206,12 @@ npm run check
 - `main.js`
 - `styles.css`
 
-release tag 必须和 `manifest.json` 中的 version 完全一致，例如 `1.7.2`。
+release 中的 `main.js` 会内嵌标准 Obsidian 安装所需的 engine payload。
+
+release tag 必须和 `manifest.json` 中的 version 完全一致，例如 `1.8.2`。
 
 ## 链接
 
 - 官网：https://bondie.io/research/understory
-- 核心引擎：https://github.com/fyaic/Understory-graphify-engine
+- 内置 engine 源码：[understory-graphify-engine](understory-graphify-engine)
 - 隐私说明：[PRIVACY.md](PRIVACY.md)

@@ -1,0 +1,136 @@
+version: 1
+
+entity_paths:
+  - "Entities/**/*.md"
+  - "entities/**/*.md"
+  - "People/**/*.md"
+  - "people/**/*.md"
+  - "Projects/**/*.md"
+  - "projects/**/*.md"
+  - "Concepts/**/*.md"
+  - "concepts/**/*.md"
+
+entity_types:
+  Person:
+    label: "人员"
+    icon: "👤"
+    description_template: "{name}，{role}"
+    attributes:
+      - name: role
+        type: string
+        required: false
+      - name: department
+        type: string
+        required: false
+      - name: email
+        type: string
+        required: false
+      - name: tags
+        type: list
+        required: false
+
+  Department:
+    label: "部门"
+    icon: "🏢"
+    description_template: "{name}"
+    attributes:
+      - name: leader
+        type: ref
+        ref_type: Person
+        required: false
+      - name: parent
+        type: ref
+        ref_type: Department
+        required: false
+      - name: description
+        type: text
+        required: false
+
+  Project:
+    label: "项目"
+    icon: "📁"
+    description_template: "{name}，{status}"
+    attributes:
+      - name: owner
+        type: ref
+        ref_type: Person
+        required: false
+      - name: status
+        type: enum
+        values:
+          - planning
+          - active
+          - paused
+          - completed
+          - archived
+        required: false
+      - name: priority
+        type: enum
+        values:
+          - p0
+          - p1
+          - p2
+          - p3
+        required: false
+      - name: start_date
+        type: date
+        required: false
+      - name: end_date
+        type: date
+        required: false
+
+  Concept:
+    label: "概念"
+    icon: "💡"
+    description_template: "{name}"
+    attributes:
+      - name: definition
+        type: text
+        required: false
+      - name: domain
+        type: string
+        required: false
+
+relation_types:
+  reports_to:
+    label: "汇报给"
+    from: Person
+    to: Person
+    cardinality: "N:1"
+    directed: true
+
+  belongs_to:
+    label: "属于"
+    from: Person
+    to: Department
+    cardinality: "N:1"
+    directed: true
+
+  manages:
+    label: "负责"
+    from: Person
+    to: Project
+    cardinality: "1:N"
+    directed: true
+
+  participates_in:
+    label: "参与"
+    from: Person
+    to: Project
+    cardinality: "N:M"
+    directed: true
+
+  depends_on:
+    label: "依赖"
+    from: Project
+    to: Project
+    cardinality: "N:M"
+    directed: true
+
+  contains:
+    label: "包含"
+    from: Department
+    to: Department
+    cardinality: "1:N"
+    directed: true
+

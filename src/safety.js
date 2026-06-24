@@ -1,7 +1,7 @@
 const MAX_ERROR_DETAIL_LENGTH = 400;
 const MAX_LOG_STRING_LENGTH = 500;
 const VALID_NETWORK_MODES = new Set(['local', 'embedding', 'full']);
-const VALID_PROVIDERS = new Set(['none', 'openai', 'zhipu', 'custom']);
+const VALID_PROVIDERS = new Set(['none', 'openai', 'zhipu', 'kimi-cn', 'kimi-global', 'custom']);
 
 function safeNetworkMode(mode) {
     const value = String(mode || '').trim();

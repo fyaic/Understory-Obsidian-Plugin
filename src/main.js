@@ -1,16 +1,23 @@
 const { Plugin, Notice } = require('obsidian');
-const { UnderstorySettingTab } = require('./settings');
+const {
+    ENGINE_DIR_ENV,
+    LEGACY_ENGINE_DIR_ENV,
+    UnderstorySettingTab,
+    isLikelyEngineDir,
+} = require('./settings');
 const { registerCoreCommands } = require('./commands');
 const graphifyLayer = require('./graphifyLayer');
 const linkDiscoveryMethods = require('./linkDiscovery');
 const { RelationsStore } = require('./relationsStore');
 const { createAgentApi } = require('./agentApi');
+const { ensureBundledEngine } = require('./bundledEngine');
 const { UnderstorySidebarView, VIEW_TYPE_UNDERSTORY_SIDEBAR, UNDERSTORY_ICON } = require('./sidebarView');
 const { t } = require('./i18n');
 
 class UnderstoryPlugin extends Plugin {
     async onload() {
         await this.loadSettings();
+        await this._ensureBundledEngineInstalled();
 
         this.timers = new Map();
         this.relationsStore = new RelationsStore(this);
@@ -65,6 +72,31 @@ class UnderstoryPlugin extends Plugin {
         });
 
         new Notice(t(this, 'plugin_enabled'));
+    }
+
+    async _ensureBundledEngineInstalled() {
+        try {
+            const bundledEngine = await ensureBundledEngine(this, this.bundledEngineOptions || {});
+            this.bundledEngine = bundledEngine;
+            if (!bundledEngine?.ok || !bundledEngine.engineDir) return;
+
+            const currentEngineDir = String(this.settings?.graphifyDir || '').trim();
+            const savedEngineDir = String(this._loadedSettingsData?.graphifyDir || '').trim();
+            const env = typeof process !== 'undefined' ? process.env || {} : {};
+            const envEngineDir = String(env[ENGINE_DIR_ENV] || env[LEGACY_ENGINE_DIR_ENV] || '').trim();
+            if (!envEngineDir && (!savedEngineDir || !currentEngineDir || !isLikelyEngineDir(currentEngineDir))) {
+                this.settings.graphifyDir = bundledEngine.engineDir;
+                await this.saveSettings();
+            }
+        } catch (error) {
+            console.warn('[Understory] Failed to install bundled engine:', error);
+        }
+
+        if (this.checkEngineHealth) {
+            this.checkEngineHealth(false).catch((error) => {
+                console.warn('[Understory] Engine health check failed:', error);
+            });
+        }
     }
 
     _runWhenWorkspaceReady(callback) {

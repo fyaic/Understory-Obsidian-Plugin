@@ -18,7 +18,7 @@ In Local only mode:
 
 If you choose **Vector model only** or **Full AI analysis**, selected note titles, snippets, prompts, or extracted facts may be sent to the provider you configure.
 
-Supported provider choices include OpenAI, Zhipu, and custom OpenAI-compatible endpoints. You provide your own provider account and API key.
+Supported provider choices include OpenAI, Zhipu, Kimi/Moonshot, and custom OpenAI-compatible endpoints. You provide your own provider account and API key.
 
 Provider accounts, API keys, pricing, quotas, privacy terms, data retention, and billing are controlled by the selected provider, not by Bondie Labs. Review the provider's privacy policy before enabling cloud model features.
 
@@ -31,6 +31,8 @@ Understory redacts known API keys, bearer tokens, webhook URLs, and similar secr
 ## Local Files
 
 Understory may write local cache, report, and relationship data under `.understory` in your vault. These files are intended to support relation discovery, graph analysis, status reports, and refresh behavior.
+
+On first load, Understory may also extract its bundled local engine from the released `main.js` into `.obsidian/plugins/understory/understory-graphify-engine/` inside the current vault. This is local release content, not a remote download or telemetry channel.
 
 ## Local Agent API
 
@@ -65,7 +67,7 @@ Webhook features are off by default and are blocked in Local only mode. If enabl
 
 Understory 默认本地优先。Bondie Labs 不会接收你的 vault 内容、API key、prompt、embedding、模型响应、本地报告或日志。
 
-如果你选择 **只用向量模型** 或 **完整 AI 分析**，插件可能会把被选中的标题、片段、prompt 或提取出的事实发送给你自己配置的模型服务商。模型服务商的账号、价格、额度、隐私条款、数据保留和账单规则由该服务商负责。
+如果你选择 **只用向量模型** 或 **完整 AI 分析**，插件可能会把被选中的标题、片段、prompt 或提取出的事实发送给你自己配置的模型服务商。可选服务商包括 OpenAI、智谱、Kimi/Moonshot 和自定义兼容 endpoint。模型服务商的账号、价格、额度、隐私条款、数据保留和账单规则由该服务商负责。
 
 如果你在设置页填写 API key，密钥会保存在本机 Obsidian 插件配置中。也可以留空并改用环境变量。
 

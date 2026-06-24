@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import hashlib
 import json
 from pathlib import Path
 
@@ -10,6 +12,7 @@ from pathlib import Path
 MODULES = [
     "main.js",
     "brandAssets.js",
+    "bundledEngine.js",
     "i18n.js",
     "safety.js",
     "agentApi.js",
@@ -32,10 +35,65 @@ MODULES = [
 
 
 VIRTUAL_AGENT_ACCESS_SOURCES = "agentAccessBundledSources.js"
+VIRTUAL_BUNDLED_ENGINE_PAYLOAD = "bundledEnginePayload.js"
+ENGINE_DIR_NAME = "understory-graphify-engine"
+EXCLUDED_ENGINE_NAMES = {
+    ".cache",
+    ".env",
+    ".git",
+    ".pytest_cache",
+    ".serena",
+    "__pycache__",
+    "config.yaml",
+}
+EXCLUDED_ENGINE_SUFFIXES = {".db", ".pyc", ".sqlite"}
 
 
 def module_id(filename: str) -> str:
     return "./" + Path(filename).with_suffix("").as_posix()
+
+
+def include_engine_file(path: Path) -> bool:
+    parts = set(path.parts)
+    if parts & EXCLUDED_ENGINE_NAMES:
+        return False
+    return path.suffix.lower() not in EXCLUDED_ENGINE_SUFFIXES
+
+
+def build_bundled_engine_payload(root_dir: Path) -> dict:
+    engine_dir = root_dir / ENGINE_DIR_NAME
+    if not engine_dir.exists():
+        raise FileNotFoundError(f"Bundled engine directory is missing: {engine_dir}")
+
+    files = []
+    for path in sorted(engine_dir.rglob("*")):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(engine_dir)
+        if not include_engine_file(relative):
+            continue
+        data = path.read_bytes()
+        files.append({
+            "path": relative.as_posix(),
+            "contentBase64": base64.b64encode(data).decode("ascii"),
+            "sha256": hashlib.sha256(data).hexdigest(),
+        })
+
+    required = {
+        "api.py",
+        "scripts/deploy_graphify.py",
+        "requirements.txt",
+    }
+    included = {file["path"] for file in files}
+    missing = sorted(required - included)
+    if missing:
+        raise FileNotFoundError(f"Bundled engine payload is missing required files: {', '.join(missing)}")
+
+    return {
+        "version": 1,
+        "engineDirName": ENGINE_DIR_NAME,
+        "files": files,
+    }
 
 
 def build_bundle(plugin_dir: Path) -> str:
@@ -57,6 +115,12 @@ def build_bundle(plugin_dir: Path) -> str:
     blocks.append(
         f"{json.dumps(module_id(VIRTUAL_AGENT_ACCESS_SOURCES))}: "
         f"function(module, exports, require) {{\n{virtual_source}\n}}"
+    )
+
+    engine_payload_source = "module.exports = " + json.dumps(build_bundled_engine_payload(root_dir), ensure_ascii=False) + ";"
+    blocks.append(
+        f"{json.dumps(module_id(VIRTUAL_BUNDLED_ENGINE_PAYLOAD))}: "
+        f"function(module, exports, require) {{\n{engine_payload_source}\n}}"
     )
 
     joined = ",\n\n".join(blocks)

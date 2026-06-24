@@ -4,7 +4,7 @@ const { test } = require('node:test');
 const { installMockObsidian } = require('./helpers/mockObsidian');
 installMockObsidian();
 
-const { DEFAULT_SETTINGS, UnderstorySettingTab } = require('../src/settings');
+const { DEFAULT_SETTINGS, providerPreset, UnderstorySettingTab } = require('../src/settings');
 
 function collectText(node, out = []) {
     if (!node) return out;
@@ -107,7 +107,7 @@ test('settings default page shows onboarding tabs without technical matrix', () 
     assert.match(text, /AI agents/);
     assert.ok(text.indexOf('Relation discovery') < text.indexOf('Relation maintenance'));
     assert.ok(text.indexOf('Relation maintenance') < text.indexOf('AI agents'));
-    assert.match(text, /Choose the local engine folder/);
+    assert.match(text, /Understory engine folder/);
     assert.doesNotMatch(text, /🌱/);
     assert.doesNotMatch(text, /🌐/);
     assert.doesNotMatch(text, /Versions/);
@@ -278,7 +278,7 @@ test('settings page toggle keeps relation maintenance next to discovery before a
 
     setupButtonAfterSwitch.click();
     text = collectText(tab.containerEl).join('\n');
-    assert.match(text, /Choose the local engine folder/);
+    assert.match(text, /Understory engine folder/);
     assert.doesNotMatch(text, /Check matrix/);
 });
 
@@ -325,6 +325,25 @@ test('models tab shows reasoning provider key and endpoint fields in full mode',
     assert.match(text, /Reasoning model API key/);
     assert.match(text, /Endpoint \/ Base URL/);
     assert.match(text, /Full AI analysis can also use a reasoning model/);
+});
+
+test('Kimi reasoning presets fill Moonshot endpoint and model', () => {
+    const tab = createSettingsTab({ networkMode: 'full' });
+
+    assert.equal(providerPreset('kimi-cn').baseUrl, 'https://api.moonshot.cn/v1');
+    assert.equal(providerPreset('kimi-cn').llmModel, 'kimi-k2.5');
+    assert.equal(providerPreset('kimi-global').baseUrl, 'https://api.moonshot.ai/v1');
+    assert.equal(providerPreset('kimi-global').llmModel, 'kimi-k2.5');
+
+    tab._applyProviderPreset('llm', 'kimi-cn');
+    assert.equal(tab.plugin.settings.llmProvider, 'kimi-cn');
+    assert.equal(tab.plugin.settings.llmBaseUrl, 'https://api.moonshot.cn/v1');
+    assert.equal(tab.plugin.settings.llmModel, 'kimi-k2.5');
+
+    tab._activeSettingsTab = 'models';
+    tab.display();
+    const text = collectText(tab.containerEl).join('\n');
+    assert.match(text, /Kimi presets fill the Moonshot endpoint and kimi-k2\.5 automatically/);
 });
 
 test('maintenance tab keeps technical diagnostics available', () => {

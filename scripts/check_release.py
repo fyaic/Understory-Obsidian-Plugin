@@ -34,6 +34,28 @@ def main() -> None:
         if not (ROOT / filename).exists():
             raise SystemExit(f"Missing required release file: {filename}")
 
+    for filename in [
+        "understory-graphify-engine/api.py",
+        "understory-graphify-engine/scripts/deploy_graphify.py",
+        "understory-graphify-engine/requirements.txt",
+    ]:
+        if not (ROOT / filename).exists():
+            raise SystemExit(f"Missing bundled engine file: {filename}")
+
+    forbidden_engine_files = [
+        "understory-graphify-engine/.env",
+        "understory-graphify-engine/config.yaml",
+        "understory-graphify-engine/.cache/embedding_index.sqlite",
+    ]
+    for filename in forbidden_engine_files:
+        if (ROOT / filename).exists():
+            raise SystemExit(f"Forbidden local engine state must not be committed: {filename}")
+
+    main_js = (ROOT / "main.js").read_text(encoding="utf-8")
+    for marker in ["./bundledEnginePayload", "scripts/deploy_graphify.py", "requirements.txt"]:
+        if marker not in main_js:
+            raise SystemExit(f"main.js is missing bundled engine payload marker: {marker}")
+
     lockfiles = ["package-lock.json", "pnpm-lock.yaml", "yarn.lock", "bun.lock"]
     if not any((ROOT / filename).exists() for filename in lockfiles):
         raise SystemExit("Missing JavaScript lockfile for reproducible build verification")

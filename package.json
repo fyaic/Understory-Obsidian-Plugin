@@ -1,6 +1,6 @@
 {
   "name": "understory-obsidian-plugin",
-  "version": "1.8.1",
+  "version": "1.8.2",
   "private": true,
   "description": "Understory Obsidian plugin release package.",
   "scripts": {

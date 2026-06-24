@@ -1,4 +1,6 @@
 const { PluginSettingTab, Setting, Notice, TFile, setIcon } = require('obsidian');
+const fs = require('fs');
+const path = require('path');
 const { UNDERSTORY_SETTINGS_LOGO_DATA_URI } = require('./brandAssets');
 const {
     USAGE_MODES,
@@ -14,17 +16,129 @@ const { getLanguage, t } = require('./i18n');
 const ENGINE_DIR_ENV = 'UNDERSTORY_ENGINE_DIR';
 const LEGACY_ENGINE_DIR_ENV = 'GRAPHIFY_ENGINE_DIR';
 const PYTHON_PATH_ENV = 'UNDERSTORY_PYTHON_PATH';
+const ENGINE_DIR_CANDIDATE_NAMES = [
+    'understory-graphify-engine',
+    'Understory-graphify-engine',
+    'Understory-Graphify-Engine',
+];
 
-function envValue(name) {
+function envValue(name, env) {
     try {
-        return (process && process.env && process.env[name] || '').trim();
+        const source = env || (typeof process !== 'undefined' && process.env) || {};
+        const value = source[name];
+        return value == null ? '' : String(value).trim();
     } catch (error) {
         return '';
     }
 }
 
-function getDefaultEngineDir() {
-    return envValue(ENGINE_DIR_ENV) || envValue(LEGACY_ENGINE_DIR_ENV);
+function safeExists(candidate, fileSystem = fs) {
+    try {
+        return !!candidate && fileSystem.existsSync(candidate);
+    } catch (error) {
+        return false;
+    }
+}
+
+function isLikelyEngineDir(candidate, options = {}) {
+    const dir = String(candidate || '').trim();
+    if (!dir) return false;
+    const pathModule = options.path || path;
+    const fileSystem = options.fs || fs;
+    return safeExists(pathModule.join(dir, 'api.py'), fileSystem)
+        && safeExists(pathModule.join(dir, 'scripts', 'deploy_graphify.py'), fileSystem);
+}
+
+function addSearchRoot(roots, rootPath, options = {}) {
+    const value = String(rootPath || '').trim();
+    if (!value) return;
+    const pathModule = options.path || path;
+    const includeAncestors = options.includeAncestors === true;
+    let current;
+    try {
+        current = pathModule.resolve(value);
+    } catch (error) {
+        return;
+    }
+    while (current) {
+        roots.push(current);
+        if (!includeAncestors) break;
+        const parent = pathModule.dirname(current);
+        if (!parent || parent === current) break;
+        current = parent;
+    }
+}
+
+function uniquePaths(values, pathModule = path) {
+    const seen = new Set();
+    const results = [];
+    const caseInsensitive = pathModule.sep === '\\';
+    for (const value of values) {
+        if (!value) continue;
+        const key = caseInsensitive ? String(value).toLowerCase() : String(value);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        results.push(value);
+    }
+    return results;
+}
+
+function processCwd() {
+    try {
+        return typeof process !== 'undefined' && typeof process.cwd === 'function'
+            ? process.cwd()
+            : '';
+    } catch (error) {
+        return '';
+    }
+}
+
+function defaultEngineSearchRoots(options = {}) {
+    const pathModule = options.path || path;
+    const roots = [];
+    for (const root of options.searchRoots || []) {
+        addSearchRoot(roots, root, { path: pathModule, includeAncestors: true });
+    }
+    if (options.pluginDir) {
+        addSearchRoot(roots, options.pluginDir, { path: pathModule, includeAncestors: true });
+    }
+    if (options.includeDefaultRoots === false) return uniquePaths(roots, pathModule);
+
+    if (!options.pluginDir) addSearchRoot(roots, __dirname, { path: pathModule, includeAncestors: true });
+    addSearchRoot(roots, processCwd(), { path: pathModule, includeAncestors: true });
+
+    const env = options.env;
+    const home = envValue('USERPROFILE', env) || envValue('HOME', env);
+    if (home) {
+        addSearchRoot(roots, home, { path: pathModule });
+        addSearchRoot(roots, pathModule.join(home, 'Documents'), { path: pathModule });
+        addSearchRoot(roots, pathModule.join(home, 'Downloads'), { path: pathModule });
+        addSearchRoot(roots, pathModule.join(home, 'Hello-World'), { path: pathModule });
+        const driveRoot = pathModule.parse(home).root;
+        if (driveRoot) addSearchRoot(roots, pathModule.join(driveRoot, 'Hello-World'), { path: pathModule });
+    }
+
+    return uniquePaths(roots, pathModule);
+}
+
+function findDefaultEngineDir(options = {}) {
+    const pathModule = options.path || path;
+    const candidateNames = options.candidateNames || ENGINE_DIR_CANDIDATE_NAMES;
+    const roots = defaultEngineSearchRoots(options);
+    for (const root of roots) {
+        if (isLikelyEngineDir(root, options)) return root;
+        for (const name of candidateNames) {
+            const candidate = pathModule.join(root, name);
+            if (isLikelyEngineDir(candidate, options)) return candidate;
+        }
+    }
+    return '';
+}
+
+function getDefaultEngineDir(options = {}) {
+    return envValue(ENGINE_DIR_ENV, options.env)
+        || envValue(LEGACY_ENGINE_DIR_ENV, options.env)
+        || findDefaultEngineDir(options);
 }
 
 function getDefaultPythonPath() {
@@ -43,6 +157,18 @@ const PROVIDER_PRESETS = {
         embeddingModel: 'text-embedding-3-small',
         llmModel: 'gpt-4o-mini',
         dimensions: 1536,
+    },
+    'kimi-cn': {
+        baseUrl: 'https://api.moonshot.cn/v1',
+        embeddingModel: '',
+        llmModel: 'kimi-k2.5',
+        dimensions: 1024,
+    },
+    'kimi-global': {
+        baseUrl: 'https://api.moonshot.ai/v1',
+        embeddingModel: '',
+        llmModel: 'kimi-k2.5',
+        dimensions: 1024,
     },
     custom: {
         baseUrl: '',
@@ -1131,6 +1257,8 @@ class UnderstorySettingTab extends PluginSettingTab {
             .addDropdown((dropdown) => dropdown
                 .addOption('zhipu', t(this.plugin, 'provider_zhipu'))
                 .addOption('openai', t(this.plugin, 'provider_openai'))
+                .addOption('kimi-cn', t(this.plugin, 'provider_kimi_cn'))
+                .addOption('kimi-global', t(this.plugin, 'provider_kimi_global'))
                 .addOption('custom', t(this.plugin, 'provider_custom'))
                 .addOption('none', t(this.plugin, 'provider_none'))
                 .setValue(this.plugin.settings.llmProvider || 'zhipu')
@@ -1365,8 +1493,10 @@ module.exports = {
     LEGACY_ENGINE_DIR_ENV,
     PYTHON_PATH_ENV,
     PROVIDER_PRESETS,
+    findDefaultEngineDir,
     getDefaultEngineDir,
     getDefaultPythonPath,
+    isLikelyEngineDir,
     providerPreset,
     UnderstorySettingTab
 };

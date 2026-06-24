@@ -102,6 +102,20 @@ test('normalizeSettings migrates unsafe persisted settings to safe defaults', ()
     assert.equal(JSON.stringify(normalized.linkLog).includes(settings.embeddingApiKey), false);
 });
 
+test('normalizeSettings keeps Kimi reasoning providers', () => {
+    const normalized = normalizeSettings({
+        embeddingProvider: 'openai',
+        llmProvider: 'kimi-global',
+    }, {
+        networkMode: 'full',
+        embeddingProvider: 'zhipu',
+        llmProvider: 'zhipu',
+    });
+
+    assert.equal(normalized.embeddingProvider, 'openai');
+    assert.equal(normalized.llmProvider, 'kimi-global');
+});
+
 test('canUseWebhook requires non-local mode, enabled flag, and URL', () => {
     assert.equal(canUseWebhook({ networkMode: 'local', webhookEnabled: true, webhookUrl: settings.webhookUrl }), false);
     assert.equal(canUseWebhook({ networkMode: 'embedding', webhookEnabled: false, webhookUrl: settings.webhookUrl }), false);

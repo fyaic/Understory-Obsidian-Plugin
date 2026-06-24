@@ -8,7 +8,7 @@
 
 Understory is a local-first knowledge layer for Obsidian. It builds a private maintenance layer under your vault, driven by Vector, ER, and Graph analysis, so related notes, claims, concepts, conflicts, and orphan pages can be discovered and maintained over time.
 
-The plugin is desktop-only and works with the local Understory engine. It is designed for people who want Obsidian to keep a durable, self-refreshing memory layer without sending vault data to a developer-operated service.
+The plugin is desktop-only and ships with the local Understory engine in this repository. It is designed for people who want Obsidian to keep a durable, self-refreshing memory layer without sending vault data to a developer-operated service.
 
 ## What It Does
 
@@ -29,9 +29,9 @@ Understory starts local-first.
 | Vector model only | Sends selected snippets/titles to the vector provider you configure for similarity analysis. No reasoning model is used. |
 | Full AI analysis | Allows both vector and reasoning model requests for semantic indexing, concept extraction, explanations, and conflict checks. |
 
-Optional cloud features can use OpenAI, Zhipu, or a custom OpenAI-compatible endpoint. You provide your own API keys. Bondie Labs does not receive or manage your notes, prompts, embeddings, responses, logs, or API keys.
+Optional cloud features can use OpenAI, Zhipu, Kimi/Moonshot, or a custom OpenAI-compatible endpoint. You provide your own API keys. Bondie Labs does not receive or manage your notes, prompts, embeddings, responses, logs, or API keys.
 
-The **Network & privacy** settings page lets you choose a provider, paste your API key, and edit the endpoint/base URL and model name. OpenAI and Zhipu presets fill the common endpoints for you, but custom proxies and compatible services are supported.
+The **Network & privacy** settings page lets you choose a provider, paste your API key, and edit the endpoint/base URL and model name. OpenAI, Zhipu, and Kimi/Moonshot presets fill the common endpoints for you, but custom proxies and compatible services are supported.
 
 Plugin logs and short diagnostics redact known API keys, bearer tokens, webhook URLs, and similar secrets. Raw process stdout is not stored in plugin logs by default.
 
@@ -46,47 +46,58 @@ Commercial licenses are available from Fuyo AI Tech Co. Limited for competing pr
 ## Requirements
 
 - Obsidian desktop app.
-- The local Understory engine.
+- The bundled local Understory engine.
 - Python available on your machine.
 
 The plugin is marked `isDesktopOnly` because it uses local files, Node APIs, and a Python subprocess.
 
 ## Manual Install
 
-Until the plugin is accepted into the Obsidian Community directory, install it manually from the latest GitHub release.
+After the plugin is accepted into the Obsidian Community directory, the standard install uses the release assets `manifest.json`, `main.js`, and `styles.css`. Understory embeds the local engine payload inside `main.js` and extracts it into the plugin folder on first load.
 
-1. Download these release assets:
-   - `manifest.json`
-   - `main.js`
-   - `styles.css`
-2. Create this folder in your vault:
+Until the Community directory has picked up the latest release, install the same release assets directly from GitHub:
+
+1. Create this folder in your vault:
 
    ```text
    <Your Vault>/.obsidian/plugins/understory/
    ```
 
-3. Put the three downloaded files into that folder.
-4. Restart Obsidian.
-5. Enable **Understory** in **Settings -> Community plugins**.
+2. Download these files from the GitHub release and place them in that folder:
+
+   ```text
+   <Your Vault>/.obsidian/plugins/understory/manifest.json
+   <Your Vault>/.obsidian/plugins/understory/main.js
+   <Your Vault>/.obsidian/plugins/understory/styles.css
+   ```
+
+3. Restart Obsidian.
+4. Enable **Understory** in **Settings -> Community plugins**.
+5. After the first load, confirm the bundled engine was extracted:
+
+   ```text
+   <Your Vault>/.obsidian/plugins/understory/understory-graphify-engine/api.py
+   ```
 
 ## Engine Setup
 
-Understory for Obsidian is the plugin shell. The local engine is maintained separately:
+Understory for Obsidian includes the local engine in this repository under `understory-graphify-engine/`. Release builds also embed that engine in `main.js`, so a standard Obsidian install can materialize the engine automatically inside the plugin folder.
 
 ```powershell
-git clone https://github.com/fyaic/Understory-graphify-engine.git
-cd Understory-graphify-engine
+cd understory-graphify-engine
 python -m pip install -r requirements.txt
 ```
 
-Set the engine path before launching Obsidian:
+Understory tries to install and find the bundled engine automatically from the plugin folder, repository folder, and common local workspace paths. Standard Obsidian installs extract it to `<vault>/.obsidian/plugins/understory/understory-graphify-engine/`. Most users do not need to set an engine path manually.
+
+If you moved the engine or want to pin a specific copy, set the engine path before launching Obsidian:
 
 ```powershell
-$env:UNDERSTORY_ENGINE_DIR="C:\path\to\Understory-graphify-engine"
+$env:UNDERSTORY_ENGINE_DIR="<Your Vault>\.obsidian\plugins\understory\understory-graphify-engine"
 $env:UNDERSTORY_PYTHON_PATH="python"
 ```
 
-You can also set the engine folder and Python path in **Settings -> Understory -> Start here**. After changing system environment variables, restart Obsidian so the desktop app can read them.
+You can also override the engine folder and Python path in **Settings -> Understory -> Start here**. After changing system environment variables, restart Obsidian so the desktop app can read them.
 
 The settings page is split into tabs. Most users only need **Start here**, **Network & privacy**, **Relation discovery**, and **Relation maintenance**. **AI agents** comes after the relation workflow, so first-run setup stays focused on the required steps.
 
@@ -95,8 +106,8 @@ The **Check setup** button checks the local engine, Python, scripts, vault `.und
 Common manual fixes:
 
 ```powershell
-python -m pip install -r "C:\path\to\Understory-graphify-engine\requirements.txt"
-$env:UNDERSTORY_ENGINE_DIR="C:\path\to\Understory-graphify-engine"
+python -m pip install -r "<Your Vault>\.obsidian\plugins\understory\understory-graphify-engine\requirements.txt"
+$env:UNDERSTORY_ENGINE_DIR="<Your Vault>\.obsidian\plugins\understory\understory-graphify-engine"
 $env:UNDERSTORY_PYTHON_PATH="python"
 ```
 
@@ -105,7 +116,7 @@ Use **Copy diagnostics** when you need to share setup details with a maintainer.
 ## First Run
 
 1. Open **Settings -> Understory**.
-2. In **Start here**, choose the local Understory engine folder and confirm Python.
+2. In **Start here**, confirm the auto-detected Understory engine folder and Python.
 3. Click **Check setup**.
 4. In **Network & privacy**, keep **Network mode** on **Local only**, or explicitly choose a cloud mode and configure your own provider key, endpoint/base URL, and model name.
 5. In **AI agents**, create the local MCP server file, copy the MCP JSON into your agent's MCP settings, and copy the matching Skill prompt if you want an external agent to use this vault as a local knowledge API.
@@ -137,7 +148,7 @@ Developer commands are still available from this repository:
 ```powershell
 node scripts/understory-agent-cli.js status --vault "C:\path\to\vault" --json
 node scripts/understory-agent-cli.js get-relations --vault "C:\path\to\vault" --note "Notes/A.md" --json
-node scripts/understory-agent-cli.js refresh-relations --vault "C:\path\to\vault" --note "Notes/A.md" --engine-dir "C:\path\to\Understory-graphify-engine" --json
+node scripts/understory-agent-cli.js refresh-relations --vault "C:\path\to\vault" --note "Notes/A.md" --engine-dir "C:\path\to\vault\.obsidian\plugins\understory\understory-graphify-engine" --json
 node scripts/understory-agent-cli.js insert-relation --vault "C:\path\to\vault" --note "Notes/A.md" --target "Notes/B.md" --title "B" --json
 ```
 
@@ -153,7 +164,7 @@ Multi-vault MCP configuration example after using **Create local MCP server file
         "--vault",
         "C:/path/to/work-vault",
         "--engine-dir",
-        "C:/path/to/Understory-graphify-engine"
+        "C:/path/to/work-vault/.obsidian/plugins/understory/understory-graphify-engine"
       ]
     },
     "understory-research-vault": {
@@ -163,7 +174,7 @@ Multi-vault MCP configuration example after using **Create local MCP server file
         "--vault",
         "C:/path/to/research-vault",
         "--engine-dir",
-        "C:/path/to/Understory-graphify-engine"
+        "C:/path/to/research-vault/.obsidian/plugins/understory/understory-graphify-engine"
       ]
     }
   }
@@ -195,10 +206,12 @@ Each GitHub release must attach:
 - `main.js`
 - `styles.css`
 
-The release tag must match `manifest.json` version exactly, for example `1.8.1`.
+The release `main.js` embeds the bundled engine payload used by standard Obsidian installs.
+
+The release tag must match `manifest.json` version exactly, for example `1.8.2`.
 
 ## Links
 
 - Website: https://bondie.io/research/understory
-- Core engine: https://github.com/fyaic/Understory-graphify-engine
+- Bundled engine source: [understory-graphify-engine](understory-graphify-engine)
 - Privacy: [PRIVACY.md](PRIVACY.md)

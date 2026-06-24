@@ -9,3 +9,10 @@ dist/
 tmp/
 .serena/
 .spec-workflow/
+__pycache__/
+*.py[cod]
+.cache/
+*.sqlite
+*.db
+understory-graphify-engine/.env
+understory-graphify-engine/config.yaml

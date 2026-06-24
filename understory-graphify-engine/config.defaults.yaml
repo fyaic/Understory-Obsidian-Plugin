@@ -1,0 +1,80 @@
+{
+  "embedding": {
+    "floor": 0.40,
+    "top_k": 15,
+    "dimensions": 1024,
+    "batch_size": 64,
+    "max_chars": 2000
+  },
+  "fusion": {
+    "kw_weight": 0.45,
+    "fusion_floor": 3.5,
+    "kw_floor": 3.0,
+    "emb_floor": 0.40
+  },
+  "relations": {
+    "short_doc_threshold": 300,
+    "same_similarity_threshold": 0.65
+  },
+  "link_merge": {
+    "ttl_days": 30
+  },
+  "lint": {
+    "max_pairwise": 1500,
+    "max_candidate_pairs": 200,
+    "max_llm_contra_calls": 12,
+    "llm_contra_budget_sec": 45,
+    "contra_llm_timeout": 20,
+    "contra_difflib_threshold": 0.70,
+    "contra_common_word_min": 0.30,
+    "contra_confirm_conf": 0.55
+  },
+  "graph": {
+    "sim_threshold": 0.5,
+    "top_k_neighbors": 15,
+    "min_community_size": 3,
+    "surprise_threshold": 0.6,
+    "god_node_min_communities": 3,
+    "mention_scan_time": 20,
+    "max_edges_per_type": 5000
+  },
+  "network": {
+    "mode": "local"
+  },
+  "provider": {
+    "embedding": "zhipu",
+    "llm": "zhipu"
+  },
+  "zhipu": {
+    "base_url": "https://open.bigmodel.cn/api/paas/v4/",
+    "embedding_model": "embedding-3",
+    "llm_model": "glm-4-flash"
+  },
+  "openai": {
+    "base_url": "https://api.openai.com/v1/",
+    "embedding_model": "text-embedding-3-small",
+    "llm_model": "gpt-4o-mini"
+  },
+  "custom": {
+    "base_url": "",
+    "embedding_model": "",
+    "llm_model": ""
+  },
+  "webhook": {
+    "enabled": false
+  },
+  "noisy_paths": [
+    "linear issues/",
+    "daily",
+    "日报",
+    "晨会",
+    "untitled"
+  ],
+  "junk_titles": [
+    "report",
+    "raw_report",
+    "worklog",
+    "linear",
+    "recap"
+  ]
+}

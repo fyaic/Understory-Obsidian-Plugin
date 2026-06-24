@@ -300,14 +300,10 @@ class LinkDiscoveryMethods {
 
     async loadSettings() {
         const data = await this.loadData() || {};
+        this._loadedSettingsData = data;
         this.settings = normalizeSettings(data, DEFAULT_SETTINGS);
         if (!this.settings.graphifyDir) this.settings.graphifyDir = getDefaultEngineDir();
         if (!this.settings.pythonPath) this.settings.pythonPath = getDefaultPythonPath();
-        if (this.checkEngineHealth) {
-            this.checkEngineHealth(false).catch((error) => {
-                console.warn('[Understory] Engine health check failed:', error);
-            });
-        }
     }
 
     async saveSettings() {
