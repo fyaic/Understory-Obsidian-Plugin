@@ -30,9 +30,13 @@ def main() -> None:
     if not re.fullmatch(r"\d+\.\d+\.\d+", version):
         raise SystemExit(f"Version must use x.y.z format: {version}")
 
-    for filename in ["main.js", "styles.css", "README.md", "PRIVACY.md", "LICENSE", "versions.json"]:
+    for filename in ["main.js", "styles.css", "README.md", "PRIVACY.md", "LICENSE", "NOTICE", "versions.json"]:
         if not (ROOT / filename).exists():
             raise SystemExit(f"Missing required release file: {filename}")
+
+    notice = (ROOT / "NOTICE").read_text(encoding="utf-8")
+    if "Required Notice:" not in notice or "Fuyo AI Tech Co. Limited" not in notice:
+        raise SystemExit("NOTICE must include Required Notice and Fuyo AI Tech Co. Limited")
 
     for filename in [
         "understory-graphify-engine/api.py",

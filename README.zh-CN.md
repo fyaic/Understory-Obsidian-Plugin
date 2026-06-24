@@ -41,7 +41,7 @@ Understory 默认本地优先。
 
 Understory 以 [PolyForm Perimeter License 1.0.0](LICENSE) 形式 source-available。你可以使用、审阅、修改和再分发源码，但不能用它向他人提供与 Understory 竞争的产品。
 
-如果需要把 Understory 封装进竞品、产品包或其他超出 PolyForm Perimeter 条款的商业用途，请联系 Fuyo AI Tech Co. Limited 获取商业授权。
+版权 Required Notice 和商业授权主体见 [NOTICE](NOTICE)。如果需要把 Understory 封装进竞品、产品包或其他超出 PolyForm Perimeter 条款的商业用途，请联系 Fuyo AI Tech Co. Limited 获取商业授权。
 
 ## 运行要求
 
