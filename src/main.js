@@ -1,7 +1,5 @@
 const { Plugin, Notice } = require('obsidian');
 const {
-    ENGINE_DIR_ENV,
-    LEGACY_ENGINE_DIR_ENV,
     UnderstorySettingTab,
     isLikelyEngineDir,
 } = require('./settings');
@@ -82,9 +80,7 @@ class UnderstoryPlugin extends Plugin {
 
             const currentEngineDir = String(this.settings?.graphifyDir || '').trim();
             const savedEngineDir = String(this._loadedSettingsData?.graphifyDir || '').trim();
-            const env = typeof process !== 'undefined' ? process.env || {} : {};
-            const envEngineDir = String(env[ENGINE_DIR_ENV] || env[LEGACY_ENGINE_DIR_ENV] || '').trim();
-            if (!envEngineDir && (!savedEngineDir || !currentEngineDir || !isLikelyEngineDir(currentEngineDir))) {
+            if (!savedEngineDir || !currentEngineDir || !isLikelyEngineDir(currentEngineDir)) {
                 this.settings.graphifyDir = bundledEngine.engineDir;
                 await this.saveSettings();
             }

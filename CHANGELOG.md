@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.8.8
+
+- Repair invalid saved or environment-provided engine paths by switching back to the bundled engine extracted from the release.
+- Prefer the bundled release engine for the settings-page default engine action and Agent access engine path.
+- Add regression coverage for invalid engine path recovery.
+
 ## 1.8.7
 
 - Return structured `warnings` and `fixes` when the Embedding cache is missing, including the command-palette action and CLI command to build the index.

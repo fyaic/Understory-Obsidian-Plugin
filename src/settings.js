@@ -145,6 +145,14 @@ function getDefaultPythonPath() {
     return envValue(PYTHON_PATH_ENV) || 'python';
 }
 
+function bundledEngineDir(plugin) {
+    return String(plugin?.bundledEngine?.engineDir || '').trim();
+}
+
+function preferredEngineDir(plugin) {
+    return bundledEngineDir(plugin) || getDefaultEngineDir();
+}
+
 const PROVIDER_PRESETS = {
     zhipu: {
         baseUrl: 'https://open.bigmodel.cn/api/paas/v4/',
@@ -471,9 +479,9 @@ class UnderstorySettingTab extends PluginSettingTab {
                 }))
             .addButton((button) => button
                 .setButtonText(t(this.plugin, 'engine_use_env_button'))
-                .setDisabled(!getDefaultEngineDir())
+                .setDisabled(!preferredEngineDir(this.plugin))
                 .onClick(async () => {
-                    this.plugin.settings.graphifyDir = getDefaultEngineDir();
+                    this.plugin.settings.graphifyDir = preferredEngineDir(this.plugin);
                     this.plugin.settings.pythonPath = getDefaultPythonPath();
                     await this.plugin.saveSettings();
                     await this.plugin.checkEngineHealth?.(true, true);
@@ -843,7 +851,7 @@ class UnderstorySettingTab extends PluginSettingTab {
             ...paths,
             agentProfileId: this.plugin.settings.agentProfileId || 'generic',
             usageModeId: this.plugin.settings.agentUsageModeId || 'memory',
-            engineDir: this.plugin.settings.graphifyDir || getDefaultEngineDir(),
+            engineDir: this.plugin.settings.graphifyDir || preferredEngineDir(this.plugin),
             networkMode: this.plugin.settings.networkMode || 'local',
             pluginVersion: this.plugin.manifest && this.plugin.manifest.version,
             pythonPath: this.plugin.settings.pythonPath || getDefaultPythonPath(),
@@ -1362,9 +1370,9 @@ class UnderstorySettingTab extends PluginSettingTab {
                 }))
             .addButton((button) => button
                 .setButtonText(t(this.plugin, 'engine_use_env_button'))
-                .setDisabled(!getDefaultEngineDir())
+                .setDisabled(!preferredEngineDir(this.plugin))
                 .onClick(async () => {
-                    this.plugin.settings.graphifyDir = getDefaultEngineDir();
+                    this.plugin.settings.graphifyDir = preferredEngineDir(this.plugin);
                     this.plugin.settings.pythonPath = getDefaultPythonPath();
                     await this.plugin.saveSettings();
                     await this.plugin.checkEngineHealth?.(true, true);
@@ -1496,6 +1504,7 @@ module.exports = {
     findDefaultEngineDir,
     getDefaultEngineDir,
     getDefaultPythonPath,
+    preferredEngineDir,
     isLikelyEngineDir,
     providerPreset,
     UnderstorySettingTab

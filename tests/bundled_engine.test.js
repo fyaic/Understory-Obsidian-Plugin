@@ -110,3 +110,42 @@ test('onload installs bundled engine and saves it as the default engine path', a
         global.window = originalWindow;
     }
 });
+
+test('_ensureBundledEngineInstalled repairs an invalid configured engine path', async (t) => {
+    const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'understory-vault-'));
+    t.after(() => fs.promises.rm(root, { recursive: true, force: true }));
+
+    const app = {
+        vault: {
+            adapter: { getBasePath: () => root },
+            configDir: '.obsidian',
+        },
+        workspace: {},
+    };
+    const previousEnv = process.env.UNDERSTORY_ENGINE_DIR;
+    process.env.UNDERSTORY_ENGINE_DIR = 'Z:/missing-understory-engine';
+
+    try {
+        const plugin = new UnderstoryPlugin(app, { id: 'understory', version: 'test' });
+        plugin.settings = {
+            graphifyDir: 'Z:/missing-understory-engine',
+            pythonPath: 'python',
+        };
+        plugin._loadedSettingsData = {};
+        plugin.bundledEngineOptions = { payload: createPayload() };
+        plugin.checkEngineHealth = async () => ({ ok: true });
+        plugin.saveSettings = async function saveSettings() {
+            this.savedData = { ...this.settings };
+        };
+
+        await plugin._ensureBundledEngineInstalled();
+
+        const expectedEngineDir = path.join(root, '.obsidian', 'plugins', 'understory', 'understory-graphify-engine');
+        assert.equal(plugin.settings.graphifyDir, expectedEngineDir);
+        assert.equal(plugin.savedData.graphifyDir, expectedEngineDir);
+        assert.equal(await fs.promises.readFile(path.join(expectedEngineDir, 'api.py'), 'utf8'), 'print("understory")\n');
+    } finally {
+        if (previousEnv === undefined) delete process.env.UNDERSTORY_ENGINE_DIR;
+        else process.env.UNDERSTORY_ENGINE_DIR = previousEnv;
+    }
+});
