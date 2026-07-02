@@ -113,14 +113,25 @@ $env:UNDERSTORY_PYTHON_PATH="python"
 
 如果需要把配置情况发给维护者，点击 **复制诊断（Copy diagnostics）**。复制出的摘要会避免包含 API key、webhook URL 和 vault 笔记正文。
 
+### Embedding 索引
+
+如果你启用了 **只用向量模型** 或 **完整 AI 分析**，请在配置好向量模型服务商后，从命令面板运行 **准备本地搜索索引**。这个命令会构建语义关联发现所需的本地 Embedding 缓存。
+
+如果 Embedding 缓存还没构建，Understory 不会只抛出原始 Python 退出码然后停止。它会先降级使用本地关键词结果，弹出提示，并返回指向 **准备本地搜索索引** 的修复建议。你也可以在终端中运行：
+
+```powershell
+python "<你的 Vault>\.obsidian\plugins\understory\understory-graphify-engine\api.py" init --vault "<你的 Vault>"
+```
+
 ## 首次使用
 
 1. 打开 **设置 -> Understory**。
 2. 在 **开始使用** 中确认自动识别到的 Understory 引擎文件夹和 Python。
 3. 点击 **检查设置（Check setup）**。
 4. 在 **联网与隐私** 中保持 **Network mode** 为 **Local only**，或主动选择云模型模式并配置自己的模型服务密钥、Endpoint / Base URL 和模型名称。
-5. 如果要让外部 Agent 把这个 vault 当作本地知识 API 使用，打开 **Agent访问**，先创建本地 MCP server 文件，再把 MCP JSON 复制到 Agent 的 MCP 设置，并复制配套的 Skill prompt。
-6. 打开命令面板，运行 **Show Understory**。
+5. 如果选择了云端向量模式，请在服务商配置完成后运行一次 **准备本地搜索索引**。
+6. 如果要让外部 Agent 把这个 vault 当作本地知识 API 使用，打开 **Agent访问**，先创建本地 MCP server 文件，再把 MCP JSON 复制到 Agent 的 MCP 设置，并复制配套的 Skill prompt。
+7. 打开命令面板，运行 **Show Understory**。
 
 ## Agent API
 
@@ -208,7 +219,9 @@ npm run check
 
 release 中的 `main.js` 会内嵌标准 Obsidian 安装所需的 engine payload。
 
-release tag 必须和 `manifest.json` 中的 version 完全一致，例如 `1.8.4`。
+当前 release：`1.8.7`。
+
+release tag 必须和 `manifest.json` 中的 version 完全一致，例如 `1.8.7`。
 
 ## 链接
 

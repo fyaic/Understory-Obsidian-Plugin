@@ -3,6 +3,7 @@ const { test } = require('node:test');
 
 const {
     canUseWebhook,
+    extractProcessJsonMessage,
     normalizeLogEntry,
     normalizeSettings,
     redactSensitiveText,
@@ -62,6 +63,18 @@ test('safeErrorDetail omits stdout by default and truncates diagnostics', () => 
     assert.equal(detail.includes(settings.embeddingApiKey), false);
     assert.match(detail, /stdout: \[omitted\]/);
     assert.ok(detail.length <= 400);
+});
+
+test('extractProcessJsonMessage reads engine JSON errors from stdout', () => {
+    const stdout = [
+        'debug line',
+        '{"status":"error","message":"missing embedding cache","error_detail":"run init first"}',
+    ].join('\n');
+
+    assert.equal(
+        extractProcessJsonMessage(stdout),
+        'missing embedding cache run init first'
+    );
 });
 
 test('normalizeLogEntry redacts string fields before persistence', () => {

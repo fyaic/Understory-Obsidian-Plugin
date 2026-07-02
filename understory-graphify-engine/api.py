@@ -27,7 +27,7 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT / "graphify-template" / "scripts"))
 
-from embedding_index import _get_env as get_env, EmbeddingIndex
+from embedding_index import _get_env as get_env, EmbeddingIndex, check_embedding_ready
 from graphify_common import clean_markdown as _clean_markdown, cosine_similarity as _cosine_similarity
 from vault_ops import detect_vault_path, list_markdown_files
 from config import config
@@ -363,6 +363,39 @@ def _load_all_cached_embeddings():
     return results
 
 
+def _embedding_index_fix(vault: Path) -> dict:
+    api_path = Path(__file__).resolve()
+    command = f'python "{api_path}" init --vault "{Path(vault).resolve()}"'
+    if _ui_language() == "zh":
+        return {
+            "id": "embedding_index_missing",
+            "severity": "warning",
+            "title": "需要构建 Embedding 索引",
+            "message": "当前先使用本地关键词降级结果。要启用语义关联，请在命令面板运行「准备本地搜索索引」，或执行下方命令。",
+            "command_palette": "准备本地搜索索引",
+            "command_id": "init-embedding-index",
+            "command": command,
+            "fallback_mode": "local-keyword",
+        }
+    return {
+        "id": "embedding_index_missing",
+        "severity": "warning",
+        "title": "Embedding index needs to be built",
+        "message": "Understory is using local keyword fallback for now. To enable semantic relations, run \"Prepare local search index\" from the command palette or run the command below.",
+        "command_palette": "Prepare local search index",
+        "command_id": "init-embedding-index",
+        "command": command,
+        "fallback_mode": "local-keyword",
+    }
+
+
+def _embedding_index_missing_guidance(vault: Path) -> tuple[list[str], list[dict]]:
+    if not embedding_allowed() or _cache_db().exists():
+        return [], []
+    fix = _embedding_index_fix(vault)
+    return [f"{fix['title']}: {_cache_db()}"], [fix]
+
+
 def _filter_existing_docs(cached_docs: list[dict], vault: Path) -> list[dict]:
     """过滤掉 vault 中已不存在的文件条目（防止索引残留僵尸条目生成无效 wikilink）。"""
     filtered = []
@@ -379,8 +412,37 @@ def _ensure_index_fresh(vault: Path) -> dict:
     AIC-2190: 引入 mtime 预筛选，只处理变更的文件，避免每次全库扫描。
     返回简要报告，供上层日志使用。
     """
-    index = EmbeddingIndex()
+    network_mode = current_network_mode()
+    if not embedding_allowed():
+        return {
+            "status": "ok",
+            "network_mode": network_mode,
+            "indexing": "skipped",
+            "message": "Embedding index skipped because network mode is local.",
+            "pruned": 0,
+            "indexed_success": 0,
+            "indexed_fail": 0,
+            "skipped_by_mtime": 0,
+            "scanned": 0,
+        }
+
+    ready, ready_message = check_embedding_ready()
+    if not ready:
+        return {
+            "status": "error",
+            "network_mode": network_mode,
+            "indexing": "unavailable",
+            "message": ready_message,
+            "pruned": 0,
+            "indexed_success": 0,
+            "indexed_fail": 0,
+            "skipped_by_mtime": 0,
+            "scanned": 0,
+        }
+
+    index = None
     try:
+        index = EmbeddingIndex()
         # AIC-2190: 先批量获取缓存中的 mtime，用于预筛选
         cached_mtimes = index.fetch_all_mtimes()
 
@@ -414,7 +476,17 @@ def _ensure_index_fresh(vault: Path) -> dict:
         # 2. 清理僵尸条目 + 增量更新
         pruned = index.prune_missing(vault)
         success, fail = index.ensure_index(docs, base_path=vault)
+        status = "ok" if fail == 0 else "error"
+        message = (
+            "Embedding index is up to date."
+            if fail == 0
+            else f"Embedding index failed for {fail} document(s)."
+        )
         return {
+            "status": status,
+            "network_mode": network_mode,
+            "indexing": "complete" if fail == 0 else "failed",
+            "message": message,
             "pruned": pruned,
             "indexed_success": success,
             "indexed_fail": fail,
@@ -422,9 +494,16 @@ def _ensure_index_fresh(vault: Path) -> dict:
             "scanned": len(docs) + skipped_by_mtime,
         }
     except Exception as exc:
-        return {"error": str(exc)}
+        return {
+            "status": "error",
+            "network_mode": network_mode,
+            "indexing": "failed",
+            "message": str(exc),
+            "error": str(exc),
+        }
     finally:
-        index.close()
+        if index is not None:
+            index.close()
 
 
 # ───────────────────────────────────────────
@@ -603,6 +682,18 @@ def init_index(vault: Optional[Path] = None) -> dict:
     vault = vault or detect_vault_path()
     db = _cache_db()
     try:
+        if not embedding_allowed():
+            return _ensure_index_fresh(vault)
+
+        ready, ready_message = check_embedding_ready()
+        if not ready:
+            return {
+                "status": "error",
+                "network_mode": current_network_mode(),
+                "indexing": "unavailable",
+                "message": ready_message,
+            }
+
         if db.exists():
             db.unlink()
         return _ensure_index_fresh(vault)
@@ -662,8 +753,12 @@ def discover_relations(
     network_mode = current_network_mode()
     can_embed = embedding_allowed()
     can_llm = llm_allowed()
+    warnings: list[str] = []
+    fixes: list[dict] = []
     if ensure_index and can_embed:
-        _ensure_index_fresh(vault)
+        index_report = _ensure_index_fresh(vault)
+        if index_report.get("status") != "ok":
+            warnings.append(index_report.get("message") or index_report.get("error") or "Embedding index refresh failed.")
     doc = Path(doc_path).expanduser()
     if not doc.is_absolute():
         doc = vault / doc
@@ -693,30 +788,40 @@ def discover_relations(
     recall_mode = "local-keyword"
 
     if can_embed:
-        new_emb = _call_embedding_api([text])[0]
         try:
+            new_emb = _call_embedding_api([text])[0]
             cached_docs = _filter_existing_docs(_load_all_cached_embeddings(), vault)
+
+            # Embedding 召回
+            emb_rels = []
+            for cached in cached_docs:
+                if cached["path"] == rel_posix:
+                    continue
+                sim = _cosine_similarity(new_emb, cached["embedding"])
+                emb_rels.append({"path": cached["path"], "title": cached["title"], "similarity": sim, "embedding": cached["embedding"]})
+
+            emb_rels.sort(key=lambda x: x["similarity"], reverse=True)
+            emb_rels = emb_rels[:top_k * 2]
+
+            # Keyword 召回（补充 embedding 盲区）
+            kw_rels = _keyword_recall(doc.stem, text, cached_docs, top_n=top_k * 2)
+
+            # 融合两路召回
+            relations = _merge_recalls(emb_rels, kw_rels, emb_weight=0.7)
+            relations = relations[:top_k * 3]  # 多留一些给 cross_folder 逻辑筛选
+            recall_mode = "embedding+keyword"
         except FileNotFoundError as exc:
-            return {"status": "error", "message": str(exc)}
-
-        # Embedding 召回
-        emb_rels = []
-        for cached in cached_docs:
-            if cached["path"] == rel_posix:
-                continue
-            sim = _cosine_similarity(new_emb, cached["embedding"])
-            emb_rels.append({"path": cached["path"], "title": cached["title"], "similarity": sim, "embedding": cached["embedding"]})
-
-        emb_rels.sort(key=lambda x: x["similarity"], reverse=True)
-        emb_rels = emb_rels[:top_k * 2]
-
-        # Keyword 召回（补充 embedding 盲区）
-        kw_rels = _keyword_recall(doc.stem, text, cached_docs, top_n=top_k * 2)
-
-        # 融合两路召回
-        relations = _merge_recalls(emb_rels, kw_rels, emb_weight=0.7)
-        relations = relations[:top_k * 3]  # 多留一些给 cross_folder 逻辑筛选
-        recall_mode = "embedding+keyword"
+            fix = _embedding_index_fix(vault)
+            fixes.append(fix)
+            warnings.append(f"{fix['title']}: {exc}")
+            cached_docs = []
+            relations = _local_keyword_recall(doc.stem, text, vault, rel_posix, top_n=top_k * 3)
+            recall_mode = "local-keyword-fallback"
+        except Exception as exc:
+            warnings.append(f"Embedding recall unavailable, fell back to local keyword search: {exc}")
+            cached_docs = []
+            relations = _local_keyword_recall(doc.stem, text, vault, rel_posix, top_n=top_k * 3)
+            recall_mode = "local-keyword-fallback"
     else:
         relations = _local_keyword_recall(doc.stem, text, vault, rel_posix, top_n=top_k * 3)
 
@@ -772,12 +877,15 @@ def discover_relations(
 
     # 概念分组
     grouped = {}
-    if use_llm_concepts and can_llm and relations:
+    if use_llm_concepts and can_llm and recall_mode == "embedding+keyword" and relations:
         snippet = content[:300].replace("\n", " ")
-        concepts = _call_llm_extract_concepts(doc.stem, snippet, max_concepts=4)
-        if concepts:
-            concept_embs = _call_embedding_api(concepts)
-            grouped = _group_by_concept_hybrid(relations, concepts, concept_embs, vault)
+        try:
+            concepts = _call_llm_extract_concepts(doc.stem, snippet, max_concepts=4)
+            if concepts:
+                concept_embs = _call_embedding_api(concepts)
+                grouped = _group_by_concept_hybrid(relations, concepts, concept_embs, vault)
+        except Exception as exc:
+            warnings.append(f"LLM concept grouping unavailable: {exc}")
     if not grouped:
         # Fallback: 按文件夹分组，但过滤同文件夹
         grouped = {}
@@ -795,6 +903,8 @@ def discover_relations(
         "target_title": doc.stem,
         "relations": [{k: v for k, v in r.items() if k != "embedding"} for r in relations],
         "grouped": {k: [item["title"] for item in v] for k, v in grouped.items()},
+        "warnings": warnings,
+        "fixes": fixes,
     }
 
 
@@ -1162,6 +1272,8 @@ def on_file_changed(doc_path: str | Path, vault: Optional[Path] = None, auto_wri
             "reason": "未找到关联文档",
             "path": str(doc.relative_to(vault)),
             "er_bridge": er_bridge,
+            "warnings": report.get("warnings", []),
+            "fixes": report.get("fixes", []),
         }
 
     if auto_write:
@@ -1185,6 +1297,8 @@ def on_file_changed(doc_path: str | Path, vault: Optional[Path] = None, auto_wri
         "modules": modules,
         "suggested_block": block if not auto_write else None,
         "er_bridge": er_bridge,
+        "warnings": report.get("warnings", []),
+        "fixes": report.get("fixes", []),
     }
 
 
@@ -1230,12 +1344,16 @@ def refresh_relations(doc_path: str | Path, vault: Optional[Path] = None, auto_w
 
     if last_hash is not None and last_hash == current_hash:
         # 内容未变，跳过 API 调用
+        warnings, fixes = _embedding_index_missing_guidance(vault)
         return {
             "status": "skipped",
             "reason": "文档内容未变更，跳过刷新",
             "path": rel_path,
             "unchanged": True,
             "er_bridge": er_bridge,
+            "network_mode": current_network_mode(),
+            "warnings": warnings,
+            "fixes": fixes,
         }
 
     report = discover_relations(doc, vault=vault, top_k=15, use_llm_concepts=True, ensure_index=False)
@@ -1255,6 +1373,8 @@ def refresh_relations(doc_path: str | Path, vault: Optional[Path] = None, auto_w
             "network_mode": report.get("network_mode"),
             "recall_mode": report.get("recall_mode"),
             "er_bridge": er_bridge,
+            "warnings": report.get("warnings", []),
+            "fixes": report.get("fixes", []),
         }
 
     replaced = False
@@ -1294,6 +1414,8 @@ def refresh_relations(doc_path: str | Path, vault: Optional[Path] = None, auto_w
         "modules": modules,
         "suggested_block": block if not auto_write else None,
         "er_bridge": er_bridge,
+        "warnings": report.get("warnings", []),
+        "fixes": report.get("fixes", []),
     }
 
 

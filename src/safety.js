@@ -75,6 +75,40 @@ function safeErrorDetail({ stdout = '', stderr = '', message = '', settings = nu
     return truncateText(detail, maxLength);
 }
 
+function parseProcessJson(stdout) {
+    const text = String(stdout || '').trim();
+    if (!text) return null;
+    try {
+        return JSON.parse(text);
+    } catch (error) {
+        const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+        for (let index = lines.length - 1; index >= 0; index -= 1) {
+            const line = lines[index];
+            if (!line.startsWith('{') || !line.endsWith('}')) continue;
+            try {
+                return JSON.parse(line);
+            } catch (lineError) {
+                // Keep looking for an earlier JSON line.
+            }
+        }
+    }
+    return null;
+}
+
+function extractProcessJsonMessage(stdout) {
+    const payload = parseProcessJson(stdout);
+    if (!payload || typeof payload !== 'object') return '';
+    const error = payload.error && typeof payload.error === 'object' ? payload.error : null;
+    return [
+        payload.message,
+        payload.reason,
+        typeof payload.error === 'string' ? payload.error : '',
+        error?.message,
+        error?.detail,
+        payload.error_detail,
+    ].map((value) => String(value || '').trim()).filter(Boolean).join(' ');
+}
+
 function normalizeLogEntry(entry, settings) {
     const input = entry && typeof entry === 'object' ? entry : {};
     const normalized = { ...input };
@@ -128,6 +162,7 @@ function canUseWebhook(settings) {
 
 module.exports = {
     canUseWebhook,
+    extractProcessJsonMessage,
     normalizeLogEntry,
     normalizeSettings,
     redactSensitiveText,

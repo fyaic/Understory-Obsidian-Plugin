@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const {
     redactSensitiveText,
+    extractProcessJsonMessage,
     safeErrorDetail,
     safeNetworkMode,
 } = require('./safety');
@@ -601,10 +602,13 @@ function runPythonJson({ pythonPath, engineDir, apiPath, args, vaultPath, timeou
         child.on('close', (code) => {
             if (timer) clearTimeout(timer);
             if (code !== 0) {
+                const engineMessage = extractProcessJsonMessage(stdout);
                 reject(new AgentApiError('ENGINE_FAILED', ERROR_MESSAGES.ENGINE_FAILED, safeErrorDetail({
                     stdout,
                     stderr,
-                    message: `api.py exited with code ${code}`,
+                    message: engineMessage
+                        ? `api.py exited with code ${code}: ${engineMessage}`
+                        : `api.py exited with code ${code}`,
                     settings,
                 })));
                 return;

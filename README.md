@@ -113,14 +113,25 @@ $env:UNDERSTORY_PYTHON_PATH="python"
 
 Use **Copy diagnostics** when you need to share setup details with a maintainer. The copied summary is designed to exclude API keys, webhook URLs, and vault note content.
 
+### Embedding Index
+
+If you enable **Vector model only** or **Full AI analysis**, run **Prepare local search index** from the command palette after configuring your vector provider. This builds the local Embedding cache used for semantic relationship discovery.
+
+If the Embedding cache has not been built yet, Understory does not stop with a raw Python exit code. It falls back to local keyword results, shows a notice, and returns a fix suggestion that points back to **Prepare local search index**. You can also build the index from a terminal:
+
+```powershell
+python "<Your Vault>\.obsidian\plugins\understory\understory-graphify-engine\api.py" init --vault "<Your Vault>"
+```
+
 ## First Run
 
 1. Open **Settings -> Understory**.
 2. In **Start here**, confirm the auto-detected Understory engine folder and Python.
 3. Click **Check setup**.
 4. In **Network & privacy**, keep **Network mode** on **Local only**, or explicitly choose a cloud mode and configure your own provider key, endpoint/base URL, and model name.
-5. In **AI agents**, create the local MCP server file, copy the MCP JSON into your agent's MCP settings, and copy the matching Skill prompt if you want an external agent to use this vault as a local knowledge API.
-6. Open the command palette and run **Show Understory**.
+5. If you selected a cloud vector mode, run **Prepare local search index** once the provider is configured.
+6. In **AI agents**, create the local MCP server file, copy the MCP JSON into your agent's MCP settings, and copy the matching Skill prompt if you want an external agent to use this vault as a local knowledge API.
+7. Open the command palette and run **Show Understory**.
 
 ## Agent API
 
@@ -208,7 +219,9 @@ Each GitHub release must attach:
 
 The release `main.js` embeds the bundled engine payload used by standard Obsidian installs.
 
-The release tag must match `manifest.json` version exactly, for example `1.8.4`.
+Current release: `1.8.7`.
+
+The release tag must match `manifest.json` version exactly, for example `1.8.7`.
 
 ## Links
 

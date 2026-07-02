@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const { Notice, TFile } = require('obsidian');
 const { MAX_PROCESS_OUTPUT_BYTES } = require('./utils');
 const { t } = require('./i18n');
-const { safeErrorDetail } = require('./safety');
+const { extractProcessJsonMessage, redactSensitiveText, safeErrorDetail } = require('./safety');
 
 const RELATIONS_PATH = '.understory/relations.json';
 const OVERRIDES_PATH = '.understory/link_overrides.json';
@@ -249,7 +249,21 @@ class RelationsStore {
         if (!(file instanceof TFile)) return null;
         const result = await this._runNoWriteDiscovery(file, refresh);
         await this.updateFromResult(file, result);
+        this._showEngineGuidance(result);
         return result;
+    }
+
+    _showEngineGuidance(result) {
+        const fixes = Array.isArray(result?.fixes) ? result.fixes : [];
+        const warnings = Array.isArray(result?.warnings) ? result.warnings : [];
+        const indexFix = fixes.find((fix) => fix && fix.id === 'embedding_index_missing');
+        if (indexFix) {
+            new Notice(t(this.plugin, 'embedding_index_missing_notice'), 10000);
+        }
+        if (warnings.length || fixes.length) {
+            const detail = JSON.stringify({ warnings, fixes });
+            console.warn('[Understory] Engine guidance:', redactSensitiveText(detail, this.plugin.settings));
+        }
     }
 
     async _runNoWriteDiscovery(file, refresh) {
@@ -290,9 +304,12 @@ class RelationsStore {
                     return;
                 }
                 if (code !== 0) {
+                    const engineMessage = extractProcessJsonMessage(stdout);
                     reject(new Error(safeErrorDetail({
                         stderr,
-                        message: `api.py exited with code ${code}`,
+                        message: engineMessage
+                            ? `api.py exited with code ${code}: ${engineMessage}`
+                            : `api.py exited with code ${code}`,
                         settings: this.plugin.settings,
                     })));
                     return;

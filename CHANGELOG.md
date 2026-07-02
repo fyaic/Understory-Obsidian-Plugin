@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.8.7
+
+- Return structured `warnings` and `fixes` when the Embedding cache is missing, including the command-palette action and CLI command to build the index.
+- Show a localized Obsidian notice when relation discovery falls back to local keyword recall because the Embedding index has not been built.
+- Propagate engine guidance through both command execution and right-sidebar refresh paths.
+
+## 1.8.6
+
+- Fix `refresh-link` in Full/Vector mode when the embedding cache has not been created yet; Understory now falls back to local keyword recall instead of exiting with code 1.
+- Surface Python JSON error details in plugin diagnostics when the engine process exits non-zero.
+- Add CLI coverage for the missing-cache refresh fallback.
+
+## 1.8.5
+
+- Fix `api.py init` in Local-only mode so it exits successfully after intentionally skipping cloud embedding indexing.
+- Add CLI coverage for the Local-only `api.py init` path.
+- Add release checks that verify key engine file hashes are embedded in `main.js`.
+- Rebuild `main.js` with the corrected bundled engine payload.
+
 ## 1.8.1
 
 - Localize Agent profile labels and install guidance in the Chinese Agent access settings UI and setup pack.

@@ -13,7 +13,13 @@ const {
     statusFromIssues,
     summarizeIssue,
 } = require('./engineHealth');
-const { normalizeLogEntry, redactSensitiveText, safeErrorDetail, safeNetworkMode } = require('./safety');
+const {
+    extractProcessJsonMessage,
+    normalizeLogEntry,
+    redactSensitiveText,
+    safeErrorDetail,
+    safeNetworkMode,
+} = require('./safety');
 
 const MANAGED_ENV_KEYS = [
     'UNDERSTORY_EMBEDDING_PROVIDER',
@@ -530,7 +536,9 @@ class GraphifyRuntimeMethods {
         if (!stdoutEnded || !stderrEnded) return; // 数据还没收完，等待
 
         if (code !== 0) {
-            const errorInfo = this._classifyError(stderr);
+            const engineMessage = extractProcessJsonMessage(stdout);
+            const diagnosticText = stderr || engineMessage;
+            const errorInfo = this._classifyError(diagnosticText);
             console.error(`[Understory] Failed [${errorInfo.category}]: ${errorInfo.desc}`);
             new Notice(t(this, 'run_failed_notice', { category: errorInfo.category, desc: errorInfo.desc }));
             await this._addLogEntry({
@@ -542,7 +550,11 @@ class GraphifyRuntimeMethods {
                 relations: [],
                 message: errorInfo.desc,
                 errorCategory: errorInfo.category,
-                errorDetail: safeErrorDetail({ stderr, settings: this.settings })
+                errorDetail: safeErrorDetail({
+                    stderr,
+                    message: engineMessage,
+                    settings: this.settings
+                })
             });
             return;
         }
@@ -590,6 +602,7 @@ class GraphifyRuntimeMethods {
                         console.error('[Understory] Failed to update relations cache:', error);
                     }
                 }
+                this._showEngineGuidance(result);
                 const count = result.relations_count || 0;
                 const rels = (result.relations || []).map(r => r.title || r.file || 'unknown');
                 this._showClickableNotice(
@@ -605,6 +618,7 @@ class GraphifyRuntimeMethods {
                     relations: rels
                 });
             } else if (result.status === 'skipped') {
+                this._showEngineGuidance(result);
                 console.log(`[Understory] Skipped: [[${file.basename}]] ${result.reason || 'skipped'}`);
                 await this._addLogEntry({
                     time: this._formatTime(new Date()),
@@ -660,6 +674,19 @@ class GraphifyRuntimeMethods {
                 errorCategory: errorInfo.category !== t(this, 'error_unknown_category') ? errorInfo.category : t(this, 'parse_error_category'),
                 errorDetail: safeErrorDetail({ stdout: raw, stderr, settings: this.settings })
             });
+        }
+    }
+
+    _showEngineGuidance(result) {
+        const fixes = Array.isArray(result?.fixes) ? result.fixes : [];
+        const warnings = Array.isArray(result?.warnings) ? result.warnings : [];
+        const indexFix = fixes.find((fix) => fix && fix.id === 'embedding_index_missing');
+        if (indexFix) {
+            new Notice(t(this, 'embedding_index_missing_notice'), 10000);
+        }
+        if (warnings.length || fixes.length) {
+            const detail = JSON.stringify({ warnings, fixes });
+            console.warn('[Understory] Engine guidance:', redactSensitiveText(detail, this.settings));
         }
     }
 
