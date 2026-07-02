@@ -97,7 +97,7 @@ $env:UNDERSTORY_ENGINE_DIR="<Your Vault>\.obsidian\plugins\understory\understory
 $env:UNDERSTORY_PYTHON_PATH="python"
 ```
 
-You can also override the engine folder and Python path in **Settings -> Understory -> Start here**. After changing system environment variables, restart Obsidian so the desktop app can read them.
+You can also override the engine folder and Python path in **Settings -> Understory -> Start here**. Understory automatically looks for `python3` when `python` is not available, including common macOS Homebrew paths such as `/opt/homebrew/bin/python3`. After changing system environment variables, restart Obsidian so the desktop app can read them.
 
 The settings page is split into tabs. Most users only need **Start here**, **Network & privacy**, **Relation discovery**, and **Relation maintenance**. **AI agents** comes after the relation workflow, so first-run setup stays focused on the required steps.
 
@@ -219,9 +219,9 @@ Each GitHub release must attach:
 
 The release `main.js` embeds the bundled engine payload used by standard Obsidian installs.
 
-Current release: `1.8.8`.
+Current release: `1.8.9`.
 
-The release tag must match `manifest.json` version exactly, for example `1.8.8`.
+The release tag must match `manifest.json` version exactly, for example `1.8.9`.
 
 ## Links
 

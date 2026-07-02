@@ -1,4 +1,5 @@
 const { PluginSettingTab, Setting, Notice, TFile, setIcon } = require('obsidian');
+const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const { UNDERSTORY_SETTINGS_LOGO_DATA_URI } = require('./brandAssets');
@@ -141,8 +142,74 @@ function getDefaultEngineDir(options = {}) {
         || findDefaultEngineDir(options);
 }
 
-function getDefaultPythonPath() {
-    return envValue(PYTHON_PATH_ENV) || 'python';
+function getDefaultPythonPath(options = {}) {
+    const platform = options.platform || (typeof process !== 'undefined' ? process.platform : '');
+    return findDefaultPythonPath(options) || envValue(PYTHON_PATH_ENV, options.env) || (platform === 'win32' ? 'python' : 'python3');
+}
+
+function uniqueValues(values) {
+    const seen = new Set();
+    const results = [];
+    for (const value of values) {
+        const text = String(value || '').trim();
+        if (!text || seen.has(text)) continue;
+        seen.add(text);
+        results.push(text);
+    }
+    return results;
+}
+
+function pythonCandidates(options = {}) {
+    const platform = options.platform || (typeof process !== 'undefined' ? process.platform : '');
+    const env = options.env;
+    const configured = envValue(PYTHON_PATH_ENV, env);
+    const candidates = [configured];
+    if (platform === 'darwin') {
+        candidates.push('/opt/homebrew/bin/python3', '/usr/local/bin/python3', '/usr/bin/python3', 'python3', 'python');
+    } else if (platform === 'win32') {
+        candidates.push('python', 'py');
+    } else {
+        candidates.push('python3', '/usr/bin/python3', '/usr/local/bin/python3', 'python');
+    }
+    return uniqueValues(candidates);
+}
+
+function isLikelyPythonExecutable(candidate, options = {}) {
+    const command = String(candidate || '').trim();
+    if (!command) return false;
+    const runner = options.spawnSync || spawnSync;
+    try {
+        const result = runner(command, ['--version'], {
+            encoding: 'utf8',
+            timeout: options.timeoutMs || 1500,
+            windowsHide: true,
+        });
+        return !result.error && result.status === 0;
+    } catch (error) {
+        return false;
+    }
+}
+
+function findDefaultPythonPath(options = {}) {
+    for (const candidate of pythonCandidates(options)) {
+        if (isLikelyPythonExecutable(candidate, options)) return candidate;
+    }
+    return '';
+}
+
+function repairPythonPath(settings, options = {}) {
+    if (!settings || typeof settings !== 'object') return { changed: false, pythonPath: '' };
+    const current = String(settings.pythonPath || '').trim();
+    const discovered = findDefaultPythonPath(options);
+    if (!current) {
+        settings.pythonPath = discovered || getDefaultPythonPath();
+        return { changed: true, pythonPath: settings.pythonPath };
+    }
+    if (discovered && discovered !== current && !isLikelyPythonExecutable(current, options)) {
+        settings.pythonPath = discovered;
+        return { changed: true, pythonPath: discovered };
+    }
+    return { changed: false, pythonPath: current };
 }
 
 function bundledEngineDir(plugin) {
@@ -1502,9 +1569,12 @@ module.exports = {
     PYTHON_PATH_ENV,
     PROVIDER_PRESETS,
     findDefaultEngineDir,
+    findDefaultPythonPath,
     getDefaultEngineDir,
     getDefaultPythonPath,
     preferredEngineDir,
+    repairPythonPath,
+    isLikelyPythonExecutable,
     isLikelyEngineDir,
     providerPreset,
     UnderstorySettingTab

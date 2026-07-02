@@ -7,7 +7,13 @@ const { test } = require('node:test');
 const { installMockObsidian } = require('./helpers/mockObsidian');
 installMockObsidian();
 
-const { getDefaultEngineDir, isLikelyEngineDir } = require('../src/settings');
+const {
+    findDefaultPythonPath,
+    getDefaultEngineDir,
+    getDefaultPythonPath,
+    isLikelyEngineDir,
+    repairPythonPath,
+} = require('../src/settings');
 
 async function makeEngine(root, name = 'understory-graphify-engine') {
     const engineDir = path.join(root, name);
@@ -55,4 +61,37 @@ test('getDefaultEngineDir ignores folders that do not look like the engine', asy
         searchRoots: [root],
         includeDefaultRoots: false,
     }), '');
+});
+
+function pythonSpawnMock(availableCommands) {
+    const available = new Set(availableCommands);
+    return (command) => {
+        if (available.has(command)) {
+            return { status: 0, stdout: 'Python 3.14.3\n', stderr: '' };
+        }
+        return { status: null, error: new Error(`${command}: command not found`) };
+    };
+}
+
+test('getDefaultPythonPath discovers Homebrew python3 on macOS when python is missing', () => {
+    const options = {
+        platform: 'darwin',
+        env: {},
+        spawnSync: pythonSpawnMock(['/opt/homebrew/bin/python3']),
+    };
+
+    assert.equal(findDefaultPythonPath(options), '/opt/homebrew/bin/python3');
+    assert.equal(getDefaultPythonPath(options), '/opt/homebrew/bin/python3');
+});
+
+test('repairPythonPath replaces a saved python command that is not executable', () => {
+    const settings = { pythonPath: 'python' };
+    const result = repairPythonPath(settings, {
+        platform: 'darwin',
+        env: {},
+        spawnSync: pythonSpawnMock(['/opt/homebrew/bin/python3']),
+    });
+
+    assert.equal(result.changed, true);
+    assert.equal(settings.pythonPath, '/opt/homebrew/bin/python3');
 });

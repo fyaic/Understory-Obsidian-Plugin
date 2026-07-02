@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.8.9
+
+- Auto-repair a saved `pythonPath` of `python` when that command is unavailable and `python3` can be found.
+- Add macOS/Homebrew Python discovery for `/opt/homebrew/bin/python3`, `/usr/local/bin/python3`, and `/usr/bin/python3`.
+- Update setup copy and regression tests for Python path recovery.
+
 ## 1.8.8
 
 - Repair invalid saved or environment-provided engine paths by switching back to the bundled engine extracted from the release.

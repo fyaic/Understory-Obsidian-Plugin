@@ -349,7 +349,7 @@ const STRINGS = {
         setup_step_engine_title: '确认 Understory 引擎文件夹',
         setup_step_engine_desc: '通常会自动填好默认路径；这是本地分析程序所在的文件夹，不是你的 vault 文件夹。',
         setup_step_python_title: '确认 Python 可用',
-        setup_step_python_desc: '大多数用户保持 python 即可；如果你使用虚拟环境，可以填写完整 Python 路径。',
+        setup_step_python_desc: 'Understory 会自动寻找可用的 python3；如果你使用虚拟环境，可以填写完整 Python 路径。',
         setup_step_check_title: '运行一次检查',
         setup_step_check_desc: '检查通过后再去配置关联发现和联网模式。不会自动安装依赖或修改系统。',
         setup_check_name: '完成设置检查',
@@ -438,7 +438,7 @@ const STRINGS = {
         engine_dir_placeholder: '自动查找默认路径，可留空',
         python_path_name: 'Python',
         python_path_desc: '默认读取 UNDERSTORY_PYTHON_PATH。能正常运行就保持默认。',
-        python_path_user_desc: '通常保持 python 即可。如果检查失败，再填写你的 Python 可执行文件路径。',
+        python_path_user_desc: 'Understory 会自动寻找 python3。若你使用虚拟环境或检查失败，请填写完整 Python 可执行文件路径。',
         engine_status_ok: '当前状态：本地引擎可用（{python}）',
         engine_status_problem: '当前状态：需要处理 - {message}',
         engine_status_unknown: '当前状态：尚未检查本地引擎',
@@ -829,7 +829,7 @@ const STRINGS = {
         setup_step_engine_title: 'Confirm the Understory engine folder',
         setup_step_engine_desc: 'The default path is usually filled in automatically. This is the local analysis program folder, not your Obsidian vault folder.',
         setup_step_python_title: 'Confirm Python works',
-        setup_step_python_desc: 'Most users can leave this as python. If you use a virtual environment, enter the full Python path.',
+        setup_step_python_desc: 'Understory automatically looks for python3. If you use a virtual environment, enter the full Python path.',
         setup_step_check_title: 'Run one setup check',
         setup_step_check_desc: 'Check setup before tuning suggestions or AI modes. It will not install dependencies or change your system automatically.',
         setup_check_name: 'Complete setup check',
@@ -918,7 +918,7 @@ const STRINGS = {
         engine_dir_placeholder: 'Leave blank to auto-detect the default path',
         python_path_name: 'Python',
         python_path_desc: 'Defaults to UNDERSTORY_PYTHON_PATH. Leave this as python if everything works.',
-        python_path_user_desc: 'Usually leave this as python. If setup check fails, enter your Python executable path.',
+        python_path_user_desc: 'Understory automatically looks for python3. If you use a virtual environment or setup check fails, enter your Python executable path.',
         engine_status_ok: 'Current status: local engine is ready ({python})',
         engine_status_problem: 'Current status: needs attention - {message}',
         engine_status_unknown: 'Current status: local engine has not been checked',
@@ -3527,6 +3527,7 @@ module.exports = {
 
 "./settings": function(module, exports, require) {
 const { PluginSettingTab, Setting, Notice, TFile, setIcon } = require('obsidian');
+const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const { UNDERSTORY_SETTINGS_LOGO_DATA_URI } = require('./brandAssets');
@@ -3669,8 +3670,74 @@ function getDefaultEngineDir(options = {}) {
         || findDefaultEngineDir(options);
 }
 
-function getDefaultPythonPath() {
-    return envValue(PYTHON_PATH_ENV) || 'python';
+function getDefaultPythonPath(options = {}) {
+    const platform = options.platform || (typeof process !== 'undefined' ? process.platform : '');
+    return findDefaultPythonPath(options) || envValue(PYTHON_PATH_ENV, options.env) || (platform === 'win32' ? 'python' : 'python3');
+}
+
+function uniqueValues(values) {
+    const seen = new Set();
+    const results = [];
+    for (const value of values) {
+        const text = String(value || '').trim();
+        if (!text || seen.has(text)) continue;
+        seen.add(text);
+        results.push(text);
+    }
+    return results;
+}
+
+function pythonCandidates(options = {}) {
+    const platform = options.platform || (typeof process !== 'undefined' ? process.platform : '');
+    const env = options.env;
+    const configured = envValue(PYTHON_PATH_ENV, env);
+    const candidates = [configured];
+    if (platform === 'darwin') {
+        candidates.push('/opt/homebrew/bin/python3', '/usr/local/bin/python3', '/usr/bin/python3', 'python3', 'python');
+    } else if (platform === 'win32') {
+        candidates.push('python', 'py');
+    } else {
+        candidates.push('python3', '/usr/bin/python3', '/usr/local/bin/python3', 'python');
+    }
+    return uniqueValues(candidates);
+}
+
+function isLikelyPythonExecutable(candidate, options = {}) {
+    const command = String(candidate || '').trim();
+    if (!command) return false;
+    const runner = options.spawnSync || spawnSync;
+    try {
+        const result = runner(command, ['--version'], {
+            encoding: 'utf8',
+            timeout: options.timeoutMs || 1500,
+            windowsHide: true,
+        });
+        return !result.error && result.status === 0;
+    } catch (error) {
+        return false;
+    }
+}
+
+function findDefaultPythonPath(options = {}) {
+    for (const candidate of pythonCandidates(options)) {
+        if (isLikelyPythonExecutable(candidate, options)) return candidate;
+    }
+    return '';
+}
+
+function repairPythonPath(settings, options = {}) {
+    if (!settings || typeof settings !== 'object') return { changed: false, pythonPath: '' };
+    const current = String(settings.pythonPath || '').trim();
+    const discovered = findDefaultPythonPath(options);
+    if (!current) {
+        settings.pythonPath = discovered || getDefaultPythonPath();
+        return { changed: true, pythonPath: settings.pythonPath };
+    }
+    if (discovered && discovered !== current && !isLikelyPythonExecutable(current, options)) {
+        settings.pythonPath = discovered;
+        return { changed: true, pythonPath: discovered };
+    }
+    return { changed: false, pythonPath: current };
 }
 
 function bundledEngineDir(plugin) {
@@ -5030,9 +5097,12 @@ module.exports = {
     PYTHON_PATH_ENV,
     PROVIDER_PRESETS,
     findDefaultEngineDir,
+    findDefaultPythonPath,
     getDefaultEngineDir,
     getDefaultPythonPath,
     preferredEngineDir,
+    repairPythonPath,
+    isLikelyPythonExecutable,
     isLikelyEngineDir,
     providerPreset,
     UnderstorySettingTab
@@ -6534,7 +6604,7 @@ module.exports = GraphifyRuntimeMethods.prototype;
 "./linkDiscovery": function(module, exports, require) {
 const { Notice, TFile } = require('obsidian');
 const { MAX_PROCESS_OUTPUT_BYTES } = require('./utils');
-const { DEFAULT_SETTINGS, getDefaultEngineDir, getDefaultPythonPath } = require('./settings');
+const { DEFAULT_SETTINGS, getDefaultEngineDir, getDefaultPythonPath, repairPythonPath } = require('./settings');
 const { t } = require('./i18n');
 const { normalizeSettings } = require('./safety');
 
@@ -6838,6 +6908,8 @@ class LinkDiscoveryMethods {
         this.settings = normalizeSettings(data, DEFAULT_SETTINGS);
         if (!this.settings.graphifyDir) this.settings.graphifyDir = getDefaultEngineDir();
         if (!this.settings.pythonPath) this.settings.pythonPath = getDefaultPythonPath();
+        const pythonRepair = repairPythonPath(this.settings);
+        if (pythonRepair.changed) await this.saveSettings();
     }
 
     async saveSettings() {

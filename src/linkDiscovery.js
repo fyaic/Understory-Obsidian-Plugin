@@ -1,6 +1,6 @@
 const { Notice, TFile } = require('obsidian');
 const { MAX_PROCESS_OUTPUT_BYTES } = require('./utils');
-const { DEFAULT_SETTINGS, getDefaultEngineDir, getDefaultPythonPath } = require('./settings');
+const { DEFAULT_SETTINGS, getDefaultEngineDir, getDefaultPythonPath, repairPythonPath } = require('./settings');
 const { t } = require('./i18n');
 const { normalizeSettings } = require('./safety');
 
@@ -304,6 +304,8 @@ class LinkDiscoveryMethods {
         this.settings = normalizeSettings(data, DEFAULT_SETTINGS);
         if (!this.settings.graphifyDir) this.settings.graphifyDir = getDefaultEngineDir();
         if (!this.settings.pythonPath) this.settings.pythonPath = getDefaultPythonPath();
+        const pythonRepair = repairPythonPath(this.settings);
+        if (pythonRepair.changed) await this.saveSettings();
     }
 
     async saveSettings() {

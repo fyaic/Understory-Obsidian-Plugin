@@ -97,7 +97,7 @@ $env:UNDERSTORY_ENGINE_DIR="<你的 Vault>\.obsidian\plugins\understory\understo
 $env:UNDERSTORY_PYTHON_PATH="python"
 ```
 
-也可以在 **设置 -> Understory -> 开始使用** 中覆盖 Understory 引擎文件夹和 Python 路径。修改系统环境变量后，需要重启 Obsidian，让桌面进程重新读取环境。
+也可以在 **设置 -> Understory -> 开始使用** 中覆盖 Understory 引擎文件夹和 Python 路径。当 `python` 不可用时，Understory 会自动寻找 `python3`，包括 macOS Homebrew 常见路径 `/opt/homebrew/bin/python3`。修改系统环境变量后，需要重启 Obsidian，让桌面进程重新读取环境。
 
 设置页已经拆成多个 tab。多数用户只需要看 **开始使用**、**联网与隐私**、**关联发现** 和 **关联维护**。**Agent访问** 放在关联工作流之后，首次配置时不会直接把版本、路径和检查矩阵堆在第一屏。
 
@@ -219,9 +219,9 @@ npm run check
 
 release 中的 `main.js` 会内嵌标准 Obsidian 安装所需的 engine payload。
 
-当前 release：`1.8.8`。
+当前 release：`1.8.9`。
 
-release tag 必须和 `manifest.json` 中的 version 完全一致，例如 `1.8.8`。
+release tag 必须和 `manifest.json` 中的 version 完全一致，例如 `1.8.9`。
 
 ## 链接
 
