@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.8.10
+
+- Respect the **Show suggestions in: Right sidebar only** setting for existing notes: auto-generated related-note sections are now stripped from the note body when the presentation mode is sidebar-only, while manually inserted sections are preserved.
+
 ## 1.8.9
 
 - Auto-repair a saved `pythonPath` of `python` when that command is unavailable and `python3` can be found.

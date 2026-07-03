@@ -139,6 +139,13 @@ class LinkDiscoveryMethods {
             stderr = stderr ? `${stderr}\n${overflowMessage}` : overflowMessage;
         }
         await processResultOnce(exitCode, stdout, stderr, true, true);
+        if (exitCode === 0 && !shouldWriteBody && this.relationsStore && this.relationsStore.stripAutoRelatedSection) {
+            try {
+                await this.relationsStore.stripAutoRelatedSection(file);
+            } catch (error) {
+                console.error('[Understory] Failed to strip auto-related section:', error);
+            }
+        }
         return { code: exitCode, stdout, stderr };
     }
 

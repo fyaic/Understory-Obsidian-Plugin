@@ -399,6 +399,29 @@ class RelationsStore {
         await this.accept(file.path, relation.title);
         return true;
     }
+
+    async stripAutoRelatedSection(file) {
+        if (!(file instanceof TFile)) return false;
+        const SENTINEL = '<!-- auto-links -->';
+        let content = await this.app.vault.read(file);
+        const section = this._findRelationSection(content);
+        if (!section) return false;
+
+        const afterHeading = content.slice(section.index + section.heading.length);
+        const nextHeading = afterHeading.search(/\n## /);
+        const sectionEnd = nextHeading === -1
+            ? content.length
+            : section.index + section.heading.length + nextHeading;
+        const sectionText = content.slice(section.index, sectionEnd);
+        if (!sectionText.includes(SENTINEL)) return false;
+
+        const before = content.slice(0, section.index).replace(/\s+$/, '');
+        const after = content.slice(sectionEnd).replace(/^\s+/, '');
+        const newContent = before + (after ? `\n\n${after}\n` : '\n');
+        if (newContent === content) return false;
+        await this.app.vault.modify(file, newContent);
+        return true;
+    }
 }
 
 module.exports = { RelationsStore, RELATIONS_PATH, OVERRIDES_PATH };

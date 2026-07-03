@@ -131,3 +131,21 @@ test('accept and reject update relation status and tombstone rejected targets', 
     assert.equal(persisted.files[file.path].relations[0].status, 'rejected');
     assert.equal(overrides[file.path].tombstones.Target.action, 'deleted');
 });
+
+test('stripAutoRelatedSection removes auto-generated related section but keeps manual section', async () => {
+    const { file, noteFiles, store } = createHarness();
+    const plugin = store.plugin;
+
+    // Manual section (no auto-links sentinel) should stay.
+    noteFiles.set(file.path, '# Note\n\n## 🏷️关联文件\n\n### 手动插入\n\n[[Manual]]\n');
+    assert.equal(await store.stripAutoRelatedSection(file), false);
+    assert.ok(noteFiles.get(file.path).includes('[[Manual]]'));
+
+    // Auto-generated section should be stripped.
+    noteFiles.set(file.path, '# Note\n\n## 🏷️关联文件\n\n<!-- auto-links -->\n\n[[Auto]]\n\n<!-- /auto-links -->\n');
+    assert.equal(await store.stripAutoRelatedSection(file), true);
+    const after = noteFiles.get(file.path);
+    assert.equal(after.includes('## 🏷️关联文件'), false);
+    assert.equal(after.includes('[[Auto]]'), false);
+    assert.ok(after.startsWith('# Note'));
+});
