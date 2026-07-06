@@ -294,6 +294,24 @@ function createUnderstorySkill(options = {}) {
     const vaultLine = vaultIdentity.vaultPath
         ? `- Vault path: \`${normalizeMcpPath(vaultIdentity.vaultPath)}\`. Treat this path as local and private.`
         : '- The vault path is supplied by the MCP server configuration. Treat it as local and private.';
+    const knowledgeMapWorkflow = [
+        '## Business Knowledge Map Workflow',
+        '',
+        '- When the user asks for research, positioning, product strategy, competitive context, architecture context, related notes, or reusable vault knowledge, turn Understory results into a business-oriented knowledge map instead of a raw search-results list.',
+        '- First restate the business question, target reader, and intended output location or format. If any part is unclear, make the smallest reasonable assumption and name it.',
+        '- Design 3-5 focused searches that cover different angles of the problem, including synonyms or bilingual terms when useful.',
+        '- Use `understory_search` for each angle, then use `understory_get_context` or `understory_get_note_brief` for the strongest candidate notes.',
+        '- Deduplicate notes and group them by business module, mechanism, decision area, or project concern rather than by query order.',
+        '- For each important note, explain why it matters, what mechanism or product meaning it contributes, and whether it is required reading, optional background, needs verification, or exposes a research gap.',
+        '- Always include knowledge gaps, recommended next actions, and a role-based reading path when the task is broader than a simple lookup.',
+        '',
+        '## Knowledge Map Quality Bar',
+        '',
+        '- Do not only say that a note matched a keyword.',
+        '- Do not paste together raw MCP results.',
+        '- Do not invent vault facts beyond returned snippets, relation metadata, or explicitly read context.',
+        '- If the user asks for a durable markdown deliverable, use a structure compatible with `templates/knowledge-map.md` from the bundled Understory engine when available.',
+    ];
     const behavior = usageMode.id === 'query'
         ? [
             'Use this skill when the user explicitly asks to query, search, cite, summarize, or inspect this Obsidian vault.',
@@ -341,6 +359,8 @@ function createUnderstorySkill(options = {}) {
         `Use case: ${usageMode.label}.`,
         '',
         ...behavior,
+        '',
+        ...knowledgeMapWorkflow,
         '',
         '## Fallback',
         '',

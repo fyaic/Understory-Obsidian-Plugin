@@ -31,33 +31,53 @@ HIDDEN_DIR_NAME = ".understory"
 # 路径解析
 # ───────────────────────────────────────────
 
-# 默认 kg skill 根路径（可被环境变量 KG_SKILL_PATH 覆盖）
-_DEFAULT_KG_SKILL = Path(os.path.expanduser("C:/Hello-World/understory-graphify-engine"))
-
-
 def get_kg_skill_path() -> Path:
     """定位 understory-graphify-engine skill 根目录。"""
-    env = os.environ.get("KG_SKILL_PATH", "").strip()
-    if env and Path(env).exists():
-        return Path(env)
-    return _DEFAULT_KG_SKILL
+    for name in ("KG_SKILL_PATH", "UNDERSTORY_ENGINE_DIR"):
+        env = os.environ.get(name, "").strip()
+        if env:
+            candidate = Path(env).expanduser().resolve()
+            if candidate.exists():
+                return candidate
+
+    here = Path(__file__).resolve()
+    local_engine = here.parents[2] if len(here.parents) > 2 else None
+    if local_engine and (local_engine / "api.py").exists() and (local_engine / "scripts").exists():
+        return local_engine
+
+    for parent in here.parents:
+        candidate = parent / ".obsidian" / "plugins" / "understory" / "understory-graphify-engine"
+        if (candidate / "api.py").exists() and (candidate / "scripts").exists():
+            return candidate.resolve()
+
+    raise RuntimeError(
+        "Understory engine path is required. Set UNDERSTORY_ENGINE_DIR or KG_SKILL_PATH, "
+        "or run from the bundled understory-graphify-engine folder."
+    )
 
 
 def get_vault_path(explicit: Optional[str] = None) -> Path:
     """
-    解析 vault 根路径。优先级：显式参数 > GRAPHIFY_VAULT 环境变量 >
-    从本脚本位置上推（.understory/scripts/ -> vault） > kg 的 detect_vault_path > 默认。
+    解析 vault 根路径。优先级：显式参数 > GRAPHIFY_VAULT/OBSIDIAN_VAULT_PATH 环境变量 >
+    从本脚本位置上推（.understory/scripts/ -> vault） > kg 的 detect_vault_path > 当前 vault 目录。
     """
     if explicit:
-        return Path(explicit)
-    env = os.environ.get("GRAPHIFY_VAULT", "").strip()
-    if env:
-        return Path(env)
+        return Path(explicit).expanduser().resolve()
+    for name in ("GRAPHIFY_VAULT", "OBSIDIAN_VAULT_PATH"):
+        env = os.environ.get(name, "").strip()
+        if env:
+            return Path(env).expanduser().resolve()
+
     # 本脚本位于 {vault}/.understory/scripts/graphify_common.py
     here = Path(__file__).resolve()
     candidate = here.parent.parent.parent
     if (candidate / HIDDEN_DIR_NAME).exists():
         return candidate
+
+    cwd = Path.cwd().resolve()
+    if (cwd / ".obsidian").exists() or (cwd / HIDDEN_DIR_NAME).exists():
+        return cwd
+
     # 退回 kg 的检测逻辑
     try:
         import sys
@@ -65,7 +85,12 @@ def get_vault_path(explicit: Optional[str] = None) -> Path:
         from vault_ops import detect_vault_path  # type: ignore
         return Path(detect_vault_path())
     except Exception:
-        return Path(os.path.expanduser("~/Documents/AIC-000"))
+        pass
+
+    raise RuntimeError(
+        "Vault path is required. Pass --vault, set GRAPHIFY_VAULT or OBSIDIAN_VAULT_PATH, "
+        "or run from a vault folder."
+    )
 
 
 def get_graphify_dir(vault_path: Path) -> Path:

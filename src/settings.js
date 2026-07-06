@@ -281,7 +281,7 @@ const DEFAULT_SETTINGS = {
     llmBaseUrl: PROVIDER_PRESETS.zhipu.baseUrl,
     llmModel: PROVIDER_PRESETS.zhipu.llmModel,
     llmApiKey: '',
-    presentationMode: 'body',
+    presentationMode: 'sidebar',
     sidebarRefreshOnEdit: true,
     sidebarShowScores: true,
     sidebarShowConflicts: true,
@@ -542,24 +542,11 @@ class UnderstorySettingTab extends PluginSettingTab {
                         return;
                     }
                     await this.plugin.checkEngineHealth(true, true);
-                    this.display();
-                }))
-            .addButton((button) => button
-                .setButtonText(t(this.plugin, 'engine_use_env_button'))
-                .setDisabled(!preferredEngineDir(this.plugin))
-                .onClick(async () => {
-                    this.plugin.settings.graphifyDir = preferredEngineDir(this.plugin);
-                    this.plugin.settings.pythonPath = getDefaultPythonPath();
-                    await this.plugin.saveSettings();
-                    await this.plugin.checkEngineHealth?.(true, true);
-                    this.display();
-                }))
-            .addButton((button) => button
-                .setButtonText(t(this.plugin, 'setup_open_diagnostics_button'))
-                .onClick(() => {
-                    this._activeSettingsTab = 'maintenance';
+                    await this.plugin.checkEmbeddingHealth?.(false, true);
                     this.display();
                 }));
+
+        this._renderEmbeddingStatusCard(containerEl);
     }
 
     _renderModelsTab(containerEl) {
@@ -602,7 +589,7 @@ class UnderstorySettingTab extends PluginSettingTab {
                 .addOption('sidebar', t(this.plugin, 'presentation_sidebar'))
                 .addOption('body', t(this.plugin, 'presentation_body'))
                 .addOption('both', t(this.plugin, 'presentation_both'))
-                .setValue(this.plugin.settings.presentationMode || 'body')
+                .setValue(this.plugin.settings.presentationMode || DEFAULT_SETTINGS.presentationMode)
                 .onChange(async (value) => {
                     this.plugin.settings.presentationMode = value;
                     await this.plugin.saveSettings();
@@ -1223,6 +1210,8 @@ class UnderstorySettingTab extends PluginSettingTab {
             cls: 'setting-item-description understory-privacy-note'
         });
 
+        this._renderEmbeddingStatusCard(containerEl);
+
         if (mode === 'local') {
             containerEl.createDiv({
                 text: t(this.plugin, 'model_config_local_notice'),
@@ -1387,6 +1376,237 @@ class UnderstorySettingTab extends PluginSettingTab {
                 cls: 'setting-item-description understory-privacy-inline-note'
             });
         }
+    }
+
+    _embeddingStatusInfo() {
+        const settings = this.plugin.settings || {};
+        const health = this.plugin.embeddingHealth;
+        const mode = settings.networkMode || 'local';
+        const provider = settings.embeddingProvider || 'zhipu';
+        const providerHasKey = provider === 'mock' || !!String(settings.embeddingApiKey || '').trim();
+        let state;
+        if (mode === 'local') {
+            state = 'local_only';
+        } else if (provider === 'none') {
+            state = 'provider_disabled';
+        } else {
+            const healthMode = health?.network_mode;
+            const staleForMode = healthMode && healthMode !== mode;
+            state = staleForMode
+                ? null
+                : health?.semantic_state;
+            state = state || (providerHasKey ? 'unchecked' : 'provider_unavailable');
+        }
+        const base = {
+            state,
+            status: health?.status || 'unchecked',
+            provider,
+            mode,
+            health,
+            primaryAction: 'build',
+        };
+        if (this.plugin.embeddingIndexInProgress) {
+            return {
+                ...base,
+                status: 'info',
+                titleKey: 'embedding_status_indexing_title',
+                descKey: 'embedding_status_indexing_desc',
+                badgeKey: 'embedding_status_badge_indexing',
+                actionDescKey: 'embedding_status_indexing_action_desc',
+                primaryAction: 'build',
+                disablePrimaryAction: true,
+            };
+        }
+        if (state === 'local_only') {
+            return {
+                ...base,
+                status: 'info',
+                titleKey: 'embedding_status_local_title',
+                descKey: 'embedding_status_local_desc',
+                badgeKey: 'embedding_status_badge_info',
+                actionDescKey: 'embedding_status_local_action_desc',
+                primaryAction: 'configure',
+            };
+        }
+        if (state === 'provider_disabled') {
+            return {
+                ...base,
+                status: 'warning',
+                titleKey: 'embedding_status_provider_disabled_title',
+                descKey: 'embedding_status_provider_disabled_desc',
+                badgeKey: 'embedding_status_badge_warning',
+                actionDescKey: 'embedding_status_configure_action_desc',
+                primaryAction: 'configure',
+            };
+        }
+        if (state === 'provider_unavailable') {
+            return {
+                ...base,
+                status: 'warning',
+                titleKey: 'embedding_status_provider_unavailable_title',
+                descKey: 'embedding_status_provider_unavailable_desc',
+                badgeKey: 'embedding_status_badge_warning',
+                actionDescKey: 'embedding_status_configure_action_desc',
+                primaryAction: 'configure',
+            };
+        }
+        if (state === 'index_missing') {
+            return {
+                ...base,
+                status: 'warning',
+                titleKey: 'embedding_status_index_missing_title',
+                descKey: 'embedding_status_index_missing_desc',
+                badgeKey: 'embedding_status_badge_warning',
+                actionDescKey: 'embedding_status_build_action_desc',
+                primaryAction: 'build',
+            };
+        }
+        if (state === 'ready') {
+            return {
+                ...base,
+                status: 'ready',
+                titleKey: 'embedding_status_ready_title',
+                descKey: 'embedding_status_ready_desc',
+                badgeKey: 'embedding_status_badge_ready',
+                actionDescKey: 'embedding_status_rebuild_action_desc',
+                primaryAction: 'build',
+            };
+        }
+        if (state === 'engine_not_ready') {
+            return {
+                ...base,
+                status: 'error',
+                titleKey: 'embedding_status_engine_not_ready_title',
+                descKey: 'embedding_status_engine_not_ready_desc',
+                badgeKey: 'embedding_status_badge_error',
+                actionDescKey: 'embedding_status_engine_action_desc',
+                primaryAction: 'setup',
+            };
+        }
+        if (state === 'status_failed') {
+            return {
+                ...base,
+                status: 'error',
+                titleKey: 'embedding_status_failed_title',
+                descKey: 'embedding_status_failed_desc',
+                badgeKey: 'embedding_status_badge_error',
+                actionDescKey: 'embedding_status_engine_action_desc',
+                primaryAction: 'setup',
+            };
+        }
+        return {
+            ...base,
+            status: 'unchecked',
+            titleKey: 'embedding_status_unchecked_title',
+            descKey: 'embedding_status_unchecked_desc',
+            badgeKey: 'embedding_status_badge_unchecked',
+            actionDescKey: providerHasKey ? 'embedding_status_check_action_desc' : 'embedding_status_configure_action_desc',
+            primaryAction: providerHasKey ? 'build' : 'configure',
+        };
+    }
+
+    _embeddingPrimaryAction(info) {
+        if (info.primaryAction === 'configure') {
+            return {
+                labelKey: 'embedding_status_configure_button',
+                cta: info.state !== 'local_only',
+                onClick: async () => {
+                    this._activeSettingsTab = 'models';
+                    if ((this.plugin.settings.networkMode || 'local') === 'local') {
+                        this.plugin.settings.networkMode = 'embedding';
+                        this.plugin.embeddingHealth = null;
+                        await this.plugin.saveSettings();
+                    }
+                    new Notice(t(this.plugin, 'embedding_configure_notice'), 7000);
+                    this.display();
+                },
+            };
+        }
+        if (info.primaryAction === 'setup') {
+            return {
+                labelKey: 'engine_check_button',
+                disabled: !this.plugin.checkEngineHealth,
+                onClick: async () => {
+                    if (!this.plugin.checkEngineHealth) {
+                        new Notice(t(this.plugin, 'engine_check_unavailable'));
+                        return;
+                    }
+                    await this.plugin.checkEngineHealth(true, true);
+                    await this.plugin.checkEmbeddingHealth?.(false, true);
+                    this.display();
+                },
+            };
+        }
+        if (info.primaryAction === 'build') {
+            return {
+                labelKey: this.plugin.embeddingIndexInProgress
+                    ? 'embedding_status_indexing_button'
+                    : 'embedding_status_build_button',
+                disabled: info.disablePrimaryAction || this.plugin.embeddingIndexInProgress || !this.plugin.initIndex,
+                onClick: async () => {
+                    if (!this.plugin.initIndex) return;
+                    if (this.plugin.embeddingIndexInProgress) {
+                        new Notice(t(this.plugin, 'index_init_already_running'), 7000);
+                        return;
+                    }
+                    this.plugin.embeddingIndexInProgress = true;
+                    new Notice(t(this.plugin, 'index_init_progress_notice'), 10000);
+                    this.display();
+                    try {
+                        await this.plugin.initIndex();
+                        await this.plugin.checkEmbeddingHealth?.(false, true);
+                    } finally {
+                        this.plugin.embeddingIndexInProgress = false;
+                        this.display();
+                    }
+                },
+            };
+        }
+        return null;
+    }
+
+    _renderEmbeddingStatusCard(containerEl) {
+        const info = this._embeddingStatusInfo();
+        const health = info.health || {};
+        const panel = containerEl.createDiv({ cls: `understory-embedding-panel is-${info.status}` });
+        const header = panel.createDiv({ cls: 'understory-embedding-head' });
+        header.createDiv({ text: t(this.plugin, info.titleKey), cls: 'understory-embedding-title' });
+        header.createEl('span', {
+            text: t(this.plugin, info.badgeKey),
+            cls: `understory-embedding-chip is-${info.status}`,
+        });
+        panel.createDiv({ text: t(this.plugin, info.descKey), cls: 'understory-embedding-desc' });
+        if (this.plugin.embeddingIndexInProgress) {
+            const progress = panel.createDiv({ cls: 'understory-embedding-progress' });
+            progress.createDiv({ cls: 'understory-embedding-progress-bar' });
+        }
+
+        const meta = [
+            t(this.plugin, `network_mode_${info.mode}`),
+            info.provider || t(this.plugin, 'engine_value_unknown'),
+        ];
+        if (Object.hasOwn(health, 'indexed_count')) {
+            meta.push(t(this.plugin, 'embedding_status_count_value', { count: health.indexed_count || 0 }));
+        }
+        if (health.index_mtime) {
+            const timestamp = new Date(Number(health.index_mtime) * 1000);
+            meta.push(timestamp.toLocaleString());
+        }
+        panel.createDiv({ text: meta.join(' / '), cls: 'understory-embedding-meta' });
+
+        const action = this._embeddingPrimaryAction(info);
+        if (!action) return;
+        new Setting(panel)
+            .setName(t(this.plugin, 'embedding_status_action_name'))
+            .setDesc(t(this.plugin, info.actionDescKey))
+            .addButton((button) => {
+                const control = button
+                    .setButtonText(t(this.plugin, action.labelKey))
+                    .setDisabled(!!action.disabled)
+                    .onClick(action.onClick);
+                if (!action.disabled && action.cta !== false) control.setCta();
+                return control;
+            });
     }
 
     _renderEngineStatus(containerEl) {

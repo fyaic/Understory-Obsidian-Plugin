@@ -172,6 +172,98 @@ class SettingsStyleMethods {
     color: var(--text-muted);
     line-height: 1.45;
 }
+.understory-embedding-panel {
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin: 12px 0 16px;
+    background: var(--background-primary);
+}
+.understory-embedding-panel.is-ready {
+    border-color: var(--text-success);
+}
+.understory-embedding-panel.is-warning,
+.understory-embedding-panel.is-unchecked {
+    border-color: var(--text-warning);
+}
+.understory-embedding-panel.is-error {
+    border-color: var(--text-error);
+}
+.understory-embedding-panel.is-info {
+    border-color: var(--background-modifier-border);
+}
+.understory-embedding-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+.understory-embedding-title {
+    font-weight: 650;
+    min-width: 0;
+}
+.understory-embedding-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 20px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: var(--font-ui-smaller);
+    line-height: 1.2;
+    white-space: nowrap;
+    color: var(--text-muted);
+    background: var(--background-secondary);
+}
+.understory-embedding-chip.is-ready {
+    color: var(--text-success);
+}
+.understory-embedding-chip.is-warning {
+    color: var(--text-warning);
+}
+.understory-embedding-chip.is-error {
+    color: var(--text-error);
+}
+.understory-embedding-desc {
+    margin-top: 6px;
+    color: var(--text-muted);
+    line-height: 1.45;
+    max-width: 76ch;
+}
+.understory-embedding-meta {
+    margin-top: 8px;
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
+    overflow-wrap: anywhere;
+}
+.understory-embedding-action-row {
+    margin-top: 12px;
+}
+.understory-embedding-primary {
+    white-space: normal;
+}
+.understory-embedding-progress {
+    position: relative;
+    height: 4px;
+    margin-top: 10px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--background-modifier-border);
+}
+.understory-embedding-progress-bar {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 38%;
+    border-radius: inherit;
+    background: var(--interactive-accent);
+    animation: understory-embedding-progress 1.1s ease-in-out infinite;
+}
+@keyframes understory-embedding-progress {
+    0% { left: -40%; }
+    50% { left: 35%; }
+    100% { left: 102%; }
+}
 .understory-setup-steps {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
@@ -424,6 +516,10 @@ class SettingsStyleMethods {
 .understory-engine-badge.is-ready,
 .understory-engine-check-pill.is-ok {
     color: var(--text-success);
+    background: var(--background-primary);
+}
+.understory-engine-badge.is-info {
+    color: var(--text-muted);
     background: var(--background-primary);
 }
 .understory-engine-badge.is-warning,

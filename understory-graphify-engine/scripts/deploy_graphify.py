@@ -10,7 +10,7 @@ deploy_graphify —— 把 .understory/ AI 隐藏层骨架部署到 vault。
   2. {vault}/.understory/scripts/                 （已存在则视为最新，仅补缺）
 
 用法：
-    python deploy_graphify.py --vault "C:/Users/ryshi/Documents/AIC-000"
+    python deploy_graphify.py --vault "<VAULT_ROOT>"
 """
 import argparse
 import datetime

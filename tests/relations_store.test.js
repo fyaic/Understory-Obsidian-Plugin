@@ -44,6 +44,9 @@ function createHarness() {
             getAbstractFileByPath(path) {
                 return tFiles.get(path) || null;
             },
+            getMarkdownFiles() {
+                return [...tFiles.values()].filter((file) => file && /\.md$/i.test(file.path));
+            },
         },
         workspace: {
             trigger(...args) {
@@ -59,7 +62,12 @@ function createHarness() {
     tFiles.set(file.path, file);
     noteFiles.set(file.path, 'source note body');
 
-    return { dataFiles, events, file, noteFiles, store };
+    const targetFile = new TFile('Notes/Target.md');
+    targetFile.stat.mtime = 1000;
+    tFiles.set(targetFile.path, targetFile);
+    noteFiles.set(targetFile.path, 'target note body');
+
+    return { dataFiles, events, file, noteFiles, store, tFiles };
 }
 
 test('_parseProcessJson parses plain JSON and mixed stdout JSON lines', () => {
@@ -112,6 +120,31 @@ test('updateFromResult writes normalized relations and getRelations reports miss
     const stale = await store.getRelations(file);
     assert.equal(stale.status, 'ok');
     assert.equal(stale.stale, true);
+});
+
+test('getRelations annotates relation target drift without mutating cache', async () => {
+    const { dataFiles, file, store, tFiles, noteFiles } = createHarness();
+    const movedFile = new TFile('Moved/MovedOnly.md');
+    movedFile.stat.mtime = 1000;
+    tFiles.set(movedFile.path, movedFile);
+    noteFiles.set(movedFile.path, 'moved note body');
+
+    await store.updateFromResult(file, {
+        status: 'ok',
+        relations: [{ title: 'MovedOnly', path: 'Old/MovedOnly.md' }],
+    });
+    const before = dataFiles.get(RELATIONS_PATH);
+
+    const current = await store.getRelations(file);
+    assert.equal(current.status, 'ok');
+    assert.equal(current.relations[0].target, 'Old/MovedOnly.md');
+    assert.equal(current.relations[0].targetStatus, 'resolved');
+    assert.equal(current.relations[0].targetExists, false);
+    assert.equal(current.relations[0].resolvedTarget, 'Moved/MovedOnly.md');
+    assert.equal(current.entry.relations[0].targetStatus, 'resolved');
+    assert.equal(current.entry.relations[0].resolvedTarget, 'Moved/MovedOnly.md');
+    assert.equal(current.diagnostics.relationTargets.resolved, 1);
+    assert.equal(dataFiles.get(RELATIONS_PATH), before);
 });
 
 test('accept and reject update relation status and tombstone rejected targets', async () => {

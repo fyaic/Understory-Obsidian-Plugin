@@ -1,5 +1,5 @@
 const { Notice, TFile } = require('obsidian');
-const { GraphifyContentModal, MAX_LOG_ENTRIES } = require('./utils');
+const { GraphifyContentModal, MAX_LOG_ENTRIES, MAX_PROCESS_OUTPUT_BYTES } = require('./utils');
 const { t } = require('./i18n');
 const {
     REQUIRED_ENGINE_SCRIPTS,
@@ -514,6 +514,196 @@ class GraphifyRuntimeMethods {
         });
     }
 
+    _parseEngineJsonOutput(stdout) {
+        const text = String(stdout || '').trim();
+        if (!text) return null;
+        try {
+            return JSON.parse(text);
+        } catch (error) {
+            const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+            for (let index = lines.length - 1; index >= 0; index -= 1) {
+                const line = lines[index];
+                if (!line.startsWith('{') || !line.endsWith('}')) continue;
+                try {
+                    return JSON.parse(line);
+                } catch (lineError) {
+                    // Keep looking for an earlier JSON line.
+                }
+            }
+        }
+        return null;
+    }
+
+    _runEngineApi(args, timeoutMs = 0) {
+        const { spawn } = require('child_process');
+        const fs = require('fs');
+        const apiPath = this._enginePath('api.py');
+        const pythonExe = this._pythonExe();
+        return new Promise((resolve, reject) => {
+            if (!apiPath || !fs.existsSync(apiPath)) {
+                reject(new Error(t(this, 'engine_script_missing', { path: apiPath || '(empty)' })));
+                return;
+            }
+            const proc = spawn(pythonExe, [apiPath, ...args], {
+                cwd: this._engineDir(),
+                env: this._pythonEnv(),
+                windowsHide: true,
+            });
+            let stdout = '';
+            let stderr = '';
+            let outputOverflowed = false;
+            let settled = false;
+            let timer = null;
+            const finish = (fn, value) => {
+                if (settled) return;
+                settled = true;
+                if (timer) clearTimeout(timer);
+                fn(value);
+            };
+            const append = (current, data) => {
+                const next = current + data.toString();
+                if (next.length <= MAX_PROCESS_OUTPUT_BYTES) return next;
+                outputOverflowed = true;
+                try { proc.kill(); } catch (error) { /* ignore */ }
+                return next.slice(0, MAX_PROCESS_OUTPUT_BYTES);
+            };
+            if (timeoutMs > 0) {
+                timer = setTimeout(() => {
+                    try { proc.kill(); } catch (error) { /* ignore */ }
+                    finish(reject, new Error(`api.py timed out after ${timeoutMs}ms`));
+                }, timeoutMs);
+            }
+            proc.stdout?.on('data', (data) => { stdout = append(stdout, data); });
+            proc.stderr?.on('data', (data) => { stderr = append(stderr, data); });
+            proc.on('error', (error) => finish(reject, error));
+            proc.on('close', (code) => {
+                if (outputOverflowed) {
+                    finish(reject, new Error(`Process output exceeded ${MAX_PROCESS_OUTPUT_BYTES} bytes.`));
+                    return;
+                }
+                const payload = this._parseEngineJsonOutput(stdout);
+                if (payload) {
+                    finish(resolve, { code, stdout, stderr, payload });
+                    return;
+                }
+                if (code === 0) {
+                    finish(resolve, { code, stdout, stderr, payload: null });
+                    return;
+                }
+                finish(reject, new Error(safeErrorDetail({
+                    stdout,
+                    stderr,
+                    message: `api.py exited with code ${code}`,
+                    settings: this.settings,
+                })));
+            });
+        });
+    }
+
+    async checkEmbeddingHealth(showNotice = false, force = false) {
+        if (!force && this.embeddingHealth) return this.embeddingHealth;
+        const networkMode = safeNetworkMode(this.settings?.networkMode);
+        const provider = String(this.settings?.embeddingProvider || 'zhipu').trim() || 'zhipu';
+
+        if (networkMode === 'local') {
+            const health = {
+                status: 'ok',
+                semantic_state: 'local_only',
+                indexing: 'skipped',
+                network_mode: networkMode,
+                provider,
+                embedding_allowed: false,
+                provider_ready: false,
+                index_ready: false,
+                recommended_action: 'configure_vector_model',
+                message: t(this, 'embedding_status_local_desc'),
+            };
+            this.embeddingHealth = health;
+            if (showNotice) new Notice(t(this, 'embedding_check_ready_notice'));
+            return health;
+        }
+
+        if (provider === 'none') {
+            const health = {
+                status: 'warning',
+                semantic_state: 'provider_disabled',
+                indexing: 'disabled',
+                network_mode: networkMode,
+                provider,
+                embedding_allowed: false,
+                provider_ready: false,
+                index_ready: false,
+                recommended_action: 'configure_vector_model',
+                message: t(this, 'embedding_status_provider_disabled_desc'),
+            };
+            this.embeddingHealth = health;
+            if (showNotice) new Notice(t(this, 'embedding_check_attention_notice', { message: health.message }));
+            return health;
+        }
+
+        try {
+            if (this.checkEngineHealth) {
+                const engineHealth = await this.checkEngineHealth(false, force);
+                if (engineHealth && !engineHealth.ok) {
+                    const health = {
+                        status: 'error',
+                        semantic_state: 'engine_not_ready',
+                        indexing: 'unavailable',
+                        network_mode: networkMode,
+                        provider,
+                        message: engineHealth.message || t(this, 'embedding_status_engine_not_ready_desc'),
+                        recommended_action: 'check_engine_setup',
+                    };
+                    this.embeddingHealth = health;
+                    if (showNotice) new Notice(t(this, 'embedding_check_failed_notice', { message: health.message }));
+                    return health;
+                }
+            }
+            const args = ['embedding-status'];
+            const base = this._vaultBasePath ? this._vaultBasePath() : null;
+            if (base) args.push('--vault', base);
+            const { code, stderr, payload } = await this._runEngineApi(args, 30000);
+            const health = payload && typeof payload === 'object'
+                ? { ...payload, network_mode: networkMode, provider: payload.provider || provider, exit_code: code }
+                : {
+                    status: 'error',
+                    semantic_state: 'status_failed',
+                    indexing: 'unavailable',
+                    network_mode: networkMode,
+                    provider,
+                    message: t(this, 'embedding_status_failed_desc'),
+                    exit_code: code,
+                };
+            if (stderr && !health.diagnostic) {
+                health.diagnostic = safeErrorDetail({ stderr, settings: this.settings });
+            }
+            this.embeddingHealth = health;
+            if (showNotice) {
+                const key = health.status === 'ok'
+                    ? 'embedding_check_ready_notice'
+                    : health.status === 'warning'
+                        ? 'embedding_check_attention_notice'
+                        : 'embedding_check_failed_notice';
+                new Notice(t(this, key, { message: health.message || '' }));
+            }
+            return health;
+        } catch (error) {
+            const message = safeErrorDetail({ message: error?.message || String(error), settings: this.settings });
+            const health = {
+                status: 'error',
+                semantic_state: 'status_failed',
+                indexing: 'unavailable',
+                network_mode: networkMode,
+                provider,
+                message,
+                recommended_action: 'check_engine_setup',
+            };
+            this.embeddingHealth = health;
+            if (showNotice) new Notice(t(this, 'embedding_check_failed_notice', { message }));
+            return health;
+        }
+    }
+
     async _addLogEntry(entry) {
         if (!this.settings.linkLog) this.settings.linkLog = [];
         this.settings.linkLog.unshift(normalizeLogEntry(entry, this.settings));
@@ -683,6 +873,11 @@ class GraphifyRuntimeMethods {
         const indexFix = fixes.find((fix) => fix && fix.id === 'embedding_index_missing');
         if (indexFix) {
             new Notice(t(this, 'embedding_index_missing_notice'), 10000);
+            if (this.checkEmbeddingHealth) {
+                this.checkEmbeddingHealth(false, true).catch((error) => {
+                    console.warn('[Understory] Failed to refresh semantic embedding status:', redactSensitiveText(String(error?.message || error), this.settings));
+                });
+            }
         }
         if (warnings.length || fixes.length) {
             const detail = JSON.stringify({ warnings, fixes });

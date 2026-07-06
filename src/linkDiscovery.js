@@ -59,7 +59,7 @@ class LinkDiscoveryMethods {
         const graphifyDir = this._engineDir ? this._engineDir() : this.settings.graphifyDir;
         const pythonExe = this._pythonExe ? this._pythonExe() : (this.settings.pythonPath || 'python');
         const cmd = refresh ? 'refresh-link' : 'auto-link';
-        const presentationMode = this.settings.presentationMode || DEFAULT_SETTINGS.presentationMode || 'body';
+        const presentationMode = this.settings.presentationMode || DEFAULT_SETTINGS.presentationMode || 'sidebar';
         const shouldWriteBody = presentationMode === 'body' || presentationMode === 'both';
         const args = [
             this._enginePath ? this._enginePath('api.py') : `${graphifyDir}/api.py`,
@@ -178,32 +178,47 @@ class LinkDiscoveryMethods {
     }
 
     async initIndex() {
-        const { spawn } = require('child_process');
         if (this._ensureEngineReady && !(await this._ensureEngineReady(true))) return;
-        const graphifyDir = this._engineDir ? this._engineDir() : this.settings.graphifyDir;
-        const pythonExe = this._pythonExe ? this._pythonExe() : (this.settings.pythonPath || 'python');
+        if (!this._runEngineApi) {
+            new Notice(t(this, 'index_init_failed', { message: t(this, 'embedding_status_failed_desc') }));
+            return;
+        }
 
         new Notice(t(this, 'index_init_started'));
 
-        const proc = spawn(pythonExe, [
-            this._enginePath ? this._enginePath('scripts', 'vault_ops.py') : `${graphifyDir}/scripts/vault_ops.py`,
-            'init'
-        ], {
-            cwd: graphifyDir,
-            env: this._pythonEnv ? this._pythonEnv() : { ...process.env, PYTHONIOENCODING: 'utf-8' },
-            windowsHide: true,
-        });
+        const args = ['init'];
+        const base = this._vaultBasePath ? this._vaultBasePath() : null;
+        if (base) args.push('--vault', base);
 
-        let stderr = '';
-        proc.stderr.on('data', (data) => { stderr += data; });
-
-        proc.on('close', (code) => {
-            if (code === 0) {
-                new Notice(t(this, 'index_init_done'));
-            } else {
-                new Notice(t(this, 'index_init_failed', { message: stderr.slice(0, 100) }));
+        try {
+            const { payload } = await this._runEngineApi(args, 10 * 60 * 1000);
+            const result = payload && typeof payload === 'object'
+                ? payload
+                : { status: 'error', indexing: 'failed', message: t(this, 'embedding_status_failed_desc') };
+            if (this.checkEmbeddingHealth) {
+                await this.checkEmbeddingHealth(false, true);
             }
-        });
+
+            if (result.status === 'ok' && result.indexing === 'skipped') {
+                new Notice(t(this, 'index_init_skipped'));
+                return;
+            }
+            if (result.status === 'ok' && result.indexing === 'complete') {
+                new Notice(t(this, 'index_init_done'));
+                return;
+            }
+            if (result.indexing === 'unavailable') {
+                new Notice(t(this, 'index_init_unavailable', { message: result.message || '' }), 10000);
+                return;
+            }
+            new Notice(t(this, 'index_init_failed', { message: result.message || result.indexing || 'unknown' }), 10000);
+        } catch (error) {
+            const message = String(error?.message || error).slice(0, 180);
+            if (this.checkEmbeddingHealth) {
+                await this.checkEmbeddingHealth(false, true);
+            }
+            new Notice(t(this, 'index_init_failed', { message }), 10000);
+        }
     }
 
     async startDaemon() {

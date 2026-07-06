@@ -6,6 +6,8 @@ Understory is local-first. Bondie Labs does not operate a hosted analysis servic
 
 By default, Understory runs in **Local only** mode.
 
+New installs also default to **Right sidebar only** presentation. Understory does not automatically write related-note sections into note bodies unless you choose a note-body presentation mode or explicitly click **Insert into body**.
+
 In Local only mode:
 
 - Notes are read from your local vault.

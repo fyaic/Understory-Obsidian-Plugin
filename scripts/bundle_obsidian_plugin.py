@@ -15,6 +15,7 @@ MODULES = [
     "bundledEngine.js",
     "i18n.js",
     "safety.js",
+    "relationTargetResolution.js",
     "agentApi.js",
     "agentAccess.js",
     "engineHealth.js",

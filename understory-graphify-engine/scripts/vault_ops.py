@@ -9,7 +9,7 @@ from pathlib import Path
 
 from config import config  # noqa: F401 - importing config centralizes .env loading
 
-DEFAULT_VAULT = os.path.expanduser("~/Documents/AIC-000")
+SKILL_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_REPO = os.path.expanduser("~/Projects/obsidian-remote")
 NOISY_PATH_KEYWORDS = (
     "linear issues/",
@@ -142,10 +142,20 @@ def run(cmd):
     return result.stdout
 
 
-def detect_vault_path():
+def detect_vault_path(explicit: str | os.PathLike | None = None):
+    if explicit:
+        candidate = Path(explicit).expanduser().resolve()
+        if candidate.exists():
+            return candidate
+        raise FileNotFoundError(f"Vault path does not exist: {candidate}")
+
     env_path = os.environ.get("OBSIDIAN_VAULT_PATH", "").strip()
     if env_path:
-        return Path(env_path).expanduser().resolve()
+        candidate = Path(env_path).expanduser().resolve()
+        if candidate.exists():
+            return candidate
+        raise FileNotFoundError(f"OBSIDIAN_VAULT_PATH does not exist: {candidate}")
+
     try:
         output = run(["obsidian-cli", "print-default"])
         for line in output.splitlines():
@@ -155,7 +165,15 @@ def detect_vault_path():
                     return candidate
     except Exception:
         pass
-    return Path(DEFAULT_VAULT).expanduser().resolve()
+
+    cwd = Path.cwd().resolve()
+    if (cwd / ".obsidian").exists() or (cwd / ".understory").exists():
+        return cwd
+
+    raise RuntimeError(
+        "Vault path is required. Pass --vault, set OBSIDIAN_VAULT_PATH, "
+        "run from a vault folder, or configure obsidian-cli."
+    )
 
 
 def detect_repo_root():
@@ -486,13 +504,13 @@ def build_search_results_with_retry(vault: Path, query: str, limit: int, retries
     return results, attempts
 
 
-def command_vault_path(_args):
-    vault = detect_vault_path()
+def command_vault_path(args):
+    vault = detect_vault_path(args.vault)
     print(json.dumps({"vault_path": str(vault)}, ensure_ascii=False, indent=2))
 
 
 def command_search(args):
-    vault = detect_vault_path()
+    vault = detect_vault_path(args.vault)
     query = args.query.strip()
     results, meta = _hybrid_results(vault, query, args.limit, args.retries)
     output = {
@@ -509,7 +527,7 @@ def command_search(args):
 
 
 def command_read(args):
-    vault = detect_vault_path()
+    vault = detect_vault_path(args.vault)
     note = resolve_note(vault, args.note)
     content = note.read_text(encoding="utf-8")
     print(
@@ -527,13 +545,13 @@ def command_read(args):
 
 
 def command_create(args):
-    vault = detect_vault_path()
+    vault = detect_vault_path(args.vault)
     note_name = normalize_note_name(args.note)
-    cmd = ["obsidian-cli", "create", note_name, "-c", args.content]
-    if args.overwrite:
-        cmd.append("-o")
-    run(cmd)
-    note = resolve_note(vault, note_name)
+    note = ensure_within_vault(vault, vault / note_name)
+    if note.exists() and not args.overwrite:
+        raise FileExistsError(f"Note already exists: {relative_note_path(vault, note)}")
+    note.parent.mkdir(parents=True, exist_ok=True)
+    note.write_text(args.content.rstrip() + "\n", encoding="utf-8")
     print(
         json.dumps(
             {
@@ -548,7 +566,7 @@ def command_create(args):
 
 
 def command_append(args):
-    vault = detect_vault_path()
+    vault = detect_vault_path(args.vault)
     note = resolve_note(vault, args.note)
     with note.open("a", encoding="utf-8") as handle:
         if note.stat().st_size > 0:
@@ -568,7 +586,7 @@ def command_append(args):
 
 
 def command_answer_pack(args):
-    vault = detect_vault_path()
+    vault = detect_vault_path(args.vault)
     query = args.query.strip()
     results, meta = _hybrid_results(vault, query, args.limit, args.retries)
     packed_sources = []
@@ -605,7 +623,7 @@ def command_answer_pack(args):
 
 
 def command_draft_answer(args):
-    vault = detect_vault_path()
+    vault = detect_vault_path(args.vault)
     query = args.query.strip()
     results, meta = _hybrid_results(vault, query, args.limit, args.retries)
     sources = []
@@ -663,9 +681,8 @@ def command_draft_answer(args):
     print(json.dumps(payload, ensure_ascii=False, indent=2))
 
 
-def command_init(_args):
-    import sys as _sys
-    vault = detect_vault_path()
+def command_init(args):
+    vault = detect_vault_path(args.vault)
 
     def _print_line(text):
         # 实时输出，避免在长时间任务中无反馈
@@ -676,11 +693,11 @@ def command_init(_args):
     _print_line(f"Markdown 文档总数: {len(list_markdown_files(vault))}")
 
     # 检查 .env
-    env_file = _skill_root / ".env"
+    env_file = SKILL_ROOT / ".env"
     if env_file.exists():
         _print_line(".env 配置文件: 已存在")
     else:
-        example = _skill_root / ".env.example"
+        example = SKILL_ROOT / ".env.example"
         _print_line(".env 配置文件: 未找到")
         if example.exists():
             _print_line(f"  提示: 可复制 {example.name} 为 .env 后填入你的 API Key")
@@ -743,31 +760,33 @@ def command_init(_args):
 def build_parser():
     parser = argparse.ArgumentParser(description="Operate local Obsidian vault for OpenClaw skills.")
     subparsers = parser.add_subparsers(dest="command", required=True)
+    vault_parent = argparse.ArgumentParser(add_help=False)
+    vault_parent.add_argument("--vault", default=None, help="Vault root path. Defaults to OBSIDIAN_VAULT_PATH, obsidian-cli, or the current vault folder.")
 
-    subparsers.add_parser("vault-path").set_defaults(func=command_vault_path)
+    subparsers.add_parser("vault-path", parents=[vault_parent]).set_defaults(func=command_vault_path)
 
-    search = subparsers.add_parser("search")
+    search = subparsers.add_parser("search", parents=[vault_parent])
     search.add_argument("query")
     search.add_argument("--limit", type=int, default=8)
     search.add_argument("--retries", type=int, default=2)
     search.set_defaults(func=command_search)
 
-    read = subparsers.add_parser("read")
+    read = subparsers.add_parser("read", parents=[vault_parent])
     read.add_argument("note")
     read.set_defaults(func=command_read)
 
-    create = subparsers.add_parser("create")
+    create = subparsers.add_parser("create", parents=[vault_parent])
     create.add_argument("note")
     create.add_argument("--content", default="")
     create.add_argument("--overwrite", action="store_true")
     create.set_defaults(func=command_create)
 
-    append = subparsers.add_parser("append")
+    append = subparsers.add_parser("append", parents=[vault_parent])
     append.add_argument("note")
     append.add_argument("--content", required=True)
     append.set_defaults(func=command_append)
 
-    answer_pack = subparsers.add_parser("answer-pack")
+    answer_pack = subparsers.add_parser("answer-pack", parents=[vault_parent])
     answer_pack.add_argument("query")
     answer_pack.add_argument("--limit", type=int, default=8)
     answer_pack.add_argument("--read-limit", type=int, default=3)
@@ -775,7 +794,7 @@ def build_parser():
     answer_pack.add_argument("--retries", type=int, default=2)
     answer_pack.set_defaults(func=command_answer_pack)
 
-    draft_answer = subparsers.add_parser("draft-answer")
+    draft_answer = subparsers.add_parser("draft-answer", parents=[vault_parent])
     draft_answer.add_argument("query")
     draft_answer.add_argument("--limit", type=int, default=8)
     draft_answer.add_argument("--read-limit", type=int, default=3)
@@ -783,7 +802,7 @@ def build_parser():
     draft_answer.add_argument("--retries", type=int, default=2)
     draft_answer.set_defaults(func=command_draft_answer)
 
-    init = subparsers.add_parser("init")
+    init = subparsers.add_parser("init", parents=[vault_parent])
     init.set_defaults(func=command_init)
 
     return parser

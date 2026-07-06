@@ -1,6 +1,6 @@
 # 运行环境
 
-- 默认 vault：`~/Documents/AIC-000`（自动解析为当前用户目录）
+- vault 来源：优先使用命令中的 `--vault "<VAULT_ROOT>"`；也可以设置 `OBSIDIAN_VAULT_PATH`，或从当前 vault 目录运行命令。
 - 优先使用运行环境已有的 Obsidian skills；如果环境里没有，再使用本 skill 自带脚本
 - 默认命令入口：`scripts/vault_ops.py`
 
@@ -14,18 +14,18 @@
 3. 安装可选依赖：
    `pip install -r requirements.txt`
 4. 一键初始化并建立 Embedding 索引：
-   `python3 scripts/vault_ops.py init`
+   `python3 scripts/vault_ops.py init --vault "<VAULT_ROOT>"`
 
 ## 知识问答
 
 1. 先检索：
-   `python3 scripts/vault_ops.py search "关键词" --limit 8 --retries 2`
+   `python3 scripts/vault_ops.py search "关键词" --vault "<VAULT_ROOT>" --limit 8 --retries 2`
 2. 再阅读命中的 2-4 篇笔记：
-   `python3 scripts/vault_ops.py read "相对路径或笔记名"`
+   `python3 scripts/vault_ops.py read "相对路径或笔记名" --vault "<VAULT_ROOT>"`
 3. 如果要给上层 agent 一个更适合直接消费的问答素材包，优先使用：
-   `python3 scripts/vault_ops.py answer-pack "用户问题" --retries 2`
+   `python3 scripts/vault_ops.py answer-pack "用户问题" --vault "<VAULT_ROOT>" --retries 2`
 4. 如果要直接拿一版“可复述草案”，使用：
-   `python3 scripts/vault_ops.py draft-answer "用户问题" --retries 2`
+   `python3 scripts/vault_ops.py draft-answer "用户问题" --vault "<VAULT_ROOT>" --retries 2`
 5. 结合读取内容回答问题，并给出来源引用：
    - 至少引用笔记标题
    - 最好给出相对路径
@@ -41,9 +41,9 @@
 ## 创建或补充笔记
 
 - 创建：
-  `python3 scripts/vault_ops.py create "笔记名" --content "# 标题"`
+  `python3 scripts/vault_ops.py create "笔记名" --vault "<VAULT_ROOT>" --content "# 标题"`
 - 追加：
-  `python3 scripts/vault_ops.py append "笔记名" --content "新增内容"`
+  `python3 scripts/vault_ops.py append "笔记名" --vault "<VAULT_ROOT>" --content "新增内容"`
 
 # 注意事项
 

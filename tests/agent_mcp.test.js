@@ -204,6 +204,85 @@ test('MCP server initializes, lists tools, and calls read tools', async (t) => {
     assert.ok(search.result.structuredContent.data.results[0].snippet);
 });
 
+test('MCP read tools expose relation target resolution diagnostics', async (t) => {
+    const vaultPath = await createVault(t);
+    const sourcePath = 'Notes/Source.md';
+    const movedPath = 'Moved/Target.md';
+    const oldPath = 'Old/Target.md';
+    const content = '# Source\n\nSource mentions Target through a stale relation.';
+    await writeVaultFile(vaultPath, sourcePath, content);
+    await writeVaultFile(vaultPath, movedPath, '# Target\n\nResolved target content.');
+    const stat = await fs.promises.stat(path.join(vaultPath, ...sourcePath.split('/')));
+    await writeVaultFile(vaultPath, RELATIONS_PATH, JSON.stringify({
+        version: 1,
+        indexedAt: '2026-06-18T03:00:00.000Z',
+        files: {
+            [sourcePath]: {
+                hash: hash(content),
+                mtime: stat.mtimeMs,
+                indexedAt: '2026-06-18T03:00:00.000Z',
+                relations: [{
+                    target: oldPath,
+                    title: 'Target',
+                    type: 'semantic',
+                    score: 0.91,
+                    group: 'concept',
+                    status: 'suggested',
+                    source: 'test',
+                }, {
+                    target: 'Missing/Gone.md',
+                    title: 'Gone',
+                    type: 'semantic',
+                    status: 'suggested',
+                    source: 'test',
+                }],
+            },
+        },
+    }, null, 2));
+    const client = startMcp(t, ['--vault', vaultPath]);
+
+    await client.request('initialize', {
+        protocolVersion: '2025-11-25',
+        capabilities: {},
+        clientInfo: { name: 'test-client', version: '1.0.0' },
+    });
+    client.notify('notifications/initialized');
+
+    const relations = await client.request('tools/call', {
+        name: 'understory_get_relations',
+        arguments: { notePath: sourcePath },
+    });
+    assert.equal(relations.result.isError, false);
+    assert.equal(relations.result.structuredContent.data.relations[0].targetStatus, 'resolved');
+    assert.equal(relations.result.structuredContent.data.relations[0].resolvedTarget, movedPath);
+    assert.equal(relations.result.structuredContent.data.entry.relations[0].targetStatus, 'resolved');
+    assert.equal(relations.result.structuredContent.data.entry.relations[0].resolvedTarget, movedPath);
+    assert.equal(relations.result.structuredContent.data.diagnostics.relationTargets.missing, 1);
+    assert.deepEqual(JSON.parse(relations.result.content[0].text), relations.result.structuredContent);
+
+    const search = await client.request('tools/call', {
+        name: 'understory_search',
+        arguments: { query: 'Target' },
+    });
+    assert.equal(search.result.isError, false);
+    const searchResult = search.result.structuredContent.data.results.find((result) => (
+        result.matchedRelations || []
+    ).some((relation) => relation.target === oldPath));
+    assert.ok(searchResult);
+    const searchRelation = searchResult.matchedRelations.find((relation) => relation.target === oldPath);
+    assert.equal(searchRelation.targetStatus, 'resolved');
+    assert.equal(searchRelation.resolvedTarget, movedPath);
+
+    const context = await client.request('tools/call', {
+        name: 'understory_get_context',
+        arguments: { notePath: sourcePath, limit: 4 },
+    });
+    assert.equal(context.result.isError, false);
+    assert.ok(context.result.structuredContent.data.items.some((item) => item.path === movedPath));
+    assert.ok(context.result.structuredContent.data.diagnostics.resolvedRelations.some((relation) => relation.resolvedTarget === movedPath));
+    assert.ok(context.result.structuredContent.data.diagnostics.unresolvedRelations.some((relation) => relation.targetStatus === 'missing'));
+});
+
 test('MCP tool errors stay structured and redact fake secrets', async (t) => {
     const secret = 'sk-abcdefghijklmnopqrstuvwxyz123456';
     const vaultPath = await createVault(t);

@@ -153,6 +153,108 @@ test('Vault-as-API read tools return scoped snippets and relation context', asyn
     assert.ok(context.data.items.some((item) => item.path === 'Notes/Target.md'));
 });
 
+test('relation target drift is annotated, resolved in context, and kept read-only', async (t) => {
+    const vaultPath = await createVault(t);
+    const sourcePath = 'Notes/Source.md';
+    const movedPath = 'AIC-会议纪要/0605-周会：知识库自维护插件-试用客户跟进-AuthO进度.md';
+    const oldPath = '录音/会议纪要/0605-周会：知识库自维护插件-试用客户跟进-AuthO进度.md';
+    const sourceContent = '# Source\n\nThis source references the AuthO progress meeting.';
+    await writeVaultFile(vaultPath, sourcePath, sourceContent);
+    await writeVaultFile(vaultPath, movedPath, '# AuthO Progress\n\nMoved meeting note content that should be available through resolvedTarget.');
+    await writeVaultFile(vaultPath, 'Archive/Duplicate.md', '# Duplicate\n\nFirst candidate.');
+    await writeVaultFile(vaultPath, 'Moved/Duplicate.md', '# Duplicate\n\nSecond candidate.');
+    const stat = await fs.promises.stat(path.join(vaultPath, ...sourcePath.split('/')));
+    const store = {
+        version: 1,
+        indexedAt: '2026-06-18T03:00:00.000Z',
+        files: {
+            [sourcePath]: {
+                hash: hash(sourceContent),
+                mtime: stat.mtimeMs,
+                indexedAt: '2026-06-18T03:00:00.000Z',
+                relations: [{
+                    target: oldPath,
+                    title: '0605-周会：知识库自维护插件-试用客户跟进-AuthO进度',
+                    type: 'semantic',
+                    score: 0.91,
+                    group: 'meeting',
+                    status: 'suggested',
+                    source: 'test',
+                }, {
+                    target: 'Missing/Gone.md',
+                    title: 'Gone',
+                    type: 'semantic',
+                    status: 'suggested',
+                    source: 'test',
+                }, {
+                    target: 'Old/Duplicate.md',
+                    title: 'Duplicate',
+                    type: 'semantic',
+                    status: 'suggested',
+                    source: 'test',
+                }, {
+                    target: '../outside.md',
+                    title: 'Unsafe',
+                    type: 'semantic',
+                    status: 'suggested',
+                    source: 'test',
+                }],
+            },
+        },
+    };
+    await writeVaultFile(vaultPath, RELATIONS_PATH, JSON.stringify(store, null, 2));
+    const before = await fs.promises.readFile(path.join(vaultPath, ...RELATIONS_PATH.split('/')), 'utf8');
+
+    const api = createAgentApi({ vaultPath });
+    const relations = await api.getRelations({ notePath: sourcePath });
+    assert.equal(relations.ok, true);
+    const resolved = relations.data.relations.find((relation) => relation.target === oldPath);
+    assert.equal(resolved.targetStatus, 'resolved');
+    assert.equal(resolved.targetExists, false);
+    assert.equal(resolved.resolvedTarget, movedPath);
+    assert.equal(resolved.resolutionReason, 'unique_basename');
+    assert.equal(
+        relations.data.entry.relations.find((relation) => relation.target === oldPath).targetStatus,
+        'resolved'
+    );
+    assert.equal(
+        relations.data.entry.relations.find((relation) => relation.target === oldPath).resolvedTarget,
+        movedPath
+    );
+    assert.equal(relations.data.relations.find((relation) => relation.target === 'Missing/Gone.md').targetStatus, 'missing');
+    const ambiguous = relations.data.relations.find((relation) => relation.target === 'Old/Duplicate.md');
+    assert.equal(ambiguous.targetStatus, 'ambiguous');
+    assert.deepEqual(ambiguous.candidates.sort(), ['Archive/Duplicate.md', 'Moved/Duplicate.md']);
+    assert.equal(relations.data.relations.find((relation) => relation.target === '../outside.md').targetStatus, 'unsafe');
+    assert.equal(relations.data.diagnostics.relationTargets.resolved, 1);
+    assert.equal(relations.data.diagnostics.relationTargets.missing, 1);
+    assert.equal(relations.data.diagnostics.relationTargets.ambiguous, 1);
+    assert.equal(relations.data.diagnostics.relationTargets.unsafe, 1);
+
+    const search = await api.search({ query: 'AuthO', limit: 5 });
+    assert.equal(search.ok, true);
+    const searchResult = search.data.results.find((result) => (
+        result.matchedRelations || []
+    ).some((relation) => relation.target === oldPath));
+    assert.ok(searchResult);
+    const searchRelation = searchResult.matchedRelations.find((relation) => relation.target === oldPath);
+    assert.equal(searchRelation.targetStatus, 'resolved');
+    assert.equal(searchRelation.resolvedTarget, movedPath);
+
+    const context = await api.getContext({ notePath: sourcePath, limit: 5 });
+    assert.equal(context.ok, true);
+    assert.equal(context.data.bodyIncluded, false);
+    assert.ok(context.data.items.some((item) => item.path === movedPath));
+    assert.ok(!context.data.items.some((item) => item.path === oldPath));
+    assert.ok(context.data.diagnostics.resolvedRelations.some((relation) => relation.resolvedTarget === movedPath));
+    assert.ok(context.data.diagnostics.unresolvedRelations.some((relation) => relation.targetStatus === 'missing'));
+    assert.ok(context.data.diagnostics.unresolvedRelations.some((relation) => relation.targetStatus === 'ambiguous'));
+    assert.ok(context.data.diagnostics.unresolvedRelations.some((relation) => relation.targetStatus === 'unsafe'));
+
+    const after = await fs.promises.readFile(path.join(vaultPath, ...RELATIONS_PATH.split('/')), 'utf8');
+    assert.equal(after, before);
+});
+
 test('acceptRelation and rejectRelation update relation state and tombstones', async (t) => {
     const vaultPath = await createVault(t);
     await seedRelations(vaultPath, 'Notes/Source.md');

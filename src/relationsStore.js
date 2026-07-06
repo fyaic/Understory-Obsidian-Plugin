@@ -3,6 +3,11 @@ const { Notice, TFile } = require('obsidian');
 const { MAX_PROCESS_OUTPUT_BYTES } = require('./utils');
 const { t } = require('./i18n');
 const { extractProcessJsonMessage, redactSensitiveText, safeErrorDetail } = require('./safety');
+const {
+    annotateRelations,
+    buildRelationDiagnostics,
+    buildVaultPathIndex,
+} = require('./relationTargetResolution');
 
 const RELATIONS_PATH = '.understory/relations.json';
 const OVERRIDES_PATH = '.understory/link_overrides.json';
@@ -101,6 +106,14 @@ class RelationsStore {
         return changed;
     }
 
+
+    _buildRelationPathIndex() {
+        const vault = this.app && this.app.vault;
+        const files = vault && typeof vault.getMarkdownFiles === 'function' ? vault.getMarkdownFiles() : [];
+        const paths = files.map((file) => file && file.path).filter(Boolean);
+        return buildVaultPathIndex(paths);
+    }
+
     _groupMap(grouped) {
         const out = new Map();
         for (const [group, values] of Object.entries(grouped || {})) {
@@ -192,19 +205,28 @@ class RelationsStore {
         const path = typeof fileOrPath === 'string' ? fileOrPath : fileOrPath && fileOrPath.path;
         const normalized = this._normalizePath(path);
         const store = await this._readStore();
+        const pathIndex = this._buildRelationPathIndex();
         const entry = store.files[normalized] || null;
         const file = fileOrPath instanceof TFile
             ? fileOrPath
             : this.app.vault.getAbstractFileByPath(normalized);
         if (!entry) {
-            return { status: 'missing', stale: true, relations: [], entry: null };
+            return {
+                status: 'missing',
+                stale: true,
+                relations: [],
+                diagnostics: buildRelationDiagnostics([]),
+                entry: null,
+            };
         }
+        const relations = annotateRelations(entry.relations || [], pathIndex);
+        const entryForResponse = { ...entry, relations };
         if (file instanceof TFile) {
             const snapshot = await this._snapshot(file);
             const stale = entry.hash !== snapshot.hash || Number(entry.mtime || 0) !== Number(snapshot.mtime || 0);
-            return { status: 'ok', stale, relations: entry.relations || [], entry };
+            return { status: 'ok', stale, relations, diagnostics: buildRelationDiagnostics(relations), entry: entryForResponse };
         }
-        return { status: 'ok', stale: false, relations: entry.relations || [], entry };
+        return { status: 'ok', stale: false, relations, diagnostics: buildRelationDiagnostics(relations), entry: entryForResponse };
     }
 
     async _updateRelationStatus(filePath, targetTitle, status) {
@@ -259,6 +281,11 @@ class RelationsStore {
         const indexFix = fixes.find((fix) => fix && fix.id === 'embedding_index_missing');
         if (indexFix) {
             new Notice(t(this.plugin, 'embedding_index_missing_notice'), 10000);
+            if (this.plugin.checkEmbeddingHealth) {
+                this.plugin.checkEmbeddingHealth(false, true).catch((error) => {
+                    console.warn('[Understory] Failed to refresh semantic embedding status:', redactSensitiveText(String(error?.message || error), this.plugin.settings));
+                });
+            }
         }
         if (warnings.length || fixes.length) {
             const detail = JSON.stringify({ warnings, fixes });

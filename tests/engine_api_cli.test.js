@@ -40,6 +40,61 @@ test('api.py init exits successfully in local-only mode', async (t) => {
     assert.equal(payload.indexed_fail, 0);
 });
 
+test('api.py embedding-status reports local-only semantic mode', async (t) => {
+    const vaultPath = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'understory-api-vault-'));
+    t.after(async () => {
+        await fs.promises.rm(vaultPath, { recursive: true, force: true });
+    });
+
+    const result = spawnSync(process.env.PYTHON || 'python', [API_PATH, 'embedding-status', '--vault', vaultPath], {
+        cwd: ENGINE_DIR,
+        encoding: 'utf8',
+        env: {
+            ...process.env,
+            UNDERSTORY_NETWORK_MODE: 'local',
+            PYTHONIOENCODING: 'utf-8',
+        },
+    });
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    const payload = JSON.parse(result.stdout);
+    assert.equal(payload.status, 'ok');
+    assert.equal(payload.semantic_state, 'local_only');
+    assert.equal(payload.indexing, 'skipped');
+    assert.equal(payload.embedding_allowed, false);
+    assert.equal(payload.recommended_action, 'configure_vector_model');
+});
+
+test('api.py embedding-status reports missing vector API key', async (t) => {
+    const vaultPath = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'understory-api-vault-'));
+    t.after(async () => {
+        await fs.promises.rm(vaultPath, { recursive: true, force: true });
+    });
+
+    const result = spawnSync(process.env.PYTHON || 'python', [API_PATH, 'embedding-status', '--vault', vaultPath], {
+        cwd: ENGINE_DIR,
+        encoding: 'utf8',
+        env: {
+            ...process.env,
+            UNDERSTORY_NETWORK_MODE: 'embedding',
+            UNDERSTORY_EMBEDDING_PROVIDER: 'openai',
+            UNDERSTORY_EMBEDDING_API_KEY: '',
+            OPENAI_API_KEY: '',
+            ZHIPU_API_KEY: '',
+            CUSTOM_OPENAI_API_KEY: '',
+            PYTHONIOENCODING: 'utf-8',
+        },
+    });
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    const payload = JSON.parse(result.stdout);
+    assert.equal(payload.status, 'warning');
+    assert.equal(payload.semantic_state, 'provider_unavailable');
+    assert.equal(payload.indexing, 'unavailable');
+    assert.equal(payload.provider_ready, false);
+    assert.equal(payload.recommended_action, 'configure_embedding_api');
+});
+
 test('api.py refresh-link falls back when embedding cache is missing', async (t) => {
     const vaultPath = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'understory-api-vault-'));
     t.after(async () => {

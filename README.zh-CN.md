@@ -13,6 +13,7 @@ Understory 是一个面向 Obsidian 的本地优先知识层。它会在你的 v
 ## 它能做什么
 
 - 在右侧栏通过 **Show Understory** 显示关联建议。
+- 新安装默认使用 **仅右侧栏** 呈现。除非你主动选择写入正文的呈现模式，或明确点击 **Insert into body**，Understory 不会自动把关联笔记区块写入笔记正文。
 - 用混合信号发现笔记关系，包括本地结构、实体事实、图分析和可选的语义模型信号。
 - 提醒潜在冲突、过期笔记、孤立页面和断裂的知识路径。
 - 在 `.understory` 中维护本地报告和缓存。
@@ -115,9 +116,14 @@ $env:UNDERSTORY_PYTHON_PATH="python"
 
 ### Embedding 索引
 
-如果你启用了 **只用向量模型** 或 **完整 AI 分析**，请在配置好向量模型服务商后，从命令面板运行 **准备本地搜索索引**。这个命令会构建语义关联发现所需的本地 Embedding 缓存。
+Understory 现在把本地引擎就绪和语义 Embedding 就绪拆成两个状态。本地引擎可以已经可用，但语义向量召回仍然关闭，或还在等待配置。
 
-如果 Embedding 缓存还没构建，Understory 不会只抛出原始 Python 退出码然后停止。它会先降级使用本地关键词结果，弹出提示，并返回指向 **准备本地搜索索引** 的修复建议。你也可以在终端中运行：
+- **Local only**：语义向量召回是主动关闭的。Understory 会继续使用本地文件、关键词、ER、链接和图结构；缺少 Embedding 索引不是错误。
+- **只用向量模型** 或 **完整 AI 分析** 但还没填写向量 API key：设置页会提示 Embedding API 尚未配置，并引导你回到 **联网与隐私**。
+- 已配置向量服务商但还没有索引：设置页会显示 **构建/更新 Embedding 索引**。这会在本机创建或更新 SQLite 缓存，不代表安装了本地 embedding 模型。
+- 就绪状态：设置页会展示语义索引状态、可用时显示已索引笔记数，以及本机索引路径。
+
+如果 Embedding 缓存还没构建，Understory 不会只抛出原始 Python 退出码然后停止。它会先降级使用本地关键词结果，给出可操作提示，并在设置页保留清晰的配置路径。你也可以在终端中运行：
 
 ```powershell
 python "<你的 Vault>\.obsidian\plugins\understory\understory-graphify-engine\api.py" init --vault "<你的 Vault>"
@@ -129,7 +135,7 @@ python "<你的 Vault>\.obsidian\plugins\understory\understory-graphify-engine\a
 2. 在 **开始使用** 中确认自动识别到的 Understory 引擎文件夹和 Python。
 3. 点击 **检查设置（Check setup）**。
 4. 在 **联网与隐私** 中保持 **Network mode** 为 **Local only**，或主动选择云模型模式并配置自己的模型服务密钥、Endpoint / Base URL 和模型名称。
-5. 如果选择了云端向量模式，请在服务商配置完成后运行一次 **准备本地搜索索引**。
+5. 如果选择了向量模式，请使用 **开始使用** 或 **联网与隐私** 里的语义索引卡片检查状态，并在服务商配置完成后构建/更新本机 Embedding 索引。
 6. 如果要让外部 Agent 把这个 vault 当作本地知识 API 使用，打开 **Agent访问**，先创建本地 MCP server 文件，再把 MCP JSON 复制到 Agent 的 MCP 设置，并复制配套的 Skill prompt。
 7. 打开命令面板，运行 **Show Understory**。
 
@@ -153,6 +159,8 @@ Skill 有两个版本：
 
 - **Query-only**：只有当你明确要求查询、搜索、引用、总结或检查当前 vault 时，Agent 才调用 Understory。这个模式更保守，默认只读。
 - **Agent memory model**：Agent 把 Understory 当作主动上下文和长期记忆层。遇到相关的长期任务或项目工作时，它可以先获取上下文再规划，并在结束时提出值得沉淀的记忆或关系更新；但本地写入仍需要用户确认。
+
+两个版本都会带上业务知识地图工作流：Agent 应该设计多组聚焦查询，通过 MCP 读取 scoped context，按业务意义归类笔记，识别缺口，并给出按角色区分的阅读路径，而不是直接粘贴搜索结果。
 
 开发者仍可在本仓库中直接使用以下命令：
 
@@ -198,6 +206,8 @@ node scripts/understory-agent-cli.js insert-relation --vault "C:\path\to\vault" 
 
 当前 MCP 读工具包括 status、capabilities、graph summary、note relations、本地关键词/关系搜索、上下文包和 note brief。写入类工具仍然只作用于本地 vault，并应在用户确认后使用。
 
+关系元数据会在读取时和当前 vault 文件树做校验。如果缓存里的 relation target 已移动，search、note brief、relations 和 context 响应会保留原始 `target`，并新增 `targetStatus`、`targetExists`、`resolvedTarget` 和 diagnostics，避免 Agent 把旧路径当作事实。读工具只报告漂移，不会改写 `.understory/relations.json`。
+
 ## 从源码构建
 
 本仓库将可审查源码放在 `src/`，将 Obsidian 安装文件放在仓库根目录。
@@ -219,9 +229,9 @@ npm run check
 
 release 中的 `main.js` 会内嵌标准 Obsidian 安装所需的 engine payload。
 
-当前 release：`1.8.10`。
+当前 release：`1.8.11`。
 
-release tag 必须和 `manifest.json` 中的 version 完全一致，例如 `1.8.10`。
+release tag 必须和 `manifest.json` 中的 version 完全一致，例如 `1.8.11`。
 
 ## 链接
 

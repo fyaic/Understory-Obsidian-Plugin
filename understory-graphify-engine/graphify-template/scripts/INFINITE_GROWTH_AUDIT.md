@@ -1,6 +1,6 @@
 # Understory Graphify Engine — 无限增长风险系统审查报告
 
-> 审查范围：`C:\Hello-World\understory-graphify-engine\graphify-template\scripts`
+> 审查范围：`understory-graphify-engine/graphify-template/scripts`
 > 审查日期：2026-06-03
 > 审查原则：只读审查，不做任何修改
 

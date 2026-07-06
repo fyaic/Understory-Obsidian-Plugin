@@ -1,8 +1,18 @@
 # Changelog
 
+## 1.8.11
+
+- Make new installs default to **Show suggestions in: Right sidebar only**, so relation refresh uses `--no-auto-write` unless the user chooses a note-body presentation mode.
+- Keep sidebar-only presentation from writing conflict blocks or related-note sections into note bodies by default.
+- Add regression coverage proving the default relation refresh path uses `--no-auto-write` and strips old auto-generated related-note sections in sidebar-only mode.
+- Polish the setup and relation UI: semantic setup now has a single primary flow with progress feedback, local-only vector configuration is secondary, and sidebar action buttons stack vertically so file titles get more room.
+
 ## 1.8.10
 
 - Respect the **Show suggestions in: Right sidebar only** setting for existing notes: auto-generated related-note sections are now stripped from the note body when the presentation mode is sidebar-only, while manually inserted sections are preserved.
+- Align the bundled Understory Skill with the MCP-based Agent setup: add the business knowledge-map workflow, ship a reusable template, and remove author-machine vault path assumptions from exported engine guidance.
+- Add guided embedding onboarding: semantic index readiness is shown separately from local engine readiness, settings expose configure/build actions, and missing-index keyword fallback points users back to setup.
+- Annotate Agent API and MCP relation targets with `targetStatus`, `targetExists`, `resolvedTarget`, and diagnostics so moved or missing cached paths are reported without rewriting `.understory/relations.json`.
 
 ## 1.8.9
 

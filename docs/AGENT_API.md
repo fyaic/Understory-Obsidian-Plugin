@@ -16,6 +16,8 @@ The Skill mode controls agent behavior:
 - **Query-only**: use Understory only when the user explicitly asks to query, search, cite, summarize, or inspect the current vault. Treat this mode as read-only.
 - **Agent memory model**: use Understory as active local context and a long-term memory layer. The agent may retrieve relevant context before planning and propose durable memory, relation, decision, or project-state updates after substantial work, but write operations still require user confirmation.
 
+Both modes include a knowledge-map workflow for broad research tasks: agents should run several focused searches, read scoped context through MCP, group notes by business meaning, call out gaps, and provide role-based reading paths rather than returning raw search hits.
+
 ## Response Envelope
 
 All CLI responses and MCP tool `structuredContent` values use the same envelope:
@@ -197,6 +199,32 @@ Relation objects are stored under `.understory/relations.json`:
 }
 ```
 
+Read APIs keep the cached `target` value for compatibility, but annotate each relation target at read time so agents can tell whether a cached path is still trustworthy:
+
+```json
+{
+  "target": "Old/Target.md",
+  "title": "Target",
+  "targetStatus": "resolved",
+  "targetExists": false,
+  "resolvedTarget": "New/Target.md",
+  "resolutionReason": "unique_basename",
+  "candidates": []
+}
+```
+
+`targetStatus` can be:
+
+| Status | Meaning |
+| --- | --- |
+| `ok` | The cached `target` currently exists and can be read. |
+| `resolved` | The cached `target` is missing, but Understory found one safe replacement path. Read context uses `resolvedTarget`. |
+| `missing` | No safe current target could be found. |
+| `ambiguous` | Multiple candidate notes matched; Understory reports candidates and does not choose one. |
+| `unsafe` | The target is unsafe or internal, such as path traversal or `.understory/`. |
+
+`understory_search` includes these fields in `matchedRelations`, `understory_get_note_brief` includes them in `relations`, and `understory_get_context` reports `resolvedRelations` and `unresolvedRelations` under `diagnostics`. These read tools do not write `.understory/relations.json`; cache repair must happen through an explicit refresh or repair flow.
+
 `get-relations` returns:
 
 ```json
@@ -205,6 +233,17 @@ Relation objects are stored under `.understory/relations.json`:
   "status": "ok",
   "stale": false,
   "relations": [],
+  "diagnostics": {
+    "relationTargets": {
+      "ok": 3,
+      "resolved": 1,
+      "missing": 0,
+      "ambiguous": 0,
+      "unsafe": 0
+    },
+    "resolvedRelations": [],
+    "unresolvedRelations": []
+  },
   "entry": {
     "hash": "abcdef1234567890",
     "mtime": 1710000000000,

@@ -6,7 +6,7 @@ index_generator —— L5 知识索引生成。
 生成 .understory/index.md（AI 易读的知识地图，含 [[wikilink]]）。
 
 用法：
-    python index_generator.py --vault "C:/Users/ryshi/Documents/AIC-000"
+    python index_generator.py --vault "<VAULT_ROOT>"
 """
 import argparse
 import json
@@ -109,7 +109,7 @@ def generate_index(vault_path: Path) -> dict:
 
     vault_total = len(gc.list_vault_markdown(vault_path))
     lines = []
-    lines.append("# AIC-000 知识索引（AI 用）\n")
+    lines.append("# Understory 知识索引（AI 用）\n")
     lines.append(f"> 自动生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M')}")
     lines.append(f"> 已提取原则的文档：{doc_count} / 全库 {vault_total} 篇 | 原则总数：{len(principles)} | "
                  f"社区数：{len(communities)} | 活跃冲突：{len(issues)}\n")

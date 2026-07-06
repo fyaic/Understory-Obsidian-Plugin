@@ -13,6 +13,7 @@ The plugin is desktop-only and ships with the local Understory engine in this re
 ## What It Does
 
 - Shows related-note suggestions in the right sidebar through **Show Understory**.
+- New installs default to **Right sidebar only** presentation. Understory does not automatically write related-note sections into note bodies unless you choose a note-body presentation mode or explicitly click **Insert into body**.
 - Discovers note relationships with hybrid signals, including local structure, entity facts, graph analysis, and optional model-powered semantic signals.
 - Flags possible conflicts, stale notes, orphan pages, and broken knowledge paths.
 - Maintains local reports and caches in `.understory`.
@@ -115,9 +116,14 @@ Use **Copy diagnostics** when you need to share setup details with a maintainer.
 
 ### Embedding Index
 
-If you enable **Vector model only** or **Full AI analysis**, run **Prepare local search index** from the command palette after configuring your vector provider. This builds the local Embedding cache used for semantic relationship discovery.
+Understory now treats local engine readiness and semantic embedding readiness as separate setup states. The local engine can be ready while semantic vector recall is still off or waiting for setup.
 
-If the Embedding cache has not been built yet, Understory does not stop with a raw Python exit code. It falls back to local keyword results, shows a notice, and returns a fix suggestion that points back to **Prepare local search index**. You can also build the index from a terminal:
+- **Local only**: semantic vector embedding is intentionally off. Understory keeps using local files, keywords, ER, links, and graph structure; a missing Embedding index is not an error.
+- **Vector model only** or **Full AI analysis** without a vector API key: Settings shows that the Embedding API is not configured yet and points you to **Model services**.
+- Vector mode with a configured provider but no index: Settings shows **Build/update Embedding index**. This creates or updates a local SQLite cache on your machine; it does not mean a local embedding model is installed.
+- Ready state: Settings shows the semantic index status, indexed note count when available, and the local index path.
+
+If the Embedding cache has not been built yet, Understory does not stop with a raw Python exit code. It falls back to local keyword results, shows actionable guidance, and keeps the settings-page setup journey visible. You can also build the index from a terminal:
 
 ```powershell
 python "<Your Vault>\.obsidian\plugins\understory\understory-graphify-engine\api.py" init --vault "<Your Vault>"
@@ -129,7 +135,7 @@ python "<Your Vault>\.obsidian\plugins\understory\understory-graphify-engine\api
 2. In **Start here**, confirm the auto-detected Understory engine folder and Python.
 3. Click **Check setup**.
 4. In **Network & privacy**, keep **Network mode** on **Local only**, or explicitly choose a cloud mode and configure your own provider key, endpoint/base URL, and model name.
-5. If you selected a cloud vector mode, run **Prepare local search index** once the provider is configured.
+5. If you selected a vector mode, use the semantic index card in **Start here** or **Network & privacy** to check readiness and build/update the local Embedding index once the provider is configured.
 6. In **AI agents**, create the local MCP server file, copy the MCP JSON into your agent's MCP settings, and copy the matching Skill prompt if you want an external agent to use this vault as a local knowledge API.
 7. Open the command palette and run **Show Understory**.
 
@@ -153,6 +159,8 @@ The Skill has two variants:
 
 - **Query-only**: the agent calls Understory only when you explicitly ask it to query, search, cite, summarize, or inspect this vault. This mode is read-only and conservative.
 - **Agent memory model**: the agent treats Understory as active local context and a long-term memory layer. For relevant ongoing work, it can retrieve context before planning and propose durable memory or relation updates at the end, but local writes still require user confirmation.
+
+Both variants include a business knowledge-map workflow: the agent should design several focused searches, read scoped context through MCP, group notes by business meaning, identify gaps, and return role-based reading paths instead of pasting raw search hits.
 
 Developer commands are still available from this repository:
 
@@ -198,6 +206,8 @@ All Agent API responses use a JSON envelope with `ok`, `data`, `error`, and `met
 
 Current MCP read tools include status, capabilities, graph summary, note relations, local keyword/relations search, scoped context packages, and note briefs. Write tools remain local-only and should be used only after user confirmation.
 
+Relation metadata is checked against the current vault when read. If a cached relation target moved, search, note brief, relations, and context responses keep the original `target` and add `targetStatus`, `targetExists`, `resolvedTarget`, and diagnostics so agents do not treat stale paths as facts. Read tools report this drift without rewriting `.understory/relations.json`.
+
 ## Build From Source
 
 This repository keeps the reviewable plugin source in `src/` and the Obsidian release files at the repository root.
@@ -219,9 +229,9 @@ Each GitHub release must attach:
 
 The release `main.js` embeds the bundled engine payload used by standard Obsidian installs.
 
-Current release: `1.8.10`.
+Current release: `1.8.11`.
 
-The release tag must match `manifest.json` version exactly, for example `1.8.10`.
+The release tag must match `manifest.json` version exactly, for example `1.8.11`.
 
 ## Links
 

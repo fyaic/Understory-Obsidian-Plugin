@@ -14,7 +14,7 @@ lint —— L3 冲突检测模块。
 持续 >7 天且 count>=3 时 severity 自动升一级；涉及原则消失则自动 resolved。
 
 用法：
-    python lint.py --vault "C:/Users/ryshi/Documents/AIC-000" [--fix] [--doc "某文档.md"]
+    python lint.py --vault "<VAULT_ROOT>" [--fix] [--doc "某文档.md"]
 """
 import argparse
 import difflib

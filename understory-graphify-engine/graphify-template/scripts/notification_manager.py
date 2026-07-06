@@ -155,7 +155,8 @@ def send_webhook(webhook_url: str, webhook_type: str, vault_path: Path, enabled:
     if not high and not medium:
         return False
 
-    text = (f"🔴 AIC-000 知识库发现 {len(high)} 项 high / {len(medium)} 项 medium 冲突\n"
+    vault_name = Path(vault_path).name or "当前 vault"
+    text = (f"🔴 {vault_name} 知识库发现 {len(high)} 项 high / {len(medium)} 项 medium 冲突\n"
             + "\n".join(f"• {SEV_ICON.get(i.get('severity'),'')} {i.get('description','')[:60]}"
                         for i in (high + medium)[:8]))
 

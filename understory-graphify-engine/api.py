@@ -27,7 +27,7 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT / "graphify-template" / "scripts"))
 
-from embedding_index import _get_env as get_env, EmbeddingIndex, check_embedding_ready
+from embedding_index import _get_env as get_env, EmbeddingIndex, check_embedding_ready, _embedding_provider_name
 from graphify_common import clean_markdown as _clean_markdown, cosine_similarity as _cosine_similarity
 from vault_ops import detect_vault_path, list_markdown_files
 from config import config
@@ -324,6 +324,87 @@ def _cache_db() -> Path:
     return Path(__file__).resolve().parent / ".cache" / "embedding_index.sqlite"
 
 
+def _embedding_index_metadata() -> dict:
+    db = _cache_db()
+    metadata = {
+        "index_exists": db.exists(),
+        "indexed_count": 0,
+        "db_path": str(db),
+        "index_mtime": db.stat().st_mtime if db.exists() else None,
+    }
+    if not db.exists():
+        return metadata
+    try:
+        conn = sqlite3.connect(str(db))
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM embeddings")
+        row = cur.fetchone()
+        metadata["indexed_count"] = int(row[0] or 0) if row else 0
+        conn.close()
+    except Exception as exc:
+        metadata["index_error"] = str(exc)
+    return metadata
+
+
+def embedding_status(vault: Optional[Path] = None) -> dict:
+    """
+    Return semantic embedding/index readiness without building the index.
+    This is a setup status probe: it must not call provider APIs.
+    """
+    network_mode = current_network_mode()
+    provider_name = _embedding_provider_name()
+    allowed = embedding_allowed()
+    ready, ready_message = check_embedding_ready()
+    metadata = _embedding_index_metadata()
+    index_ready = bool(metadata.get("index_exists")) and not metadata.get("index_error")
+
+    if not allowed:
+        status = "ok"
+        semantic_state = "local_only"
+        indexing = "skipped"
+        recommended_action = "configure_vector_model"
+        message = "Semantic vector embedding is off in Local only mode."
+    elif provider_name in {"none", "off", "disabled"}:
+        status = "warning"
+        semantic_state = "provider_disabled"
+        indexing = "unavailable"
+        recommended_action = "choose_embedding_provider"
+        message = ready_message
+    elif not ready:
+        status = "warning"
+        semantic_state = "provider_unavailable"
+        indexing = "unavailable"
+        recommended_action = "configure_embedding_api"
+        message = ready_message
+    elif index_ready:
+        status = "ok"
+        semantic_state = "ready"
+        indexing = "ready"
+        recommended_action = "rebuild_embedding_index"
+        message = "Semantic index ready."
+    else:
+        status = "warning"
+        semantic_state = "index_missing"
+        indexing = "missing"
+        recommended_action = "build_embedding_index"
+        message = "Embedding API is configured, but the local semantic index has not been built."
+
+    return {
+        "status": status,
+        "network_mode": network_mode,
+        "embedding_allowed": allowed,
+        "provider": provider_name,
+        "provider_ready": bool(ready),
+        "provider_message": ready_message,
+        "semantic_state": semantic_state,
+        "indexing": indexing,
+        "index_ready": index_ready,
+        "recommended_action": recommended_action,
+        "message": message,
+        **metadata,
+    }
+
+
 def _refresh_state_path() -> Path:
     return Path(__file__).resolve().parent / ".cache" / "refresh_state.json"
 
@@ -424,6 +505,7 @@ def _ensure_index_fresh(vault: Path) -> dict:
             "indexed_fail": 0,
             "skipped_by_mtime": 0,
             "scanned": 0,
+            **_embedding_index_metadata(),
         }
 
     ready, ready_message = check_embedding_ready()
@@ -438,6 +520,7 @@ def _ensure_index_fresh(vault: Path) -> dict:
             "indexed_fail": 0,
             "skipped_by_mtime": 0,
             "scanned": 0,
+            **_embedding_index_metadata(),
         }
 
     index = None
@@ -492,6 +575,7 @@ def _ensure_index_fresh(vault: Path) -> dict:
             "indexed_fail": fail,
             "skipped_by_mtime": skipped_by_mtime,
             "scanned": len(docs) + skipped_by_mtime,
+            **_embedding_index_metadata(),
         }
     except Exception as exc:
         return {
@@ -500,6 +584,7 @@ def _ensure_index_fresh(vault: Path) -> dict:
             "indexing": "failed",
             "message": str(exc),
             "error": str(exc),
+            **_embedding_index_metadata(),
         }
     finally:
         if index is not None:
@@ -1898,6 +1983,10 @@ if __name__ == "__main__":
     init_parser = sub.add_parser("init", help="Initialize or update the embedding index")
     init_parser.add_argument("--vault", default=None, help="Vault root path")
 
+    # embedding-status: 查询语义索引状态，不构建索引
+    status_parser = sub.add_parser("embedding-status", help="Show semantic embedding/index readiness")
+    status_parser.add_argument("--vault", default=None, help="Vault root path")
+
     # orphan-links: 为孤儿笔记批量建联
     orphan_parser = sub.add_parser("orphan-links", help="Build links for orphan notes (no wikilinks)")
     orphan_parser.add_argument("--vault", default=None, help="Vault root path")
@@ -2118,6 +2207,24 @@ if __name__ == "__main__":
             print(json.dumps(result, ensure_ascii=False))
             sys.stdout.flush()
             sys.exit(0 if result.get("status") == "ok" else 1)
+        except Exception as e:
+            error_result = {
+                "status": "error",
+                "message": f"{type(e).__name__}: {str(e)}",
+                "error_type": type(e).__name__,
+                "error_detail": str(e)
+            }
+            print(json.dumps(error_result, ensure_ascii=False))
+            sys.stdout.flush()
+            sys.exit(1)
+
+    elif args.cmd == "embedding-status":
+        try:
+            vault_path = Path(args.vault) if args.vault else None
+            result = embedding_status(vault=vault_path)
+            print(json.dumps(result, ensure_ascii=False))
+            sys.stdout.flush()
+            sys.exit(0 if result.get("status") in ("ok", "warning") else 1)
         except Exception as e:
             error_result = {
                 "status": "error",

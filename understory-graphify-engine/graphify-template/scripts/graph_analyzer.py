@@ -13,7 +13,7 @@ graph_analyzer —— L4 图分析模块（完全离线）。
   .understory/god_nodes.json
 
 用法：
-    python graph_analyzer.py --vault "C:/Users/ryshi/Documents/AIC-000"
+    python graph_analyzer.py --vault "<VAULT_ROOT>"
 """
 import argparse
 import json

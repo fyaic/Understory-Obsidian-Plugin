@@ -46,7 +46,7 @@ function findByClass(node, className) {
     return null;
 }
 
-function createSettingsTab(settings = {}, health = null) {
+function createSettingsTab(settings = {}, health = null, embeddingHealth = null) {
     const app = {
         workspace: { trigger() {} },
         vault: {
@@ -66,11 +66,17 @@ function createSettingsTab(settings = {}, health = null) {
             ...settings,
         },
         engineHealth: health,
+        embeddingHealth,
         async saveSettings() {},
         async checkEngineHealth() {
             this.engineHealth = health || { status: 'error', ok: false, message: 'No local engine folder selected' };
             return this.engineHealth;
         },
+        async checkEmbeddingHealth() {
+            this.embeddingHealth = embeddingHealth || { status: 'ok', semantic_state: 'local_only', indexing: 'skipped' };
+            return this.embeddingHealth;
+        },
+        async initIndex() {},
         async openSidebar() {},
         _countOpenConflicts: () => 0,
         _openConflictsView() {},
@@ -115,6 +121,105 @@ test('settings default page shows onboarding tabs without technical matrix', () 
     assert.doesNotMatch(text, /Open sidebar on startup/);
 });
 
+test('settings page explains Local only semantic behavior', () => {
+    const tab = createSettingsTab({ networkMode: 'local' });
+
+    tab.display();
+    const text = collectText(tab.containerEl).join('\n');
+
+    assert.match(text, /Local only mode is active/);
+    assert.match(text, /Semantic vector recall is off/);
+    assert.match(text, /Semantic index/);
+    assert.match(text, /Local only mode does not need a semantic index/);
+    assert.doesNotMatch(text, /Local semantic index has not been built/);
+});
+
+test('local-only configure vector model action is secondary', () => {
+    const tab = createSettingsTab({ networkMode: 'local' });
+    const info = tab._embeddingStatusInfo();
+    const action = tab._embeddingPrimaryAction(info);
+
+    assert.equal(info.state, 'local_only');
+    assert.equal(action.labelKey, 'embedding_status_configure_button');
+    assert.equal(action.cta, false);
+});
+
+test('configure vector model action enables vector settings from local-only mode', async () => {
+    const tab = createSettingsTab({ networkMode: 'local', embeddingApiKey: '' });
+    const action = tab._embeddingPrimaryAction({ primaryAction: 'configure' });
+
+    await action.onClick();
+
+    assert.equal(tab._activeSettingsTab, 'models');
+    assert.equal(tab.plugin.settings.networkMode, 'embedding');
+    const text = collectText(tab.containerEl).join('\n');
+    assert.match(text, /Vector model API key/);
+    assert.match(text, /Semantic index/);
+});
+
+test('models tab guides vector mode without an API key', () => {
+    const tab = createSettingsTab({
+        networkMode: 'embedding',
+        embeddingProvider: 'openai',
+        embeddingApiKey: '',
+    });
+    tab._activeSettingsTab = 'models';
+
+    tab.display();
+    const text = collectText(tab.containerEl).join('\n');
+
+    assert.match(text, /Vector model API is not configured/);
+    assert.match(text, /Semantic index/);
+    assert.match(text, /Configure the vector model provider and API key/);
+});
+
+test('settings semantic card shows missing index build CTA', () => {
+    const tab = createSettingsTab(
+        { networkMode: 'embedding', embeddingProvider: 'mock' },
+        null,
+        {
+            status: 'warning',
+            semantic_state: 'index_missing',
+            indexing: 'missing',
+            provider: 'mock',
+            indexed_count: 0,
+            db_path: 'C:/engine/.cache/embedding_index.sqlite',
+        }
+    );
+    tab._activeSettingsTab = 'models';
+
+    tab.display();
+    const text = collectText(tab.containerEl).join('\n');
+
+    assert.match(text, /Local semantic index has not been built/);
+    assert.match(text, /Semantic index/);
+    assert.match(text, /Next, create the semantic index on this machine/);
+    assert.equal(text.includes('C:/engine/.cache/embedding_index.sqlite'), false);
+});
+
+test('settings semantic card shows ready index count', () => {
+    const tab = createSettingsTab(
+        { networkMode: 'embedding', embeddingProvider: 'mock' },
+        null,
+        {
+            status: 'ok',
+            semantic_state: 'ready',
+            indexing: 'ready',
+            provider: 'mock',
+            indexed_count: 12,
+            db_path: 'C:/engine/.cache/embedding_index.sqlite',
+        }
+    );
+    tab._activeSettingsTab = 'models';
+
+    tab.display();
+    const text = collectText(tab.containerEl).join('\n');
+
+    assert.match(text, /Semantic index ready/);
+    assert.match(text, /12 notes/);
+    assert.match(text, /Rebuild or update/);
+});
+
 test('agent access tab shows MCP config and Understory Skill together', () => {
     const tab = createSettingsTab({
         graphifyDir: 'C:\\Engine',
@@ -143,6 +248,7 @@ test('agent access tab shows MCP config and Understory Skill together', () => {
     assert.match(text, /Copy Skill prompt/);
     assert.match(text, /understory-mcp-server\.js/);
     assert.match(text, /active local context and a long-term memory layer/);
+    assert.match(text, /business-oriented knowledge map/);
     assert.match(text, /This Skill is only for this vault/);
     assert.match(text, /Copy full setup pack/);
     assert.match(text, /Multi-vault setup/);

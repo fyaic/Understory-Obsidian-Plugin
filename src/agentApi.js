@@ -8,6 +8,13 @@ const {
     safeErrorDetail,
     safeNetworkMode,
 } = require('./safety');
+const {
+    annotateRelations,
+    buildRelationDiagnostics,
+    buildVaultPathIndex,
+    relationSummary,
+    relationTargetForRead,
+} = require('./relationTargetResolution');
 
 const API_VERSION = '1';
 const RELATIONS_PATH = '.understory/relations.json';
@@ -865,7 +872,12 @@ function createAgentApi(options = {}) {
         return matches;
     }
 
-    async function buildNoteBrief(notePath, store, query) {
+    async function buildRelationPathIndex(markdownNotePaths) {
+        const notePaths = Array.isArray(markdownNotePaths) ? markdownNotePaths : await listMarkdownNotePaths();
+        return buildVaultPathIndex(notePaths);
+    }
+
+    async function buildNoteBrief(notePath, store, query, pathIndex) {
         const normalized = normalizeInputPath(notePath, adapter, 'notePath');
         const [content, stat] = await Promise.all([
             adapter.readText(normalized),
@@ -873,18 +885,14 @@ function createAgentApi(options = {}) {
         ]);
         const entry = store.files[normalized] || null;
         const relations = Array.isArray(entry && entry.relations) ? entry.relations : [];
+        const resolvedPathIndex = pathIndex || await buildRelationPathIndex();
+        const annotatedRelations = annotateRelations(relations, resolvedPathIndex);
         return {
             path: normalized,
             title: noteTitleFromPath(normalized),
             snippet: compactSnippet(content, query),
             relationCount: relations.length,
-            relations: relations.slice(0, 8).map((relation) => ({
-                target: relation.target || '',
-                title: relation.title || titleFromTarget(relation.target || ''),
-                type: relation.type || '',
-                status: relation.status || 'suggested',
-                score: relation.score,
-            })),
+            relations: annotatedRelations.slice(0, 8).map(relationSummary),
             indexedAt: entry && entry.indexedAt || '',
             mtime: stat.mtime || 0,
         };
@@ -897,9 +905,11 @@ function createAgentApi(options = {}) {
         }
         const maxResults = clampLimit(limit);
         const { store } = await readStore();
+        const markdownNotePaths = await listMarkdownNotePaths();
+        const pathIndex = await buildRelationPathIndex(markdownNotePaths);
         const paths = new Set([
             ...Object.keys(store.files || {}),
-            ...(await listMarkdownNotePaths()),
+            ...markdownNotePaths,
         ]);
         const results = [];
 
@@ -934,13 +944,13 @@ function createAgentApi(options = {}) {
                     reasons.push('content snippet');
                 }
             }
-            const relationHits = relationMatches(entry, terms);
+            const relationHits = annotateRelations(relationMatches(entry, terms), pathIndex);
             if (relationHits.length) {
                 score += relationHits.length * 4;
                 reasons.push('relations graph');
             }
             if (!score) continue;
-            const brief = await buildNoteBrief(notePath, store, query);
+            const brief = await buildNoteBrief(notePath, store, query, pathIndex);
             results.push({
                 path: brief.path,
                 title: brief.title,
@@ -948,12 +958,7 @@ function createAgentApi(options = {}) {
                 why: [...new Set(reasons)].join(', '),
                 score,
                 relationCount: brief.relationCount,
-                matchedRelations: relationHits.slice(0, 5).map((relation) => ({
-                    target: relation.target || '',
-                    title: relation.title || titleFromTarget(relation.target || ''),
-                    type: relation.type || '',
-                    status: relation.status || 'suggested',
-                })),
+                matchedRelations: relationHits.slice(0, 5).map(relationSummary),
             });
         }
 
@@ -1029,6 +1034,7 @@ function createAgentApi(options = {}) {
             return run(async () => {
                 const normalized = await assertNoteExists(notePath);
                 const { store } = await readStore();
+                const pathIndex = await buildRelationPathIndex();
                 const entry = store.files[normalized] || null;
                 if (!entry) {
                     return {
@@ -1036,6 +1042,7 @@ function createAgentApi(options = {}) {
                         status: 'missing',
                         stale: true,
                         relations: [],
+                        diagnostics: buildRelationDiagnostics([]),
                         entry: null,
                     };
                 }
@@ -1050,12 +1057,15 @@ function createAgentApi(options = {}) {
                 } catch (error) {
                     stale = false;
                 }
+                const relations = annotateRelations(Array.isArray(entry.relations) ? entry.relations : [], pathIndex);
+                const entryForResponse = { ...entry, relations };
                 return {
                     notePath: normalized,
                     status: 'ok',
                     stale,
-                    relations: Array.isArray(entry.relations) ? entry.relations : [],
-                    entry,
+                    relations,
+                    diagnostics: buildRelationDiagnostics(relations),
+                    entry: entryForResponse,
                 };
             });
         },
@@ -1068,9 +1078,11 @@ function createAgentApi(options = {}) {
             return run(async () => {
                 const normalized = await assertNoteExists(notePath);
                 const { store } = await readStore();
-                const brief = await buildNoteBrief(normalized, store, '');
+                const pathIndex = await buildRelationPathIndex();
+                const brief = await buildNoteBrief(normalized, store, '', pathIndex);
                 return {
                     ...brief,
+                    diagnostics: buildRelationDiagnostics(brief.relations),
                     bodyIncluded: false,
                 };
             });
@@ -1082,13 +1094,15 @@ function createAgentApi(options = {}) {
                 if (notePath) {
                     const normalized = await assertNoteExists(notePath);
                     const { store } = await readStore();
-                    const source = await buildNoteBrief(normalized, store, query || '');
+                    const pathIndex = await buildRelationPathIndex();
+                    const source = await buildNoteBrief(normalized, store, query || '', pathIndex);
                     const related = [];
                     for (const relation of source.relations) {
-                        if (!relation.target) continue;
+                        const targetPath = relationTargetForRead(relation);
+                        if (!targetPath) continue;
                         try {
-                            if (await adapter.exists(relation.target)) {
-                                related.push(await buildNoteBrief(relation.target, store, query || ''));
+                            if (await adapter.exists(targetPath)) {
+                                related.push(await buildNoteBrief(targetPath, store, query || '', pathIndex));
                             }
                         } catch (error) {
                             // Relations may point to aliases or notes that are not present locally.
@@ -1100,6 +1114,7 @@ function createAgentApi(options = {}) {
                         query: query || '',
                         source,
                         items: [source, ...related].slice(0, maxResults),
+                        diagnostics: buildRelationDiagnostics(source.relations),
                         bodyIncluded: false,
                     };
                 }

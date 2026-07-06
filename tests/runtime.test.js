@@ -51,6 +51,80 @@ function createRuntimePlugin(settings = {}) {
     return plugin;
 }
 
+test('checkEmbeddingHealth stores semantic status from api.py', async () => {
+    const plugin = createRuntimePlugin({ networkMode: 'embedding' });
+    let receivedArgs = null;
+    plugin.checkEngineHealth = async () => ({ ok: true });
+    plugin._runEngineApi = async (args) => {
+        receivedArgs = args;
+        return {
+            code: 0,
+            stderr: '',
+            payload: {
+                status: 'warning',
+                semantic_state: 'index_missing',
+                indexing: 'missing',
+                provider: 'mock',
+                recommended_action: 'build_embedding_index',
+            },
+        };
+    };
+
+    const health = await plugin.checkEmbeddingHealth(false, true);
+
+    assert.deepEqual(receivedArgs, ['embedding-status', '--vault', 'C:/vault']);
+    assert.equal(health.status, 'warning');
+    assert.equal(health.semantic_state, 'index_missing');
+    assert.equal(plugin.embeddingHealth.recommended_action, 'build_embedding_index');
+});
+
+test('checkEmbeddingHealth treats local-only mode as ready without reading semantic index', async () => {
+    const plugin = createRuntimePlugin({ networkMode: 'local', embeddingProvider: 'zhipu' });
+    plugin.checkEngineHealth = async () => {
+        throw new Error('should not check engine for local-only semantic status');
+    };
+    plugin._runEngineApi = async () => {
+        throw new Error('should not run embedding status in local-only mode');
+    };
+
+    const health = await plugin.checkEmbeddingHealth(false, true);
+
+    assert.equal(health.status, 'ok');
+    assert.equal(health.semantic_state, 'local_only');
+    assert.equal(health.indexing, 'skipped');
+    assert.equal(plugin.embeddingHealth.recommended_action, 'configure_vector_model');
+});
+
+test('checkEmbeddingHealth keeps engine readiness separate from semantic readiness', async () => {
+    const plugin = createRuntimePlugin({ networkMode: 'embedding' });
+    plugin.checkEngineHealth = async () => ({ ok: false, message: 'engine missing' });
+    plugin._runEngineApi = async () => {
+        throw new Error('should not run embedding status when engine is missing');
+    };
+
+    const health = await plugin.checkEmbeddingHealth(false, true);
+
+    assert.equal(health.status, 'error');
+    assert.equal(health.semantic_state, 'engine_not_ready');
+    assert.equal(health.recommended_action, 'check_engine_setup');
+});
+
+test('_showEngineGuidance refreshes semantic status for missing embedding index', () => {
+    const plugin = createRuntimePlugin();
+    let call = null;
+    plugin.checkEmbeddingHealth = (showNotice, force) => {
+        call = { showNotice, force };
+        return Promise.resolve({ status: 'warning' });
+    };
+
+    plugin._showEngineGuidance({
+        fixes: [{ id: 'embedding_index_missing' }],
+        warnings: ['using keyword fallback'],
+    });
+
+    assert.deepEqual(call, { showNotice: false, force: true });
+});
+
 test('local mode strips managed provider and webhook env values', () => {
     const envKeys = [...managedProviderEnvKeys, 'UNDERSTORY_WEBHOOK_ENABLED'];
     const previous = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));

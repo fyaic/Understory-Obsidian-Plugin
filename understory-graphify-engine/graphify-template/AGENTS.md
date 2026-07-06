@@ -1,11 +1,11 @@
-# AGENTS.md —— Understory · AIC-000 知识库 AI 操作契约
+# AGENTS.md —— Understory · 当前 vault AI 操作契约
 
 > 本文件是 AI 在本 vault 维护知识时的操作契约。人类无需阅读，AI 每次操作前应遵守。
-> 本目录 `.understory/` 是 AI 的隐藏工作层，Obsidian 不显示（点前缀），人在 AIC-000 正常读写。
+> 本目录 `.understory/` 是 AI 的隐藏工作层，Obsidian 不显示（点前缀），人在当前 vault 正常读写。
 
 ## 一、单 vault 铁律
 
-- **AIC-000 就是真身**，不存在第二个 wiki/ 或 raw/ vault。
+- **当前 vault 就是真身**，不存在第二个 wiki/ 或 raw/ vault。
 - AI 的全部元数据存放在 `.understory/`：SQLite + JSON + Markdown。
 - 人看 `.md` 业务文档，AI 看 `.understory/` 元数据。两者互不污染。
 

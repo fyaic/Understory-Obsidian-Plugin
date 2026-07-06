@@ -96,6 +96,10 @@ test('Understory Skill changes agent behavior toward MCP first', () => {
     assert.match(skill, /active local context and a long-term memory layer/);
     assert.match(skill, /retrieve relevant Understory context early even if the user did not explicitly say "search Obsidian"/);
     assert.match(skill, /durable memory, relation, decision, or project-state updates/);
+    assert.match(skill, /business-oriented knowledge map/);
+    assert.match(skill, /Design 3-5 focused searches/);
+    assert.match(skill, /required reading, optional background, needs verification, or exposes a research gap/);
+    assert.match(skill, /role-based reading path/);
     assert.match(skill, /Do not scan the entire vault by default/);
     assert.match(skill, /Before calling write tools/);
     assert.match(skill, /MCP is unavailable/);
@@ -118,6 +122,7 @@ test('Understory Skill supports query-only and memory usage modes', () => {
 
     assert.match(querySkill, /Use case: Query-only/);
     assert.match(querySkill, /when the user explicitly asks to query, search, cite, summarize, or inspect/);
+    assert.match(querySkill, /business-oriented knowledge map/);
     assert.match(querySkill, /Treat Query-only mode as read-only/);
     assert.match(querySkill, /Do not create, update, accept, reject, insert, refresh, write back, or maintain/);
     assert.doesNotMatch(querySkill, /retrieve relevant Understory context early/);

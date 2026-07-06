@@ -214,7 +214,7 @@ class GraphifyCoreMethods {
             if (highCount > 0 && this._shouldNotify('high_conflict')) {
                 new Notice(t(this, 'high_conflict_notice', { count: highCount }), 10000);
             }
-            if (this.settings.conflictBlockEnabled && (this.settings.presentationMode || 'body') !== 'sidebar') {
+            if (this.settings.conflictBlockEnabled && (this.settings.presentationMode || 'sidebar') !== 'sidebar') {
                 try { await this._updateConflictBlocksInVault(); } catch (e) { console.error('[Understory] conflict blocks:', e); }
             }
             if (manual) {
@@ -268,7 +268,7 @@ class GraphifyCoreMethods {
     }
 
     async _updateConflictBlocksInVault() {
-        if ((this.settings.presentationMode || 'body') === 'sidebar') return;
+        if ((this.settings.presentationMode || 'sidebar') === 'sidebar') return;
         const data = this._readConflicts();
         if (!data || !Array.isArray(data.issues)) return;
         const minSev = this.settings.conflictBlockMinSeverity || 'high';
