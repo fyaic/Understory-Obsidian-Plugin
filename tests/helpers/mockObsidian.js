@@ -51,6 +51,8 @@ class Plugin {
         this.views = new Map();
         this.ribbonIcons = [];
         this.settingTabs = [];
+        this.protocolHandlers = new Map();
+        this.domEvents = [];
     }
 
     async loadData() {
@@ -85,6 +87,14 @@ class Plugin {
     registerInterval(intervalRef) {
         this.intervals.push(intervalRef);
         return intervalRef;
+    }
+
+    registerObsidianProtocolHandler(protocol, handler) {
+        this.protocolHandlers.set(protocol, handler);
+    }
+
+    registerDomEvent(target, eventName, handler) {
+        this.domEvents.push({ target, eventName, handler });
     }
 }
 

@@ -30,6 +30,14 @@ def main() -> None:
     if "obsidian" in plugin_id or plugin_id.endswith("plugin"):
         raise SystemExit(f"Plugin id violates Obsidian naming guidance: {plugin_id}")
 
+    plugin_name = str(manifest["name"])
+    if "obsidian" in plugin_name.lower() or "plugin" in plugin_name.lower():
+        raise SystemExit(f"Plugin name violates Obsidian naming guidance: {plugin_name}")
+
+    description = str(manifest["description"])
+    if "obsidian" in description.lower():
+        raise SystemExit("manifest.json description must not include the word Obsidian")
+
     version = str(manifest["version"])
     if not re.fullmatch(r"\d+\.\d+\.\d+", version):
         raise SystemExit(f"Version must use x.y.z format: {version}")
@@ -61,9 +69,20 @@ def main() -> None:
             raise SystemExit(f"Forbidden local engine state must not be committed: {filename}")
 
     main_js = (ROOT / "main.js").read_text(encoding="utf-8")
-    for marker in ["./bundledEnginePayload", "api.py", "scripts/deploy_graphify.py", "requirements.txt"]:
+    for marker in [
+        "./authProtocol",
+        "./hostedAnalysis",
+        "./hostedClient",
+        "./hostedDiscovery",
+        "./bundledEnginePayload",
+        "api.py",
+        "scripts/deploy_graphify.py",
+        "requirements.txt",
+    ]:
         if marker not in main_js:
-            raise SystemExit(f"main.js is missing bundled engine payload marker: {marker}")
+            raise SystemExit(f"main.js is missing required bundle marker: {marker}")
+    if '"./settingsStyles"' in main_js:
+        raise SystemExit("main.js still contains the deleted settingsStyles module")
     for filename in required_engine_files:
         digest = hashlib.sha256((ROOT / filename).read_bytes()).hexdigest()
         if digest not in main_js:
@@ -107,6 +126,35 @@ def main() -> None:
         readme = (ROOT / filename).read_text(encoding="utf-8")
         if f"`{version}`" not in readme:
             raise SystemExit(f"{filename} does not mention current release version `{version}`")
+
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    privacy = (ROOT / "PRIVACY.md").read_text(encoding="utf-8")
+    for marker in ["Continue with Bondie", "Optional payments", "server-managed provider"]:
+        if marker not in readme:
+            raise SystemExit(f"README.md is missing hosted release disclosure: {marker}")
+    for marker in ["Hosted mode is not local-only", "selected snippets", "processing units", "does not read clipboard contents"]:
+        if marker not in privacy:
+            raise SystemExit(f"PRIVACY.md is missing required data-flow disclosure: {marker}")
+
+    release_workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+    for marker in ["npm run verify", "git diff --exit-code -- main.js", "actions/attest@v4"]:
+        if marker not in release_workflow:
+            raise SystemExit(f"Release workflow is missing provenance gate: {marker}")
+    if not (ROOT / ".github" / "workflows" / "ci.yml").exists():
+        raise SystemExit("Missing pull request CI workflow")
+
+    tracked = subprocess.run(
+        ["git", "ls-files"],
+        cwd=str(ROOT),
+        text=True,
+        capture_output=True,
+        check=True,
+    ).stdout.splitlines()
+    forbidden_tracked_names = {".env", ".DS_Store", "id_rsa", "id_ed25519"}
+    for filename in tracked:
+        path = Path(filename)
+        if path.name in forbidden_tracked_names or path.suffix.lower() in {".pem", ".p12", ".pfx"}:
+            raise SystemExit(f"Sensitive or local-only file is tracked: {filename}")
 
     subprocess.run(["node", "--check", str(ROOT / "main.js")], check=True)
 

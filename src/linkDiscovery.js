@@ -2,38 +2,60 @@ const { Notice, TFile } = require('obsidian');
 const { MAX_PROCESS_OUTPUT_BYTES } = require('./utils');
 const { DEFAULT_SETTINGS, getDefaultEngineDir, getDefaultPythonPath, repairPythonPath } = require('./settings');
 const { t } = require('./i18n');
-const { normalizeSettings } = require('./safety');
+const { normalizeSettings, recordBackgroundError } = require('./safety');
+
+const MAX_HOSTED_PENDING_DISCOVERIES = 10;
 
 class LinkDiscoveryMethods {
     scheduleLink(file) {
         if (!file) return;
         const path = file.path;
 
+        if (this._shouldUseHostedDiscovery?.()) {
+            if (this.settings?.sidebarRefreshOnEdit === false) return;
+            if (!this._hostedAccessToken?.() || !this.settings?.hostedConsentAccepted) return;
+            const activeFile = this.app?.workspace?.getActiveFile?.();
+            if (!activeFile || activeFile.path !== path) return;
+        }
+
         // 黑名单过滤：跳过排除文件夹中的文件
         if (this._isPathExcluded(path)) {
-            console.log(`[Understory] Skipped scheduling (excluded folder): ${path}`);
             return;
         }
 
         // 0509-repeat-fix: 文件创建后固定等待10分钟，期间不重置定时器
         // 确保即使文件被反复编辑，10分钟后也必定执行一次关联发现
         if (this.timers.has(path)) {
-            console.log(`[Understory] Timer already running for ${path}, not resetting`);
             return;
         }
 
-        const delay = (this.settings.debounceMinutes || 10) * 60 * 1000;
-        const timer = setTimeout(() => this.runGraphify(file), delay);
-        this.timers.set(path, timer);
+        if (this._shouldUseHostedDiscovery?.() && this.timers.size >= MAX_HOSTED_PENDING_DISCOVERIES) {
+            const oldest = this.timers.entries().next().value;
+            if (oldest) {
+                window.clearTimeout(oldest[1]);
+                this.timers.delete(oldest[0]);
+            }
+        }
 
-        console.log(`[Understory] Scheduled link discovery for ${path} in ${this.settings.debounceMinutes}min`);
+        const delay = (this.settings.debounceMinutes || 10) * 60 * 1000;
+        const timer = window.setTimeout(() => {
+            this.runGraphify(file, false, false).catch((error) => {
+                recordBackgroundError(this, 'discover-relations', error);
+            });
+        }, delay);
+        this.timers.set(path, timer);
     }
 
     _clearScheduledLink(path) {
         if (!path || !this.timers.has(path)) return;
-        clearTimeout(this.timers.get(path));
+        window.clearTimeout(this.timers.get(path));
         this.timers.delete(path);
-        console.log(`[Understory] Cleared scheduled link discovery for ${path}`);
+    }
+
+    _clearHostedScheduledWork() {
+        if (!this.timers) return;
+        for (const timer of this.timers.values()) window.clearTimeout(timer);
+        this.timers.clear();
     }
 
     async linkNow() {
@@ -46,10 +68,27 @@ class LinkDiscoveryMethods {
             new Notice(t(this, 'notice_note_excluded'));
             return;
         }
-        await this.runGraphify(file);
+        await this.runGraphify(file, true, true);
     }
 
-    async _runGraphifyProcess(file, refresh = false) {
+    async _runGraphifyProcess(file, refresh = false, interactive = refresh) {
+        if (this._shouldUseHostedDiscovery?.() && this.hostedDiscoverRelations) {
+            try {
+                const result = await this.hostedDiscoverRelations(file, { interactiveConsent: interactive });
+                const stdout = JSON.stringify(result || {
+                    status: 'skipped',
+                    reason: t(this, 'hosted_discovery_no_result'),
+                });
+                this.timers.delete(file.path);
+                await this._maybeProcessResult(file, 0, stdout, '', true, true, { notify: interactive });
+                return { code: 0, stdout, stderr: '' };
+            } catch (error) {
+                const stderr = String(error?.message || error).slice(0, 300);
+                this.timers.delete(file.path);
+                await this._maybeProcessResult(file, 1, '', stderr, true, true, { notify: interactive });
+                return { code: 1, stdout: '', stderr };
+            }
+        }
         const { spawn } = require('child_process');
         if (this._ensureEngineReady && !(await this._ensureEngineReady(true))) {
             return { code: -1, stdout: '', stderr: 'Understory engine is not ready' };
@@ -69,8 +108,6 @@ class LinkDiscoveryMethods {
         ];
         const vaultBase = this._vaultBasePath ? this._vaultBasePath() : null;
         if (vaultBase) args.push('--vault', vaultBase);
-
-        console.log(`[Understory] Running: ${pythonExe} api.py ${cmd} "${absPath}" ${shouldWriteBody ? '--auto-write' : '--no-auto-write'}`);
 
         const proc = spawn(pythonExe, args, {
             cwd: graphifyDir,
@@ -143,13 +180,13 @@ class LinkDiscoveryMethods {
             try {
                 await this.relationsStore.stripAutoRelatedSection(file);
             } catch (error) {
-                console.error('[Understory] Failed to strip auto-related section:', error);
+                recordBackgroundError(this, 'remove-legacy-related-section', error);
             }
         }
         return { code: exitCode, stdout, stderr };
     }
 
-    async runGraphify(file, refresh = false) {
+    async runGraphify(file, refresh = false, interactive = refresh) {
         if (!file) return this.runQueue;
         if (this.queuedPaths.has(file.path)) {
             return this.queuedTasks.get(file.path) || this.runQueue;
@@ -160,7 +197,7 @@ class LinkDiscoveryMethods {
         const task = this.runQueue.then(async () => {
             this.isRunning = true;
             try {
-                return await this._runGraphifyProcess(file, refresh);
+                return await this._runGraphifyProcess(file, refresh, interactive);
             } finally {
                 this.isRunning = false;
                 this.queuedPaths.delete(file.path);
@@ -171,7 +208,7 @@ class LinkDiscoveryMethods {
         this.queuedTasks.set(file.path, task);
 
         this.runQueue = task.catch((error) => {
-            console.error('[Understory] Queue worker failed:', error);
+            recordBackgroundError(this, 'relation-queue', error);
         });
 
         return task;
@@ -243,7 +280,6 @@ class LinkDiscoveryMethods {
 
         if (!fs.existsSync(scriptPath)) {
             new Notice(t(this, 'daemon_script_missing'));
-            console.error('[Understory] index daemon script missing:', scriptPath);
             return;
         }
 
@@ -263,20 +299,19 @@ class LinkDiscoveryMethods {
 
         proc.stdout?.on('data', (data) => {
             const msg = data.toString().trim();
-            if (msg) console.log(`[Understory daemon] ${msg}`);
+            if (msg) this.lastDaemonMessage = msg.slice(0, 300);
         });
         proc.stderr?.on('data', (data) => {
             const msg = data.toString().trim();
-            if (msg) console.error(`[Understory daemon] ${msg}`);
+            if (msg) recordBackgroundError(this, 'local-index-daemon', msg);
         });
         proc.on('error', (error) => {
             this.daemonProcess = null;
-            console.error('[Understory] Failed to start daemon:', error);
+            recordBackgroundError(this, 'start-local-index-daemon', error);
             new Notice(t(this, 'daemon_start_failed', { message: error.message }));
         });
         proc.on('close', (code) => {
             this.daemonProcess = null;
-            console.log(`[Understory] Index daemon exited with code ${code}`);
             if (this.settings.daemonEnabled && code !== 0) {
                 new Notice(t(this, 'daemon_exited', { code }));
             }
@@ -297,7 +332,7 @@ class LinkDiscoveryMethods {
             proc.kill();
             if (showNotice) new Notice(t(this, 'daemon_stopped_notice'));
         } catch (error) {
-            console.error('[Understory] Failed to stop daemon:', error);
+            recordBackgroundError(this, 'stop-local-index-daemon', error);
             if (showNotice) new Notice(t(this, 'daemon_stop_failed', { message: error.message }));
         }
     }
@@ -322,12 +357,22 @@ class LinkDiscoveryMethods {
 
     async loadSettings() {
         const data = await this.loadData() || {};
+        const previousSchemaVersion = Number(data.settingsSchemaVersion || 0);
         this._loadedSettingsData = data;
         this.settings = normalizeSettings(data, DEFAULT_SETTINGS);
-        if (!this.settings.graphifyDir) this.settings.graphifyDir = getDefaultEngineDir();
-        if (!this.settings.pythonPath) this.settings.pythonPath = getDefaultPythonPath();
-        const pythonRepair = repairPythonPath(this.settings);
-        if (pythonRepair.changed) await this.saveSettings();
+        if ((this.settings.networkMode || 'local') === 'hosted') {
+            this.settings.embeddingProvider = 'hosted';
+            this.settings.llmProvider = 'hosted';
+            if (previousSchemaVersion < 2 && (!data.presentationMode || data.presentationMode === 'body')) {
+                this.settings.presentationMode = 'sidebar';
+            }
+        } else {
+            if (!this.settings.graphifyDir) this.settings.graphifyDir = getDefaultEngineDir();
+            if (!this.settings.pythonPath) this.settings.pythonPath = getDefaultPythonPath();
+            repairPythonPath(this.settings);
+        }
+        this.settings.settingsSchemaVersion = 2;
+        if (previousSchemaVersion < 2) await this.saveSettings();
     }
 
     async saveSettings() {
@@ -341,8 +386,8 @@ class LinkDiscoveryMethods {
     /**
      * Promise 版本的 runGraphify，用于水流式队列
      */
-    async runGraphifyAsync(file, refresh = false) {
-        return this.runGraphify(file, refresh);
+    async runGraphifyAsync(file, refresh = false, interactive = false) {
+        return this.runGraphify(file, refresh, interactive);
     }
 
     /**
@@ -404,17 +449,12 @@ class LinkDiscoveryMethods {
             this.settings.lastRefreshTime = now;
             await this.saveSettings();
             const days = Math.ceil(threshold / msPerDay);
-            console.log(`[Understory] First install / reset detected. Auto-refresh scheduled in ${days} days.`);
             new Notice(t(this, 'auto_refresh_first_enabled', { days }));
             return;
         }
 
         if (now - last > threshold) {
-            console.log(`[Understory] Auto-refresh threshold exceeded (${freq}), starting refresh...`);
             await this.startRefreshQueue();
-        } else {
-            const daysLeft = Math.ceil((threshold - (now - last)) / msPerDay);
-            console.log(`[Understory] Auto-refresh not needed, ${daysLeft} days left`);
         }
     }
 
@@ -458,7 +498,6 @@ class LinkDiscoveryMethods {
             this.refreshTimer = null;
             await this.saveSettings();
             new Notice(t(this, 'refresh_done_notice', { count: queue.length }));
-            console.log(`[Understory] Refresh queue completed: ${queue.length} files`);
             return;
         }
 
@@ -466,15 +505,14 @@ class LinkDiscoveryMethods {
         const file = this.app.vault.getAbstractFileByPath(path);
 
         if (file instanceof TFile) {
-            console.log(`[Understory] Refreshing [${idx + 1}/${queue.length}]: ${path}`);
-            await this.runGraphifyAsync(file, true);
+            await this.runGraphifyAsync(file, true, false);
         }
 
         this.settings.refreshQueueIndex = idx + 1;
         await this.saveSettings();
 
         // 水流式间隔：每篇之间 5 秒，避免高并发
-        this.refreshTimer = setTimeout(() => this.processNextInQueue(), 5000);
+        this.refreshTimer = window.setTimeout(() => this.processNextInQueue(), 5000);
     }
 
     /**
@@ -482,7 +520,7 @@ class LinkDiscoveryMethods {
      */
     async cancelRefresh() {
         if (this.refreshTimer) {
-            clearTimeout(this.refreshTimer);
+            window.clearTimeout(this.refreshTimer);
             this.refreshTimer = null;
         }
         this.settings.refreshInProgress = false;
@@ -494,23 +532,24 @@ class LinkDiscoveryMethods {
 
     onunload() {
         for (const timer of this.timers.values()) {
-            clearTimeout(timer);
+            window.clearTimeout(timer);
         }
         this.timers.clear();
         this.queuedPaths.clear();
         this.queuedTasks.clear();
+        this._understoryNoticeCooldowns?.clear();
         this.runQueue = Promise.resolve();
         if (this.refreshTimer) {
-            clearTimeout(this.refreshTimer);
+            window.clearTimeout(this.refreshTimer);
             this.refreshTimer = null;
         }
         // Graphify AI 层清理
         if (this.ingestTimers) {
-            for (const timer of this.ingestTimers.values()) clearTimeout(timer);
+            for (const timer of this.ingestTimers.values()) window.clearTimeout(timer);
             this.ingestTimers.clear();
         }
         if (this.periodicTimer) {
-            clearInterval(this.periodicTimer);
+            window.clearInterval(this.periodicTimer);
             this.periodicTimer = null;
         }
         this.stopDaemon(false);

@@ -167,7 +167,6 @@ test('accept and reject update relation status and tombstone rejected targets', 
 
 test('stripAutoRelatedSection removes auto-generated related section but keeps manual section', async () => {
     const { file, noteFiles, store } = createHarness();
-    const plugin = store.plugin;
 
     // Manual section (no auto-links sentinel) should stay.
     noteFiles.set(file.path, '# Note\n\n## 🏷️关联文件\n\n### 手动插入\n\n[[Manual]]\n');

@@ -1,240 +1,175 @@
 # Understory
 
 <p align="center">
-  <img src="assets/understory-logo.png" alt="Understory logo" width="220">
+  <img src="assets/understory-logo.png" alt="Understory leaf mark" width="150">
 </p>
 
-[Chinese README](README.zh-CN.md) | [Website](https://bondie.io/research/understory) | [Privacy](PRIVACY.md)
+<p align="center">
+  Find related notes, surface conflicts, and keep a growing vault easier to navigate.
+</p>
 
-Understory is a local-first knowledge layer for Obsidian. It builds a private maintenance layer under your vault, driven by Vector, ER, and Graph analysis, so related notes, claims, concepts, conflicts, and orphan pages can be discovered and maintained over time.
+<p align="center">
+  <a href="README.zh-CN.md">简体中文</a> ·
+  <a href="PRIVACY.md">Privacy</a> ·
+  <a href="CHANGELOG.md">Changelog</a>
+</p>
 
-The plugin is desktop-only and ships with the local Understory engine in this repository. It is designed for people who want Obsidian to keep a durable, self-refreshing memory layer without sending vault data to a developer-operated service.
+Understory is a desktop knowledge-maintenance companion. Open a note, ask Understory to analyze it, then review related-note suggestions and risks in a focused right sidebar.
 
-## What It Does
+The standard experience is hosted-first. Sign in with a Bondie account and Understory prepares the managed AI service automatically. You do not need to choose a provider, paste a model key, install Python, or configure an endpoint.
 
-- Shows related-note suggestions in the right sidebar through **Show Understory**.
-- New installs default to **Right sidebar only** presentation. Understory does not automatically write related-note sections into note bodies unless you choose a note-body presentation mode or explicitly click **Insert into body**.
-- Discovers note relationships with hybrid signals, including local structure, entity facts, graph analysis, and optional model-powered semantic signals.
-- Flags possible conflicts, stale notes, orphan pages, and broken knowledge paths.
-- Maintains local reports and caches in `.understory`.
-- Supports English and Chinese UI text from the plugin settings.
-- Lets you choose a privacy mode before configuring any model provider.
+## Start In Three Steps
 
-## Privacy Modes
+1. Enable Understory and click the leaf icon in the ribbon.
+2. Select **Continue with Bondie** and complete sign-in in your browser.
+3. Return to your note and select **Generate suggestions**.
 
-Understory starts local-first.
+The first analysis asks for permission before selected note snippets leave your device. Understory then shows suggestions and risks without changing the note body. You decide whether to accept, ignore, or insert a confirmed relation.
 
-| Mode | What happens |
-| :--- | :--- |
-| Local only | No cloud model or webhook requests. Provider keys are not passed to the local engine process. Understory uses local files, keywords, ER data, existing caches, and reports. |
-| Vector model only | Sends selected snippets/titles to the vector provider you configure for similarity analysis. No reasoning model is used. |
-| Full AI analysis | Allows both vector and reasoning model requests for semantic indexing, concept extraction, explanations, and conflict checks. |
+## What You Get
 
-Optional cloud features can use OpenAI, Zhipu, Kimi/Moonshot, or a custom OpenAI-compatible endpoint. You provide your own API keys. Bondie Labs does not receive or manage your notes, prompts, embeddings, responses, logs, or API keys.
+- A right sidebar organized into **Suggestions** and **Risks**.
+- Related-note matches grouped by topic or source.
+- Conflict, stale-content, orphan-note, and broken-link checks.
+- A clear account page with profile, membership, and service readiness.
+- Per-account usage totals and feature-level activity.
+- Folder scope controls for notes that should be included or ignored.
+- English and Chinese interfaces, with light and dark theme support.
+- An advanced local Agent API through JSON CLI and MCP stdio.
 
-The **Network & privacy** settings page lets you choose a provider, paste your API key, and edit the endpoint/base URL and model name. OpenAI, Zhipu, and Kimi/Moonshot presets fill the common endpoints for you, but custom proxies and compatible services are supported.
+## Account And Membership
 
-Plugin logs and short diagnostics redact known API keys, bearer tokens, webhook URLs, and similar secrets. Raw process stdout is not stored in plugin logs by default.
+Bondie manages sign-in, profile changes, account security, connected devices, and account recovery. The plugin provides direct entries to those account pages instead of duplicating identity settings.
 
-Payment status: **Optional payments**. The plugin is free to install. Local mode does not require an API key. Provider accounts, API keys, pricing, quotas, privacy terms, and billing are controlled by the provider you choose.
+Understory currently assigns every account the **Free** membership. The client already understands Free, Pro, and Plus membership states so future plans can be introduced without exposing billing controls before they are ready.
 
-## License
+Signing out of Understory revokes this product session only. A separate, clearly confirmed action signs out of the wider Bondie account.
 
-Understory is source-available under the [PolyForm Perimeter License 1.0.0](LICENSE). You may use, inspect, modify, and redistribute the source, but you may not use it to provide a product that competes with Understory.
+## Hosted AI, Without Client Keys
 
-The required copyright notice and commercial licensing contact are in [NOTICE](NOTICE). Commercial licenses are available from Fuyo AI Tech Co. Limited for competing products, redistributed product bundles, or other uses outside the PolyForm Perimeter terms.
+In the standard hosted mode:
 
-## Requirements
+- Model credentials are managed by the Understory service and are never returned to the plugin.
+- Each signed-in account receives server-managed provider access.
+- The service records account-linked request and processing-unit totals for quotas, reliability, and operator observability.
+- The plugin displays the account's aggregate usage without exposing provider credentials or internal routing.
 
-- Obsidian desktop app.
-- The bundled local Understory engine.
-- Python available on your machine.
+The current managed service uses server-side provider routing. Provider pools and upstream credentials can change without requiring users to reconfigure the plugin.
 
-The plugin is marked `isDesktopOnly` because it uses local files, Node APIs, and a Python subprocess.
+## Privacy At A Glance
 
-## Manual Install
+Understory reads Markdown notes in the current vault. Hosted analysis can send note paths, titles, and bounded text snippets to `https://understory.bondie.io` only after consent. Current limits include up to 4,000 characters for the active note and up to 2,000 characters for each selected candidate during relation discovery.
 
-After the plugin is accepted into the Obsidian Community directory, the standard install uses the release assets `manifest.json`, `main.js`, and `styles.css`. Understory embeds the local engine payload inside `main.js` and extracts it into the plugin folder on first load.
+The server returns relations, scores, risk summaries, and usage data. The client stores the session, settings, relation cache, and analysis reports locally. Hosted responses state that note content is not retained by the Understory service; account and usage records are retained as required to operate the service.
 
-Until the Community directory has picked up the latest release, install the same release assets directly from GitHub:
+You can exclude folders, disable selected-snippet uploads, sign out, or switch an existing advanced installation to a local/self-hosted workflow. See [PRIVACY.md](PRIVACY.md) for the complete data-flow matrix.
 
-1. Create this folder in your vault:
+## Advanced Local And Self-Hosted Workflows
 
-   ```text
-   <Your Vault>/.obsidian/plugins/understory/
-   ```
+Existing users who already selected local mode stay in local mode after upgrading. Advanced settings also retain local, self-hosted, and bring-your-own-key workflows for operators who intentionally need them.
 
-2. Download these files from the GitHub release and place them in that folder:
+Those workflows may require:
 
-   ```text
-   <Your Vault>/.obsidian/plugins/understory/manifest.json
-   <Your Vault>/.obsidian/plugins/understory/main.js
-   <Your Vault>/.obsidian/plugins/understory/styles.css
-   ```
+- Obsidian desktop.
+- Python and the bundled local engine.
+- A provider account and key for optional vector or reasoning services.
+- Manual endpoint, model, and privacy configuration.
 
-3. Restart Obsidian.
-4. Enable **Understory** in **Settings -> Community plugins**.
-5. After the first load, confirm the bundled engine was extracted:
+These controls live under **Settings -> Understory -> Advanced**. They are not part of the first-run path. Local mode blocks managed hosted discovery and does not require a Bondie session.
 
-   ```text
-   <Your Vault>/.obsidian/plugins/understory/understory-graphify-engine/api.py
-   ```
+## AI Agents
 
-## Engine Setup
+Understory can expose the current vault to a local agent through MCP stdio. It does not open an HTTP port. From **Settings -> Understory -> AI agents**, you can:
 
-Understory for Obsidian includes the local engine in this repository under `understory-graphify-engine/`. Release builds also embed that engine in `main.js`, so a standard Obsidian install can materialize the engine automatically inside the plugin folder.
+- Create a vault-specific MCP server file in `.understory/agent`.
+- Copy a vault-specific MCP configuration.
+- Choose a conservative query-only prompt or an agent-memory workflow.
+- Export a local setup pack and redacted diagnostics.
 
-```powershell
-cd understory-graphify-engine
-python -m pip install -r requirements.txt
+Read tools return scoped snippets and relation metadata rather than full note bodies by default. Write tools modify local vault files and should be used only after user confirmation. See [docs/AGENT_API.md](docs/AGENT_API.md) for the complete contract.
+
+## Local Files
+
+Understory may write these local artifacts:
+
+```text
+<vault>/.understory/                         relation cache, reports, logs, Agent files
+<vault>/.obsidian/plugins/understory/data.json
+                                             plugin settings and the product session
+<vault>/.obsidian/plugins/understory/understory-graphify-engine/
+                                             bundled engine for advanced local mode
 ```
 
-Understory tries to install and find the bundled engine automatically from the plugin folder, repository folder, and common local workspace paths. Standard Obsidian installs extract it to `<vault>/.obsidian/plugins/understory/understory-graphify-engine/`. Most users do not need to set an engine path manually.
+Normal hosted use does not start the Python engine.
 
-If you moved the engine or want to pin a specific copy, set the engine path before launching Obsidian:
+## Installation
 
-```powershell
-$env:UNDERSTORY_ENGINE_DIR="<Your Vault>\.obsidian\plugins\understory\understory-graphify-engine"
-$env:UNDERSTORY_PYTHON_PATH="python"
+### Community Directory
+
+After the Community listing is approved:
+
+1. Open **Settings -> Community plugins -> Browse**.
+2. Search for **Understory**.
+3. Install and enable it.
+
+### Manual Release Install
+
+Download `manifest.json`, `main.js`, and `styles.css` from the same GitHub release. Place them in:
+
+```text
+<vault>/.obsidian/plugins/understory/
 ```
 
-You can also override the engine folder and Python path in **Settings -> Understory -> Start here**. Understory automatically looks for `python3` when `python` is not available, including common macOS Homebrew paths such as `/opt/homebrew/bin/python3`. After changing system environment variables, restart Obsidian so the desktop app can read them.
+Restart Obsidian, then enable Understory under **Community plugins**. Do not mix assets from different versions.
 
-The settings page is split into tabs. Most users only need **Start here**, **Network & privacy**, **Relation discovery**, and **Relation maintenance**. **AI agents** comes after the relation workflow, so first-run setup stays focused on the required steps.
+## Troubleshooting
 
-The **Check setup** button checks the local engine, Python, scripts, vault `.understory` deployment, and permissions. Each problem includes a suggested fix and, when useful, a command you can copy. The panel does not run `pip install`, `git pull`, or other repair commands automatically.
+### The browser says sign-in succeeded but the plugin is still disconnected
 
-Common manual fixes:
+Return to the same vault, open Understory, and select **Refresh status**. If the callback was opened by another vault or profile, start sign-in again from the intended vault.
 
-```powershell
-python -m pip install -r "<Your Vault>\.obsidian\plugins\understory\understory-graphify-engine\requirements.txt"
-$env:UNDERSTORY_ENGINE_DIR="<Your Vault>\.obsidian\plugins\understory\understory-graphify-engine"
-$env:UNDERSTORY_PYTHON_PATH="python"
+### Suggestions do not run
+
+Confirm that:
+
+- The account page says **Connected** and **Service ready**.
+- A Markdown note is active.
+- Snippet upload consent is enabled.
+- The note is not inside an excluded folder.
+
+### A session expired
+
+Understory clears an invalid local session after an unauthorized server response. Sign in again; the relation cache in `.understory` remains local.
+
+### Local mode is unavailable
+
+Open **Advanced**, run the local setup check, and review Python, engine path, dependency, and permission guidance. Hosted users do not need this setup.
+
+## Payment Status
+
+Community listing: **Optional payments**.
+
+Understory is free to install and the current hosted membership is Free. It connects to a managed service and retains advanced workflows that can connect to paid APIs, so Obsidian's policy requires the Optional payments label even while checkout is disabled.
+
+## Development
+
+The reviewable source lives in `src/`; release assets live at the repository root.
+
+```bash
+npm ci
+npm run verify
 ```
 
-Use **Copy diagnostics** when you need to share setup details with a maintainer. The copied summary is designed to exclude API keys, webhook URLs, and vault note content.
+`npm run verify` runs the official Obsidian lint rules, 99 automated tests, the deterministic bundle, release metadata checks, a bundle syntax check, and a local engine smoke test.
 
-### Embedding Index
-
-Understory now treats local engine readiness and semantic embedding readiness as separate setup states. The local engine can be ready while semantic vector recall is still off or waiting for setup.
-
-- **Local only**: semantic vector embedding is intentionally off. Understory keeps using local files, keywords, ER, links, and graph structure; a missing Embedding index is not an error.
-- **Vector model only** or **Full AI analysis** without a vector API key: Settings shows that the Embedding API is not configured yet and points you to **Model services**.
-- Vector mode with a configured provider but no index: Settings shows **Build/update Embedding index**. This creates or updates a local SQLite cache on your machine; it does not mean a local embedding model is installed.
-- Ready state: Settings shows the semantic index status, indexed note count when available, and the local index path.
-
-If the Embedding cache has not been built yet, Understory does not stop with a raw Python exit code. It falls back to local keyword results, shows actionable guidance, and keeps the settings-page setup journey visible. You can also build the index from a terminal:
-
-```powershell
-python "<Your Vault>\.obsidian\plugins\understory\understory-graphify-engine\api.py" init --vault "<Your Vault>"
-```
-
-## First Run
-
-1. Open **Settings -> Understory**.
-2. In **Start here**, confirm the auto-detected Understory engine folder and Python.
-3. Click **Check setup**.
-4. In **Network & privacy**, keep **Network mode** on **Local only**, or explicitly choose a cloud mode and configure your own provider key, endpoint/base URL, and model name.
-5. If you selected a vector mode, use the semantic index card in **Start here** or **Network & privacy** to check readiness and build/update the local Embedding index once the provider is configured.
-6. In **AI agents**, create the local MCP server file, copy the MCP JSON into your agent's MCP settings, and copy the matching Skill prompt if you want an external agent to use this vault as a local knowledge API.
-7. Open the command palette and run **Show Understory**.
-
-## Agent API
-
-Understory also exposes a local Agent API for automation. It is not an HTTP server and does not open a port. Agents can call it through a JSON CLI or an MCP stdio server.
-
-For regular Obsidian plugin users, open **Settings -> Understory -> AI agents**. That page provides:
-
-- A copyable, vault-specific MCP JSON configuration with a server key such as `understory-work-notes`.
-- A local MCP server file created at `.understory/agent/understory-mcp-server.js`; this is not a cloud server and does not open an HTTP port.
-- A use-case selector for **Query-only** or **Agent memory model**.
-- Agent-specific setup notes for Generic MCP, Codex, Claude Desktop, Cursor, and OpenClaw.
-- A copyable Skill prompt that binds the agent to this vault and the selected use case.
-- A setup pack that combines the MCP config, Skill, vault identity, and install notes.
-- A local diagnostics summary that is designed to avoid API keys, webhook URLs, and vault note content.
-
-Understory identifies only the currently open vault. If you use multiple Obsidian vaults, repeat this flow in each vault and add each generated MCP server entry to your agent config. Do not reuse a single global `understory` key for every vault.
-
-The Skill has two variants:
-
-- **Query-only**: the agent calls Understory only when you explicitly ask it to query, search, cite, summarize, or inspect this vault. This mode is read-only and conservative.
-- **Agent memory model**: the agent treats Understory as active local context and a long-term memory layer. For relevant ongoing work, it can retrieve context before planning and propose durable memory or relation updates at the end, but local writes still require user confirmation.
-
-Both variants include a business knowledge-map workflow: the agent should design several focused searches, read scoped context through MCP, group notes by business meaning, identify gaps, and return role-based reading paths instead of pasting raw search hits.
-
-Developer commands are still available from this repository:
-
-```powershell
-node scripts/understory-agent-cli.js status --vault "C:\path\to\vault" --json
-node scripts/understory-agent-cli.js get-relations --vault "C:\path\to\vault" --note "Notes/A.md" --json
-node scripts/understory-agent-cli.js refresh-relations --vault "C:\path\to\vault" --note "Notes/A.md" --engine-dir "C:\path\to\vault\.obsidian\plugins\understory\understory-graphify-engine" --json
-node scripts/understory-agent-cli.js insert-relation --vault "C:\path\to\vault" --note "Notes/A.md" --target "Notes/B.md" --title "B" --json
-```
-
-Multi-vault MCP configuration example after using **Create local MCP server file** in each vault:
-
-```json
-{
-  "mcpServers": {
-    "understory-work-notes": {
-      "command": "node",
-      "args": [
-        "C:/path/to/work-vault/.understory/agent/understory-mcp-server.js",
-        "--vault",
-        "C:/path/to/work-vault",
-        "--engine-dir",
-        "C:/path/to/work-vault/.obsidian/plugins/understory/understory-graphify-engine"
-      ]
-    },
-    "understory-research-vault": {
-      "command": "node",
-      "args": [
-        "C:/path/to/research-vault/.understory/agent/understory-mcp-server.js",
-        "--vault",
-        "C:/path/to/research-vault",
-        "--engine-dir",
-        "C:/path/to/research-vault/.obsidian/plugins/understory/understory-graphify-engine"
-      ]
-    }
-  }
-}
-```
-
-Developers working from this repository can use `scripts/understory-mcp-server.js` instead of the exported server path.
-
-All Agent API responses use a JSON envelope with `ok`, `data`, `error`, and `meta`. The API keeps paths inside the selected vault, does not return full note bodies by default, and reuses Understory secret redaction. See [docs/AGENT_API.md](docs/AGENT_API.md) for the full tool contract.
-
-Current MCP read tools include status, capabilities, graph summary, note relations, local keyword/relations search, scoped context packages, and note briefs. Write tools remain local-only and should be used only after user confirmation.
-
-Relation metadata is checked against the current vault when read. If a cached relation target moved, search, note brief, relations, and context responses keep the original `target` and add `targetStatus`, `targetExists`, `resolvedTarget`, and diagnostics so agents do not treat stale paths as facts. Read tools report this drift without rewriting `.understory/relations.json`.
-
-## Build From Source
-
-This repository keeps the reviewable plugin source in `src/` and the Obsidian release files at the repository root.
-
-```powershell
-npm run build
-npm run check
-```
-
-The build script bundles `src/*.js` into root `main.js`.
-
-## Release Files
-
-Each GitHub release must attach:
+Every release must attach exactly these install assets:
 
 - `manifest.json`
 - `main.js`
 - `styles.css`
 
-The release `main.js` embeds the bundled engine payload used by standard Obsidian installs.
+The Git tag must exactly match the manifest version. Current release: `1.13.0`.
 
-Current release: `1.8.11`.
+## License
 
-The release tag must match `manifest.json` version exactly, for example `1.8.11`.
-
-## Links
-
-- Website: https://bondie.io/research/understory
-- Bundled engine source: [understory-graphify-engine](understory-graphify-engine)
-- Privacy: [PRIVACY.md](PRIVACY.md)
+Understory is source-available under the [PolyForm Perimeter License 1.0.0](LICENSE). See [NOTICE](NOTICE) for the required notice and commercial licensing contact.

@@ -16,6 +16,7 @@ const {
 const {
     extractProcessJsonMessage,
     normalizeLogEntry,
+    recordBackgroundError,
     redactSensitiveText,
     safeErrorDetail,
     safeNetworkMode,
@@ -31,6 +32,8 @@ const MANAGED_ENV_KEYS = [
     'UNDERSTORY_LLM_BASE_URL',
     'UNDERSTORY_LLM_MODEL',
     'UNDERSTORY_LLM_API_KEY',
+    'UNDERSTORY_HOSTED_API_BASE_URL',
+    'UNDERSTORY_HOSTED_ACCESS_TOKEN',
     'UNDERSTORY_WEBHOOK_ENABLED',
 ];
 
@@ -49,9 +52,7 @@ class GraphifyRuntimeMethods {
             });
             const list = wrap.createEl('div');
             for (const it of orphans) {
-                const row = list.createEl('div');
-                row.style.padding = '3px 0';
-                row.style.borderBottom = '1px solid var(--background-modifier-border)';
+                const row = list.createEl('div', { cls: 'understory-orphan-row' });
                 this._appendNoteLink(row, it.doc, modal);
             }
         }).open();
@@ -75,8 +76,9 @@ class GraphifyRuntimeMethods {
 
     _pythonEnv(extra = {}) {
         const vaultBase = this._vaultBasePath ? this._vaultBasePath() : null;
-        const networkMode = safeNetworkMode(this.settings?.networkMode);
-        const webhookEnabled = networkMode !== 'local'
+        const networkMode = safeNetworkMode(this.settings?.networkMode, 'hosted');
+        const isHosted = networkMode === 'hosted';
+        const webhookEnabled = !isHosted && networkMode !== 'local'
             && !!this.settings?.webhookEnabled
             && !!String(this.settings?.webhookUrl || '').trim();
         const env = {
@@ -89,14 +91,27 @@ class GraphifyRuntimeMethods {
             PYTHONIOENCODING: 'utf-8',
             ...extra,
         };
-        for (const key of MANAGED_ENV_KEYS) {
-            delete env[key];
-        }
+        for (const key of MANAGED_ENV_KEYS) delete env[key];
         env.UNDERSTORY_WEBHOOK_ENABLED = webhookEnabled ? '1' : '0';
         const setIfPresent = (key, value) => {
             const text = String(value || '').trim();
             if (text) env[key] = text;
         };
+
+        if (isHosted) {
+            const config = this.settings?.hostedRuntimeConfig || {};
+            const features = config.features || {};
+            const embedding = features.embedding || {};
+            const reasoning = features.reasoning || {};
+            env.UNDERSTORY_EMBEDDING_PROVIDER = 'hosted';
+            env.UNDERSTORY_LLM_PROVIDER = 'hosted';
+            setIfPresent('UNDERSTORY_HOSTED_API_BASE_URL', this.settings?.hostedServerUrl || config.public_api_base_url);
+            setIfPresent('UNDERSTORY_HOSTED_ACCESS_TOKEN', this.settings?.hostedAccessToken);
+            setIfPresent('UNDERSTORY_EMBEDDING_MODEL', embedding.model || this.settings?.embeddingModel);
+            setIfPresent('UNDERSTORY_LLM_MODEL', reasoning.model || this.settings?.llmModel);
+            return env;
+        }
+
         if (networkMode === 'embedding' || networkMode === 'full') {
             setIfPresent('UNDERSTORY_EMBEDDING_PROVIDER', this.settings?.embeddingProvider);
             setIfPresent('UNDERSTORY_EMBEDDING_BASE_URL', this.settings?.embeddingBaseUrl);
@@ -138,19 +153,19 @@ class GraphifyRuntimeMethods {
                 windowsHide: true,
             });
             let output = '';
-            let timer = setTimeout(() => {
+            let timer = window.setTimeout(() => {
                 try { proc.kill(); } catch (error) { /* ignore */ }
                 reject(new Error(t(this, 'engine_python_timeout')));
             }, timeoutMs);
             proc.stdout?.on('data', (data) => { output += data.toString(); });
             proc.stderr?.on('data', (data) => { output += data.toString(); });
             proc.on('error', (error) => {
-                if (timer) clearTimeout(timer);
+                if (timer) window.clearTimeout(timer);
                 timer = null;
                 reject(error);
             });
             proc.on('close', (code) => {
-                if (timer) clearTimeout(timer);
+                if (timer) window.clearTimeout(timer);
                 timer = null;
                 if (code === 0) resolve(output.trim() || pythonExe);
                 else reject(new Error(output.trim() || `Python exited with code ${code}`));
@@ -474,7 +489,6 @@ class GraphifyRuntimeMethods {
     async _ensureEngineReady(showNotice = true) {
         const health = await this.checkEngineHealth(false);
         if (health.ok) return true;
-        console.warn('[Understory] Engine is not ready:', health.issues);
         if (showNotice) {
             new Notice(t(this, 'engine_health_problem_notice', { message: health.message }));
         }
@@ -498,16 +512,16 @@ class GraphifyRuntimeMethods {
             let stderr = '';
             let timer = null;
             if (timeoutMs > 0) {
-                timer = setTimeout(() => {
+                timer = window.setTimeout(() => {
                     try { proc.kill(); } catch (e) { /* ignore */ }
                     reject(new Error(`Script timed out after ${timeoutMs}ms: ${scriptPath}`));
                 }, timeoutMs);
             }
             if (proc.stdout) proc.stdout.on('data', (d) => { stdout += d; });
             if (proc.stderr) proc.stderr.on('data', (d) => { stderr += d; });
-            proc.on('error', (e) => { if (timer) clearTimeout(timer); reject(e); });
+            proc.on('error', (e) => { if (timer) window.clearTimeout(timer); reject(e); });
             proc.on('close', (code) => {
-                if (timer) clearTimeout(timer);
+                if (timer) window.clearTimeout(timer);
                 if (code === 0) resolve(stdout);
                 else reject(new Error(`Script failed (${code}): ${safeErrorDetail({ stderr, settings: this.settings })}`));
             });
@@ -557,7 +571,7 @@ class GraphifyRuntimeMethods {
             const finish = (fn, value) => {
                 if (settled) return;
                 settled = true;
-                if (timer) clearTimeout(timer);
+                if (timer) window.clearTimeout(timer);
                 fn(value);
             };
             const append = (current, data) => {
@@ -568,7 +582,7 @@ class GraphifyRuntimeMethods {
                 return next.slice(0, MAX_PROCESS_OUTPUT_BYTES);
             };
             if (timeoutMs > 0) {
-                timer = setTimeout(() => {
+                timer = window.setTimeout(() => {
                     try { proc.kill(); } catch (error) { /* ignore */ }
                     finish(reject, new Error(`api.py timed out after ${timeoutMs}ms`));
                 }, timeoutMs);
@@ -721,16 +735,18 @@ class GraphifyRuntimeMethods {
     /**
      * 确保 stdout/stderr 都接收完毕后再处理结果（避免 EOF 报错）
      */
-    async _maybeProcessResult(file, code, stdout, stderr, stdoutEnded, stderrEnded) {
+    async _maybeProcessResult(file, code, stdout, stderr, stdoutEnded, stderrEnded, options = {}) {
         if (code === null) return; // 进程还没退出
         if (!stdoutEnded || !stderrEnded) return; // 数据还没收完，等待
+        const notify = options.notify !== false;
 
         if (code !== 0) {
             const engineMessage = extractProcessJsonMessage(stdout);
             const diagnosticText = stderr || engineMessage;
             const errorInfo = this._classifyError(diagnosticText);
-            console.error(`[Understory] Failed [${errorInfo.category}]: ${errorInfo.desc}`);
-            new Notice(t(this, 'run_failed_notice', { category: errorInfo.category, desc: errorInfo.desc }));
+            if (notify && this._shouldShowRunNotice(`error:${errorInfo.category}:${errorInfo.desc}`)) {
+                new Notice(t(this, 'run_failed_notice', { category: errorInfo.category, desc: errorInfo.desc }));
+            }
             await this._addLogEntry({
                 time: this._formatTime(new Date()),
                 file: file.basename,
@@ -749,7 +765,7 @@ class GraphifyRuntimeMethods {
             return;
         }
 
-        await this._parseAndLogResult(file, stdout, stderr);
+        await this._parseAndLogResult(file, stdout, stderr, { notify });
     }
 
     /**
@@ -758,12 +774,12 @@ class GraphifyRuntimeMethods {
     /**
      * 解析 stdout JSON 并记录日志（统一入口）
      */
-    async _parseAndLogResult(file, stdout, stderr) {
+    async _parseAndLogResult(file, stdout, stderr, options = {}) {
         const raw = stdout.trim();
+        const notify = options.notify !== false;
         if (!raw) {
             // stdout 为空 = Python 异常崩溃且未输出 JSON（旧版本或极端情况）
             const errorInfo = this._classifyError(stderr);
-            console.error('[Understory] Empty stdout, Python likely crashed:', safeErrorDetail({ stderr, settings: this.settings }));
             await this._addLogEntry({
                 time: this._formatTime(new Date()),
                 file: file.basename,
@@ -787,18 +803,24 @@ class GraphifyRuntimeMethods {
             if (result.status === 'ok') {
                 if (this.relationsStore) {
                     try {
-                        await this.relationsStore.updateFromResult(file, result);
+                        const entry = await this.relationsStore.updateFromResult(file, result);
+                        const placement = this.settings?.presentationMode || 'sidebar';
+                        if (this._shouldUseHostedDiscovery?.() && (placement === 'body' || placement === 'both')) {
+                            await this.relationsStore.syncSuggestedRelationsIntoBody(file, entry?.relations || []);
+                        }
                     } catch (error) {
-                        console.error('[Understory] Failed to update relations cache:', error);
+                        recordBackgroundError(this, 'update-relations-cache', error);
                     }
                 }
-                this._showEngineGuidance(result);
+                this._showEngineGuidance(result, notify);
                 const count = result.relations_count || 0;
                 const rels = (result.relations || []).map(r => r.title || r.file || 'unknown');
-                this._showClickableNotice(
-                    t(this, 'relations_found_notice', { note: file.basename, count }),
-                    file.path
-                );
+                if (notify) {
+                    this._showClickableNotice(
+                        t(this, 'relations_found_notice', { note: file.basename, count }),
+                        file.path
+                    );
+                }
                 await this._addLogEntry({
                     time: this._formatTime(new Date()),
                     file: file.basename,
@@ -808,8 +830,7 @@ class GraphifyRuntimeMethods {
                     relations: rels
                 });
             } else if (result.status === 'skipped') {
-                this._showEngineGuidance(result);
-                console.log(`[Understory] Skipped: [[${file.basename}]] ${result.reason || 'skipped'}`);
+                this._showEngineGuidance(result, notify);
                 await this._addLogEntry({
                     time: this._formatTime(new Date()),
                     file: file.basename,
@@ -821,7 +842,6 @@ class GraphifyRuntimeMethods {
                 });
             } else if (result.status === 'error') {
                 // Python 端已捕获的异常（新版）
-                console.error(`[Understory] Python error: ${redactSensitiveText(result.message, this.settings)}`);
                 const errorInfo = this._classifyError(result.message + ' ' + (result.error_detail || ''));
                 await this._addLogEntry({
                     time: this._formatTime(new Date()),
@@ -849,9 +869,9 @@ class GraphifyRuntimeMethods {
                     message: result.message || 'unknown'
                 });
             }
-        } catch (e) {
+        } catch (error) {
             // JSON 解析失败（输出损坏或不完整）
-            console.error('[Understory] JSON parse error:', e && e.message ? e.message : e);
+            recordBackgroundError(this, 'parse-local-engine-result', error);
             const errorInfo = this._classifyError(stderr);
             await this._addLogEntry({
                 time: this._formatTime(new Date()),
@@ -867,21 +887,23 @@ class GraphifyRuntimeMethods {
         }
     }
 
-    _showEngineGuidance(result) {
+    _showEngineGuidance(result, notify = false) {
         const fixes = Array.isArray(result?.fixes) ? result.fixes : [];
         const warnings = Array.isArray(result?.warnings) ? result.warnings : [];
         const indexFix = fixes.find((fix) => fix && fix.id === 'embedding_index_missing');
         if (indexFix) {
-            new Notice(t(this, 'embedding_index_missing_notice'), 10000);
+            if (notify && this._shouldShowRunNotice('embedding-index-missing')) {
+                new Notice(t(this, 'embedding_index_missing_notice'), 10000);
+            }
             if (this.checkEmbeddingHealth) {
                 this.checkEmbeddingHealth(false, true).catch((error) => {
-                    console.warn('[Understory] Failed to refresh semantic embedding status:', redactSensitiveText(String(error?.message || error), this.settings));
+                    recordBackgroundError(this, 'refresh-embedding-status', error);
                 });
             }
         }
         if (warnings.length || fixes.length) {
             const detail = JSON.stringify({ warnings, fixes });
-            console.warn('[Understory] Engine guidance:', redactSensitiveText(detail, this.settings));
+            this.lastEngineGuidance = redactSensitiveText(detail, this.settings);
         }
     }
 
@@ -919,10 +941,19 @@ class GraphifyRuntimeMethods {
         return { category: t(this, 'error_unknown_category'), desc: redactSensitiveText(stderr, this.settings).slice(0, 100) || t(this, 'error_unknown_desc') };
     }
 
+    _shouldShowRunNotice(key, cooldownMs = 10000) {
+        if (!this._understoryNoticeCooldowns) this._understoryNoticeCooldowns = new Map();
+        const now = Date.now();
+        const previous = Number(this._understoryNoticeCooldowns.get(key) || 0);
+        if (now - previous < cooldownMs) return false;
+        this._understoryNoticeCooldowns.set(key, now);
+        return true;
+    }
+
     _showClickableNotice(message, filePath, duration = 6000) {
         const notice = new Notice(message, duration);
         if (notice.el && filePath) {
-            notice.el.style.cursor = 'pointer';
+            notice.el.addClass?.('understory-clickable-notice');
             notice.el.addEventListener('click', () => {
                 notice.hide();
                 const file = this.app.vault.getAbstractFileByPath(filePath);

@@ -1,76 +1,136 @@
-# Privacy
+# Understory Privacy And Data Flow
 
-Understory is local-first. Bondie Labs does not operate a hosted analysis service for this plugin and does not receive your vault content, API keys, prompts, embeddings, model responses, local reports, or logs.
+Last updated: 2026-07-15
 
-## What Stays Local
+Understory supports two distinct operating paths:
 
-By default, Understory runs in **Local only** mode.
+1. **Hosted mode**, the default for new users, uses a Bondie account and the Understory service.
+2. **Advanced local/self-hosted modes** are retained for existing users and operators who intentionally configure them.
 
-New installs also default to **Right sidebar only** presentation. Understory does not automatically write related-note sections into note bodies unless you choose a note-body presentation mode or explicitly click **Insert into body**.
+This document describes both paths. Hosted mode is not local-only.
 
-In Local only mode:
+## Hosted Mode
 
-- Notes are read from your local vault.
-- Reports and caches are written locally under `.understory`.
-- No cloud model request is made.
-- Provider API keys are not passed to the local engine process.
-- No webhook request is made, even if a webhook URL remains in saved settings.
+### Account data
 
-## Optional Cloud Model Modes
+Browser sign-in is handled through Bondie/SynapseHub. After sign-in, the plugin can receive and display:
 
-If you choose **Vector model only** or **Full AI analysis**, selected note titles, snippets, prompts, or extracted facts may be sent to the provider you configure.
+- Email address.
+- Display name.
+- Profile picture URL.
+- Membership and entitlement state.
+- Product service readiness.
+- Account-linked usage totals.
 
-Supported provider choices include OpenAI, Zhipu, Kimi/Moonshot, and custom OpenAI-compatible endpoints. You provide your own provider account and API key.
+The plugin stores a product access token and sanitized runtime configuration in the local plugin configuration at `.obsidian/plugins/understory/data.json`. It does not store a Bondie password. Profile editing, account recovery, security, and device management remain on Bondie account pages.
 
-Provider accounts, API keys, pricing, quotas, privacy terms, data retention, and billing are controlled by the selected provider, not by Bondie Labs. Review the provider's privacy policy before enabling cloud model features.
+### Note content sent for analysis
 
-## API Key Storage
+Before the first hosted analysis, Understory asks for consent to upload selected snippets. Consent is stored locally and can be disabled from plugin settings.
 
-You can leave API key fields blank and use environment variables instead. If you enter API keys in the plugin settings page, they are stored in your local Obsidian plugin configuration.
+Relation discovery may send:
 
-Understory redacts known API keys, bearer tokens, webhook URLs, and similar secrets from plugin logs and short diagnostics. Raw process stdout is not stored in plugin logs by default. Do not share screenshots, logs, or diagnostic output that include secrets.
+- The active note path and title.
+- Up to 4,000 characters from the active note after frontmatter, fenced code blocks, and repeated whitespace are removed.
+- Up to 40 locally ranked candidate notes.
+- Each candidate path, title, and up to 2,000 characters of normalized text.
+- A request to include or skip risk analysis.
+
+Principle extraction may send the active note path, title, and up to 4,000 characters of normalized text.
+
+Vault semantic review may locally inspect eligible Markdown notes, then send title plus a snippet of up to 1,200 characters for embedding. It can send a bounded set of candidate snippet pairs for risk review. Structural checks such as resolved links, broken links, and orphan status are computed locally.
+
+Users control the analysis scope through included and excluded folders. Hidden folders, the vault configuration folder, `.understory`, and trash paths are excluded from hosted note collection.
+
+### Service processing and retention
+
+Hosted requests go to `https://understory.bondie.io`. The service routes model work through server-managed provider credentials. Upstream provider keys are not returned to the plugin.
+
+The current hosted runtime contract reports that submitted note content is processed without server-side content retention. The plugin therefore stores the returned relation and analysis results locally under `.understory`. This content-retention statement does not mean the service keeps no operational records: account identity, session state, request counts, processing units, timestamps, error categories, quota state, and security records may be retained as needed to operate, protect, and observe the service.
+
+The service operator can observe usage by registered account and feature. The plugin shows the signed-in user an aggregate view of the same request and processing-unit categories.
+
+### Upstream model providers
+
+In hosted mode, users do not choose or receive upstream provider keys. The Understory service may route requests to managed model providers. Provider pools can change without a client update. The service is responsible for selecting providers and enforcing its provider agreements; users remain responsible for deciding whether the hosted data flow is appropriate for their notes.
 
 ## Local Files
 
-Understory may write local cache, report, and relationship data under `.understory` in your vault. These files are intended to support relation discovery, graph analysis, status reports, and refresh behavior.
+Understory can write:
 
-On first load, Understory may also extract its bundled local engine from the released `main.js` into `.obsidian/plugins/understory/understory-graphify-engine/` inside the current vault. This is local release content, not a remote download or telemetry channel.
+| Path | Purpose |
+| :--- | :--- |
+| `.obsidian/plugins/understory/data.json` | Plugin settings, hosted product token, consent state, sanitized runtime configuration, and advanced provider settings if entered. |
+| `.understory/relations.json` | Related-note cache, scores, states, and risk results. |
+| `.understory/link_overrides.json` | Accepted and ignored relation decisions. |
+| `.understory/conflicts.json` | Local or hosted analysis report. |
+| `.understory/principles.hosted.json` | Locally stored principle-extraction results. |
+| `.understory/index.md` | Locally generated analysis summary. |
+| `.understory/agent/` | User-created MCP server, Skill prompt, and setup artifacts. |
+| `.obsidian/plugins/understory/understory-graphify-engine/` | Bundled engine extracted for advanced local workflows. |
+
+Inserting a confirmed relation changes the selected Markdown note by adding a normal wiki link. Understory does not write suggestion blocks into note bodies by default.
+
+## Advanced Local, Self-Hosted, And BYOK Modes
+
+Existing installations that selected local mode remain local after upgrading. In local mode:
+
+- Hosted relation discovery is disabled.
+- A Bondie session is not required.
+- Managed hosted provider credentials are not used.
+- Webhooks are blocked.
+- Analysis uses local files, the bundled Python engine, local caches, and configured local behavior.
+
+Advanced vector or full-analysis modes can send titles, snippets, prompts, embeddings, or extracted facts directly to the endpoint configured by the user. Advanced users can store provider keys in local plugin configuration or supply them through environment variables. Provider pricing, quotas, retention, training, and privacy terms are controlled by that provider or endpoint owner.
+
+Self-hosted endpoints and optional webhooks are operator-controlled data destinations. Webhooks are off by default, require a separate opt-in, and send only the configured summary payload.
 
 ## Local Agent API
 
-The Agent API is local-only by design. It is exposed through a JSON command-line entry point and an MCP stdio server. It does not start an HTTP server, does not open a local network port, and does not send data to Bondie Labs.
+The Agent API uses a local JSON CLI or MCP stdio process. It does not open an HTTP port. It requires an explicit vault path and rejects note paths that leave that vault.
 
-The **AI agents** settings page can create a local MCP server file and save an Understory Skill prompt into `.understory/agent` inside your vault. These files are local configuration artifacts. The MCP server file is a local stdio entrypoint, not a cloud server, and it does not open an HTTP port. The Skill prompt is an instruction document for your agent; saving or copying it does not upload vault content.
+Read tools return scoped snippets and relation metadata rather than full note bodies by default. Write tools can accept, ignore, refresh, or insert relations in local vault files. Understory does not automatically edit external Agent configuration files.
 
-The Skill can be generated in Query-only mode or Agent memory model mode. Query-only mode is conservative and read-only by instruction. Agent memory model mode tells the agent to retrieve relevant local context proactively and propose durable memory updates, but it does not grant permission to upload vault content or make local writes without user confirmation.
+The privacy of an Agent session also depends on the Agent client and any model provider used by that client. Review those products separately before giving them access to an Understory MCP server.
 
-For multi-vault use, Understory identifies only the currently open vault and generates a separate MCP server key for that vault. It does not scan your computer for every Obsidian vault, and it does not write Codex, Claude Desktop, Cursor, OpenClaw, or other agent configuration files automatically.
+## Logs, Diagnostics, And Clipboard
 
-Agent API calls require an explicit vault path. Note paths are normalized and rejected if they try to leave that vault. Read operations return relationship metadata, graph summary counts, status fields, and file paths. They do not return full note bodies by default. Write operations such as accepting, rejecting, or inserting a relation modify local vault files only.
+Plugin logs and diagnostics redact configured API keys, bearer tokens, webhook URLs, and common environment-style secret values. Background failures are kept as a bounded, redacted status rather than repeated notification content. Raw process stdout is not persisted by default.
 
-The Agent API reuses Understory redaction for API keys, bearer tokens, webhook URLs, and similar secrets in JSON error details. As with any local automation, review MCP/Agent client logs before sharing them.
+Understory can write generated MCP configuration, Skill prompts, setup packs, and diagnostics to the clipboard only after an explicit copy action. It does not read clipboard contents.
 
-## Webhooks
+No support bundle is uploaded automatically. Information leaves the device for support only when the user intentionally shares it.
 
-Webhook features are off by default and are blocked in Local only mode. If enabled in a cloud-capable mode, a summary payload may be sent to the URL you configure. Webhook provider behavior is governed by that provider and the URL owner.
+## Network Destinations
 
-## Data Flow Summary
+| Destination | When used | Data categories |
+| :--- | :--- | :--- |
+| `account.bondie.io` and SynapseHub-managed login pages | Browser sign-in and account management | Account identity, authentication, membership, and account operations. |
+| `understory.bondie.io` | Hosted product session, runtime config, relation analysis, principle extraction, vault semantic review, billing readiness, and usage | Product token, selected note paths/titles/snippets, analysis requests, returned results, usage and operational metadata. |
+| User-configured provider endpoint | Advanced BYOK modes only | Selected titles/snippets, prompts, embeddings, or extracted facts. |
+| User-configured webhook URL | Advanced mode with separate opt-in | Configured alert summary. |
 
-| Feature | Default | Local Files Written | Data Sent Off Device | User Control |
-| :--- | :--- | :--- | :--- | :--- |
-| Local analysis | On | `.understory` cache and reports | None | Keep Local only mode or disable features |
-| Vector model only | Off unless selected | Vector/cache metadata | Selected titles or snippets to your provider | Choose provider/key or return to Local only |
-| Full AI analysis | Off unless selected | Reports/cache metadata | Selected snippets, prompts, or extracted facts to your provider | Enable only with consent and provider key |
-| Webhooks | Off | Notification/log metadata | Summary payload to configured URL | Explicit opt-in and URL |
-| Diagnostics | Manual | Local report/output | None unless you share it | Review and redact before sharing |
-| Agent API CLI/MCP | Off unless launched locally | Relationship metadata, local MCP server/Skill prompt files, and note edits when requested | None | Launch with an explicit vault path, copy Skill intentionally, and review client logs |
+## User Controls
+
+Users can:
+
+- Decline or disable selected-snippet upload consent.
+- Exclude folders from analysis.
+- Use **Sign out of Understory** to revoke only the product session.
+- Use the separately confirmed Bondie global sign-out flow.
+- Remove local plugin data or `.understory` files through normal vault management.
+- Keep an existing installation in advanced local mode.
+
+Removing local files does not automatically delete a Bondie account or server-side operational records. Use the Bondie account center for account requests.
+
+## Payment Status
+
+Understory is currently free to install and hosted membership defaults to Free. The Community listing should use **Optional payments** because the plugin connects to a managed service and advanced modes can connect to paid APIs. Future Pro or Plus plans require updated pricing, billing, support, and privacy disclosures before public launch.
 
 ## 中文摘要
 
-Understory 默认本地优先。Bondie Labs 不会接收你的 vault 内容、API key、prompt、embedding、模型响应、本地报告或日志。
+Understory 新安装默认使用 Bondie 账号和托管服务，不是纯本地插件。第一次托管分析前，插件会请求上传选中笔记片段的许可。关联分析可能发送当前笔记和候选笔记的路径、标题与有限长度片段；服务器返回关系、风险和用量信息。模型 key 由服务端管理，不会下发到客户端。
 
-如果你选择 **只用向量模型** 或 **完整 AI 分析**，插件可能会把被选中的标题、片段、prompt 或提取出的事实发送给你自己配置的模型服务商。可选服务商包括 OpenAI、智谱、Kimi/Moonshot 和自定义兼容 endpoint。模型服务商的账号、价格、额度、隐私条款、数据保留和账单规则由该服务商负责。
+插件会在本地保存产品 token、设置、关系缓存和分析报告。服务端当前声明不保留提交的笔记正文，但会按运行需要保留账号、会话、用量、额度、安全和错误元数据。运营侧可以按注册账号和功能观察用量。
 
-如果你在设置页填写 API key，密钥会保存在本机 Obsidian 插件配置中。也可以留空并改用环境变量。
-
-在 **完全本地** 模式下，插件不会把模型服务密钥传给本地引擎进程，也不会发送 Webhook。插件日志和短诊断会尽量脱敏 API key、Bearer token、Webhook URL 等敏感信息，默认不会把 raw stdout 存入插件日志。
+已有本地模式用户升级后仍保持本地模式。高级 BYOK、自托管和 Webhook 由用户自行选择目标和承担对应服务商条款。完整路径、字段和控制项以本文件英文正文为准。

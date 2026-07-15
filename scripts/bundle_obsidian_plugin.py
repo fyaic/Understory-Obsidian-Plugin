@@ -9,34 +9,12 @@ import json
 from pathlib import Path
 
 
-MODULES = [
-    "main.js",
-    "brandAssets.js",
-    "bundledEngine.js",
-    "i18n.js",
-    "safety.js",
-    "relationTargetResolution.js",
-    "agentApi.js",
-    "agentAccess.js",
-    "engineHealth.js",
-    "settings.js",
-    "commands.js",
-    "graphifyLayer.js",
-    "graphifyCore.js",
-    "graphifyViews.js",
-    "graphifyRuntime.js",
-    "linkDiscovery.js",
-    "utils.js",
-    "settingsStyles.js",
-    "settingsLogs.js",
-    "settingsFolders.js",
-    "relationsStore.js",
-    "sidebarView.js",
-]
-
-
 VIRTUAL_AGENT_ACCESS_SOURCES = "agentAccessBundledSources.js"
 VIRTUAL_BUNDLED_ENGINE_PAYLOAD = "bundledEnginePayload.js"
+SOURCE_MODULE_EXCLUDES = {
+    VIRTUAL_AGENT_ACCESS_SOURCES,
+    VIRTUAL_BUNDLED_ENGINE_PAYLOAD,
+}
 ENGINE_DIR_NAME = "understory-graphify-engine"
 EXCLUDED_ENGINE_NAMES = {
     ".cache",
@@ -52,6 +30,16 @@ EXCLUDED_ENGINE_SUFFIXES = {".db", ".pyc", ".sqlite"}
 
 def module_id(filename: str) -> str:
     return "./" + Path(filename).with_suffix("").as_posix()
+
+
+def source_modules(plugin_dir: Path) -> list[Path]:
+    modules = sorted(
+        path for path in plugin_dir.glob("*.js")
+        if path.name not in SOURCE_MODULE_EXCLUDES
+    )
+    if not any(path.name == "main.js" for path in modules):
+        raise FileNotFoundError(f"Plugin entrypoint is missing: {plugin_dir / 'main.js'}")
+    return modules
 
 
 def include_engine_file(path: Path) -> bool:
@@ -99,10 +87,8 @@ def build_bundled_engine_payload(root_dir: Path) -> dict:
 
 def build_bundle(plugin_dir: Path) -> str:
     blocks: list[str] = []
-    for filename in MODULES:
-        path = plugin_dir / filename
-        if not path.exists():
-            raise FileNotFoundError(path)
+    for path in source_modules(plugin_dir):
+        filename = path.name
         source = path.read_text(encoding="utf-8")
         blocks.append(f"{json.dumps(module_id(filename))}: function(module, exports, require) {{\n{source}\n}}")
 

@@ -85,7 +85,7 @@ function createCorePlugin(settings) {
     };
 }
 
-test('loadSettings normalizes unsafe persisted settings', async () => {
+test('loadSettings normalizes unsafe persisted settings to hosted-safe defaults', async () => {
     const plugin = createLinkDiscoveryPlugin({
         networkMode: 'invalid',
         webhookEnabled: true,
@@ -102,10 +102,10 @@ test('loadSettings normalizes unsafe persisted settings', async () => {
 
     await plugin.loadSettings();
 
-    assert.equal(plugin.settings.networkMode, 'local');
+    assert.equal(plugin.settings.networkMode, 'hosted');
     assert.equal(plugin.settings.webhookEnabled, false);
-    assert.equal(plugin.settings.embeddingProvider, 'zhipu');
-    assert.equal(plugin.settings.llmProvider, 'zhipu');
+    assert.equal(plugin.settings.embeddingProvider, 'hosted');
+    assert.equal(plugin.settings.llmProvider, 'hosted');
     assert.equal(plugin.settings.lintInProgress, false);
     assert.equal(plugin.settings.refreshInProgress, false);
     assert.equal(JSON.stringify(plugin.settings.linkLog).includes(fakeSecrets.embeddingApiKey), false);

@@ -18,11 +18,10 @@ class SettingsFolderMethods {
         }
 
         const folderContainer = containerEl.createDiv({ cls: 'understory-tree-container' });
-        const descEl = folderContainer.createEl('div', {
+        folderContainer.createEl('div', {
             text: isWhitelist ? t(this.plugin, 'folder_whitelist_hint') : t(this.plugin, 'folder_blacklist_hint'),
-            cls: 'setting-item-description'
+            cls: 'setting-item-description understory-spacing-after-sm'
         });
-        descEl.style.marginBottom = '8px';
 
         const actionRow = folderContainer.createDiv({ cls: 'understory-folder-actions' });
         const selectAllButton = actionRow.createEl('button', { text: t(this.plugin, 'folder_select_all') });
@@ -50,8 +49,8 @@ class SettingsFolderMethods {
 
         containerEl.createEl('div', {
             text: t(this.plugin, 'folder_count', { label: countLabel, selected: selected.size, total: allFolders.length }),
-            cls: `setting-item-description ${countClass}`
-        }).style.marginTop = '4px';
+            cls: `setting-item-description understory-spacing-before-xs ${countClass}`
+        });
     }
 
     _buildFolderTree(folders) {

@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.13.0
+
+- Make Bondie sign-in and the managed Understory service the default path for new installs. New users no longer see provider keys, endpoints, Python, or engine setup before they can use the plugin.
+- Add the complete SynapseHub product session flow: browser login, Obsidian protocol callback, session exchange, product-only logout, separately confirmed global logout, account switching, and account-center links.
+- Add account identity, fallback avatars, Free/Pro/Plus membership states, service readiness, and profile/security/device entries managed by Bondie.
+- Add per-account usage totals and feature-level request/processing-unit activity from the hosted service.
+- Add hosted relation discovery, risk analysis, principle extraction, and bounded vault semantic review with explicit selected-snippet consent and server-managed provider credentials.
+- Redesign settings into Account, Usage, Workflow, Scope, Suggestions, Activity, AI agents, and Advanced pages. Disconnected users see a single Bondie sign-in action.
+- Redesign the right sidebar around the current note, account state, Suggestions/Risks tabs, friendly match percentages, localized severity, and bounded error reporting.
+- Preserve existing local/self-hosted/BYOK and Agent/MCP workflows under Advanced. Existing saved local mode remains local after upgrade.
+- Prevent duplicate startup work and notification storms, filter hidden/configuration paths, and keep background failures redacted and bounded.
+- Replace the stale hardcoded bundle list with automatic source-module discovery so all hosted modules are included in `main.js`.
+- Add official Obsidian linting, hosted integration regressions, deterministic release checks, updated privacy/payment disclosures, and real Obsidian hosted-flow smoke coverage.
+
 ## 1.8.11
 
 - Make new installs default to **Show suggestions in: Right sidebar only**, so relation refresh uses `--no-auto-write` unless the user chooses a note-body presentation mode.

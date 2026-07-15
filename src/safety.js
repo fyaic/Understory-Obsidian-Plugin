@@ -1,11 +1,12 @@
 const MAX_ERROR_DETAIL_LENGTH = 400;
 const MAX_LOG_STRING_LENGTH = 500;
-const VALID_NETWORK_MODES = new Set(['local', 'embedding', 'full']);
-const VALID_PROVIDERS = new Set(['none', 'openai', 'zhipu', 'kimi-cn', 'kimi-global', 'custom']);
+const VALID_NETWORK_MODES = new Set(['hosted', 'local', 'embedding', 'full']);
+const VALID_PROVIDERS = new Set(['hosted', 'none', 'openai', 'zhipu', 'kimi-cn', 'kimi-global', 'custom']);
 
-function safeNetworkMode(mode) {
+function safeNetworkMode(mode, fallback = 'local') {
     const value = String(mode || '').trim();
-    return VALID_NETWORK_MODES.has(value) ? value : 'local';
+    if (VALID_NETWORK_MODES.has(value)) return value;
+    return VALID_NETWORK_MODES.has(fallback) ? fallback : 'local';
 }
 
 function safeProvider(provider, fallback = 'none') {
@@ -28,6 +29,7 @@ function collectSecrets(source) {
         settings.embeddingApiKey,
         settings.llmApiKey,
         settings.webhookUrl,
+        settings.hostedAccessToken,
     ];
 }
 
@@ -127,13 +129,26 @@ function normalizeLogEntry(entry, settings) {
     return normalized;
 }
 
+function recordBackgroundError(target, scope, error) {
+    if (!target || typeof target !== 'object') return;
+    target.lastBackgroundError = {
+        scope: String(scope || 'background-task').slice(0, 80),
+        message: redactSensitiveText(String(error?.message || error || 'Unknown error'), target.settings).slice(0, 300),
+        at: Date.now(),
+    };
+}
+
 function normalizeSettings(data, defaults = {}, options = {}) {
     const settings = Object.assign({}, defaults, data || {});
-    settings.networkMode = safeNetworkMode(settings.networkMode);
+    settings.networkMode = safeNetworkMode(settings.networkMode, defaults.networkMode || 'local');
     settings.embeddingProvider = safeProvider(settings.embeddingProvider, defaults.embeddingProvider || 'none');
     settings.llmProvider = safeProvider(settings.llmProvider, defaults.llmProvider || 'none');
 
-    if (settings.networkMode === 'local') {
+    if (settings.networkMode === 'hosted') {
+        settings.embeddingProvider = 'hosted';
+        settings.llmProvider = 'hosted';
+        settings.webhookEnabled = false;
+    } else if (settings.networkMode === 'local') {
         settings.webhookEnabled = false;
     } else {
         settings.webhookEnabled = !!settings.webhookEnabled;
@@ -165,6 +180,7 @@ module.exports = {
     extractProcessJsonMessage,
     normalizeLogEntry,
     normalizeSettings,
+    recordBackgroundError,
     redactSensitiveText,
     safeErrorDetail,
     safeNetworkMode,

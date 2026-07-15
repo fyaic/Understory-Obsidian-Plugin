@@ -40,6 +40,7 @@ test('onload defers vault event listeners until workspace layout is ready', asyn
             },
         };
         const plugin = new UnderstoryPlugin(app, { version: 'test' });
+        plugin.loadData = async () => ({ networkMode: 'local', settingsSchemaVersion: 1 });
         plugin.checkEngineHealth = async () => ({ ok: false });
 
         await plugin.onload();

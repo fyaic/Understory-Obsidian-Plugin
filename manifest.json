@@ -1,9 +1,9 @@
 {
   "id": "understory",
   "name": "Understory",
-  "version": "1.8.11",
-  "minAppVersion": "0.15.0",
-  "description": "Local-first knowledge layer for relationship discovery, ER facts, graph analysis, and optional model-powered insights.",
+  "version": "1.13.0",
+  "minAppVersion": "1.8.7",
+  "description": "Find related notes, surface conflicts, and maintain knowledge with a Bondie account or advanced local workflows.",
   "author": "Bondie Labs",
   "authorUrl": "https://bondie.io/research/understory",
   "isDesktopOnly": true

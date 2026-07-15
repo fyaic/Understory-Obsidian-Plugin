@@ -15,17 +15,14 @@ class GraphifyContentModal extends Modal {
     onOpen() {
         const { contentEl, titleEl, modalEl } = this;
         titleEl.setText(this.titleText);
-        try { modalEl.style.width = 'min(900px, 90vw)'; } catch (e) { /* ignore */ }
-        const wrap = contentEl.createDiv();
-        wrap.style.maxHeight = '72vh';
-        wrap.style.overflow = 'auto';
-        wrap.style.paddingRight = '8px';
+        modalEl.addClass?.('understory-content-modal');
+        const wrap = contentEl.createDiv({ cls: 'understory-content-modal-body' });
         if (typeof this.content === 'function') {
             this.content(wrap, this);
         } else {
             try {
-                MarkdownRenderer.renderMarkdown(String(this.content), wrap, '.understory/', this.plugin);
-            } catch (e) {
+                MarkdownRenderer.renderMarkdown(String(this.content), wrap, '.understory/', this);
+            } catch {
                 wrap.createEl('pre', { text: String(this.content) });
             }
         }

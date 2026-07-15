@@ -60,7 +60,7 @@ test('safePayloadParts rejects absolute and parent traversal paths', () => {
     assert.deepEqual(safePayloadParts('scripts/deploy_graphify.py'), ['scripts', 'deploy_graphify.py']);
 });
 
-test('onload installs bundled engine and saves it as the default engine path', async (t) => {
+test('existing local install receives the bundled engine during upgrade', async (t) => {
     const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'understory-vault-'));
     t.after(() => fs.promises.rm(root, { recursive: true, force: true }));
 
@@ -91,7 +91,7 @@ test('onload installs bundled engine and saves it as the default engine path', a
 
     try {
         const plugin = new UnderstoryPlugin(app, { id: 'understory', version: 'test' });
-        plugin.loadData = async () => ({});
+        plugin.loadData = async () => ({ networkMode: 'local', settingsSchemaVersion: 1 });
         let healthChecks = 0;
         plugin.checkEngineHealth = async () => {
             healthChecks += 1;

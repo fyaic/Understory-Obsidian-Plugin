@@ -1,5 +1,6 @@
-const crypto = require('crypto');
+const nodeCrypto = require('crypto');
 const { spawn } = require('child_process');
+const { clearTimeout: clearNodeTimeout, setTimeout: setNodeTimeout } = require('node:timers');
 const fs = require('fs');
 const path = require('path');
 const {
@@ -67,7 +68,7 @@ function normalizeVaultRoot(vaultPath) {
 }
 
 function hashContent(content) {
-    return crypto.createHash('sha256').update(String(content || '')).digest('hex').slice(0, 16);
+    return nodeCrypto.createHash('sha256').update(String(content || '')).digest('hex').slice(0, 16);
 }
 
 function configuredSecrets(settings) {
@@ -482,28 +483,24 @@ function relationSource(relation) {
     return 'understory';
 }
 
-const INTERNAL_RELATION_TARGET_PREFIXES = [
-    '.obsidian/',
-    '.understory/',
-    '.trash/',
-];
-
-function isInternalRelationTarget(target) {
+function isInternalRelationTarget(target, internalPrefixes) {
     const normalized = toPosixPath(target).replace(/^\/+/, '').toLowerCase();
-    return INTERNAL_RELATION_TARGET_PREFIXES.some((prefix) => normalized === prefix.slice(0, -1) || normalized.startsWith(prefix));
+    const firstSegment = normalized.split('/')[0] || '';
+    return (firstSegment.startsWith('.') && firstSegment !== '.' && firstSegment !== '..')
+        || internalPrefixes.some((prefix) => normalized === prefix.slice(0, -1) || normalized.startsWith(prefix));
 }
 
-function sanitizeRelations(relations) {
+function sanitizeRelations(relations, internalPrefixes) {
     if (!Array.isArray(relations)) return [];
-    return relations.filter((relation) => relation && relation.target && !isInternalRelationTarget(relation.target));
+    return relations.filter((relation) => relation && relation.target && !isInternalRelationTarget(relation.target, internalPrefixes));
 }
 
-function sanitizeStoreRelations(store) {
+function sanitizeStoreRelations(store, internalPrefixes) {
     let changed = false;
     if (!isObject(store.files)) return false;
     for (const entry of Object.values(store.files)) {
         if (!isObject(entry) || !Array.isArray(entry.relations)) continue;
-        const sanitized = sanitizeRelations(entry.relations);
+        const sanitized = sanitizeRelations(entry.relations, internalPrefixes);
         if (sanitized.length !== entry.relations.length) {
             entry.relations = sanitized;
             changed = true;
@@ -512,7 +509,7 @@ function sanitizeStoreRelations(store) {
     return changed;
 }
 
-function normalizeRelations(result) {
+function normalizeRelations(result, internalPrefixes) {
     const grouped = groupMap(result && result.grouped || {});
     const now = new Date().toISOString();
     const relations = Array.isArray(result && result.relations) ? result.relations : [];
@@ -530,7 +527,7 @@ function normalizeRelations(result) {
             createdAt: relation.createdAt || now,
             updatedAt: now,
         };
-    }).filter((relation) => relation.target && relation.title && !isInternalRelationTarget(relation.target));
+    }).filter((relation) => relation.target && relation.title && !isInternalRelationTarget(relation.target, internalPrefixes));
 }
 
 function parseProcessJson(stdout) {
@@ -583,7 +580,7 @@ function runPythonJson({ pythonPath, engineDir, apiPath, args, vaultPath, timeou
         });
         let stdout = '';
         let stderr = '';
-        const timer = timeoutMs ? setTimeout(() => {
+        const timer = timeoutMs ? setNodeTimeout(() => {
             child.kill();
             reject(new AgentApiError('ENGINE_FAILED', 'Understory engine timed out.', safeErrorDetail({
                 stdout,
@@ -600,14 +597,14 @@ function runPythonJson({ pythonPath, engineDir, apiPath, args, vaultPath, timeou
             stderr += chunk.toString('utf8');
         });
         child.on('error', (error) => {
-            if (timer) clearTimeout(timer);
+            if (timer) clearNodeTimeout(timer);
             reject(new AgentApiError('ENGINE_FAILED', ERROR_MESSAGES.ENGINE_FAILED, safeErrorDetail({
                 message: error.message,
                 settings,
             })));
         });
         child.on('close', (code) => {
-            if (timer) clearTimeout(timer);
+            if (timer) clearNodeTimeout(timer);
             if (code !== 0) {
                 const engineMessage = extractProcessJsonMessage(stdout);
                 reject(new AgentApiError('ENGINE_FAILED', ERROR_MESSAGES.ENGINE_FAILED, safeErrorDetail({
@@ -637,6 +634,12 @@ function createAgentApi(options = {}) {
     const engineDir = options.engineDir || process.env.UNDERSTORY_ENGINE_DIR || '';
     const pythonPath = options.pythonPath || process.env.UNDERSTORY_PYTHON_PATH || 'python';
     const refreshTimeoutMs = Number(options.refreshTimeoutMs || 120000);
+    const configDir = toPosixPath(options.app?.vault?.configDir || options.configDir || '').replace(/\/+$/, '').toLowerCase();
+    const internalPrefixes = [
+        ...(configDir ? [`${configDir}/`] : []),
+        '.understory/',
+        '.trash/',
+    ];
 
     async function readJson(relativePath, fallback) {
         if (!(await adapter.exists(relativePath))) {
@@ -670,7 +673,7 @@ function createAgentApi(options = {}) {
         const store = isObject(result.value) ? result.value : emptyStore();
         if (!isObject(store.files)) store.files = {};
         if (!store.version) store.version = 1;
-        const sanitized = sanitizeStoreRelations(store);
+        const sanitized = sanitizeStoreRelations(store, internalPrefixes);
         return { exists: result.exists, store, sanitized };
     }
 
@@ -791,7 +794,7 @@ function createAgentApi(options = {}) {
             adapter.readText(normalized),
             adapter.stat(normalized),
         ]);
-        const relations = normalizeRelations(result);
+        const relations = normalizeRelations(result, internalPrefixes);
         const { store } = await readStore();
         const indexedAt = new Date().toISOString();
         store.files[normalized] = {
@@ -849,7 +852,8 @@ function createAgentApi(options = {}) {
                 for (const entry of entries) {
                     const relativePath = relativeDir ? `${relativeDir}/${entry.name}` : entry.name;
                     if (entry.isDirectory()) {
-                        if (entry.name === '.obsidian' || entry.name === '.understory') continue;
+                        const normalizedDirectory = toPosixPath(relativePath).toLowerCase();
+                        if (entry.name.startsWith('.') || normalizedDirectory === configDir) continue;
                         await walk(relativePath);
                     } else if (entry.isFile() && /\.md$/i.test(entry.name)) {
                         seen.add(toPosixPath(relativePath));
@@ -874,7 +878,7 @@ function createAgentApi(options = {}) {
 
     async function buildRelationPathIndex(markdownNotePaths) {
         const notePaths = Array.isArray(markdownNotePaths) ? markdownNotePaths : await listMarkdownNotePaths();
-        return buildVaultPathIndex(notePaths);
+        return buildVaultPathIndex(notePaths, { internalPrefixes });
     }
 
     async function buildNoteBrief(notePath, store, query, pathIndex) {
@@ -886,7 +890,7 @@ function createAgentApi(options = {}) {
         const entry = store.files[normalized] || null;
         const relations = Array.isArray(entry && entry.relations) ? entry.relations : [];
         const resolvedPathIndex = pathIndex || await buildRelationPathIndex();
-        const annotatedRelations = annotateRelations(relations, resolvedPathIndex);
+        const annotatedRelations = annotateRelations(relations, resolvedPathIndex, { internalPrefixes });
         return {
             path: normalized,
             title: noteTitleFromPath(normalized),
@@ -944,7 +948,7 @@ function createAgentApi(options = {}) {
                     reasons.push('content snippet');
                 }
             }
-            const relationHits = annotateRelations(relationMatches(entry, terms), pathIndex);
+            const relationHits = annotateRelations(relationMatches(entry, terms), pathIndex, { internalPrefixes });
             if (relationHits.length) {
                 score += relationHits.length * 4;
                 reasons.push('relations graph');
@@ -1057,7 +1061,7 @@ function createAgentApi(options = {}) {
                 } catch (error) {
                     stale = false;
                 }
-                const relations = annotateRelations(Array.isArray(entry.relations) ? entry.relations : [], pathIndex);
+                const relations = annotateRelations(Array.isArray(entry.relations) ? entry.relations : [], pathIndex, { internalPrefixes });
                 const entryForResponse = { ...entry, relations };
                 return {
                     notePath: normalized,

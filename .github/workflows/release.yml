@@ -7,6 +7,8 @@ on:
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 
 jobs:
   release:
@@ -15,7 +17,27 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate release artifacts
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify source and release package
+        run: npm run verify
+
+      - name: Confirm committed bundle is reproducible
+        run: git diff --exit-code -- main.js
+
+      - name: Validate tag and stage install assets
         shell: bash
         run: |
           manifest_version="$(python -c "import json; print(json.load(open('manifest.json', encoding='utf-8'))['version'])")"
@@ -23,18 +45,21 @@ jobs:
             echo "Tag $GITHUB_REF_NAME does not match manifest version $manifest_version"
             exit 1
           fi
-          python -m json.tool manifest.json >/dev/null
-          test -f package-lock.json
-          npm ci --ignore-scripts
-          test -f main.js
-          test -f styles.css
-          node --check main.js
+          mkdir -p dist
+          cp manifest.json main.js styles.css dist/
+          test "$(find dist -maxdepth 1 -type f | wc -l | tr -d ' ')" = "3"
+
+      - name: Attest release provenance
+        uses: actions/attest@v4
+        with:
+          subject-path: "dist/*"
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
           body_path: RELEASE_NOTES.md
+          fail_on_unmatched_files: true
           files: |
-            manifest.json
-            main.js
-            styles.css
+            dist/manifest.json
+            dist/main.js
+            dist/styles.css

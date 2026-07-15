@@ -1,4 +1,4 @@
-const crypto = require('crypto');
+const nodeCrypto = require('crypto');
 const { Notice, TFile } = require('obsidian');
 const { MAX_PROCESS_OUTPUT_BYTES } = require('./utils');
 const { t } = require('./i18n');
@@ -11,11 +11,9 @@ const {
 
 const RELATIONS_PATH = '.understory/relations.json';
 const OVERRIDES_PATH = '.understory/link_overrides.json';
-const INTERNAL_RELATION_TARGET_PREFIXES = [
-    '.obsidian/',
-    '.understory/',
-    '.trash/',
-];
+const INTERNAL_RELATION_TARGET_PREFIXES = ['.understory/', '.trash/'];
+const SUGGESTIONS_START = '<!-- understory:suggestions:start -->';
+const SUGGESTIONS_END = '<!-- understory:suggestions:end -->';
 
 class RelationsStore {
     constructor(plugin) {
@@ -37,7 +35,7 @@ class RelationsStore {
     }
 
     _emptyStore() {
-        return { version: 1, indexedAt: new Date().toISOString(), files: {} };
+        return { version: 2, indexedAt: new Date().toISOString(), files: {} };
     }
 
     async _readJson(path, fallback) {
@@ -57,7 +55,7 @@ class RelationsStore {
     async _readStore() {
         const data = await this._readJson(RELATIONS_PATH, this._emptyStore());
         if (!data.files || typeof data.files !== 'object') data.files = {};
-        if (!data.version) data.version = 1;
+        data.version = Math.max(2, Number(data.version || 0));
         this._sanitizeStore(data);
         return data;
     }
@@ -68,7 +66,7 @@ class RelationsStore {
     }
 
     _hash(content) {
-        return crypto.createHash('sha256').update(content || '', 'utf8').digest('hex').slice(0, 16);
+        return nodeCrypto.createHash('sha256').update(content || '', 'utf8').digest('hex').slice(0, 16);
     }
 
     async _snapshot(file) {
@@ -85,7 +83,18 @@ class RelationsStore {
 
     _isInternalRelationTarget(target) {
         const normalized = this._normalizePath(target).toLowerCase();
-        return INTERNAL_RELATION_TARGET_PREFIXES.some((prefix) => normalized === prefix.slice(0, -1) || normalized.startsWith(prefix));
+        const firstSegment = normalized.split('/')[0] || '';
+        const hiddenTarget = firstSegment.startsWith('.') && firstSegment !== '.' && firstSegment !== '..';
+        return hiddenTarget || this._internalRelationTargetPrefixes()
+            .some((prefix) => normalized === prefix.slice(0, -1) || normalized.startsWith(prefix));
+    }
+
+    _internalRelationTargetPrefixes() {
+        const configDir = this._normalizePath(this.app?.vault?.configDir).replace(/\/+$/, '').toLowerCase();
+        return [
+            ...(configDir ? [`${configDir}/`] : []),
+            ...INTERNAL_RELATION_TARGET_PREFIXES,
+        ];
     }
 
     _sanitizeRelations(relations) {
@@ -111,7 +120,7 @@ class RelationsStore {
         const vault = this.app && this.app.vault;
         const files = vault && typeof vault.getMarkdownFiles === 'function' ? vault.getMarkdownFiles() : [];
         const paths = files.map((file) => file && file.path).filter(Boolean);
-        return buildVaultPathIndex(paths);
+        return buildVaultPathIndex(paths, { internalPrefixes: this._internalRelationTargetPrefixes() });
     }
 
     _groupMap(grouped) {
@@ -164,6 +173,25 @@ class RelationsStore {
         }).filter((relation) => relation.target && relation.title && !this._isInternalRelationTarget(relation.target));
     }
 
+    _normalizeRisks(result, filePath) {
+        const allowedTypes = new Set(['possible_conflict', 'stale_claim', 'duplicate']);
+        const allowedSeverities = new Set(['high', 'medium', 'low']);
+        return (Array.isArray(result.risks) ? result.risks : [])
+            .filter((risk) => risk && allowedTypes.has(risk.type))
+            .map((risk) => ({
+                candidate_path: this._normalizePath(risk.candidate_path || risk.doc_b),
+                doc_a: this._normalizePath(risk.doc_a || filePath),
+                doc_b: this._normalizePath(risk.doc_b || risk.candidate_path),
+                type: risk.type,
+                severity: allowedSeverities.has(risk.severity) ? risk.severity : 'low',
+                description: String(risk.description || '').slice(0, 500),
+                suggestion: String(risk.suggestion || '').slice(0, 500),
+                status: 'open',
+                source: risk.source === 'hosted' ? 'hosted' : (risk.source || 'local'),
+            }))
+            .filter((risk) => risk.candidate_path && risk.description);
+    }
+
     async _readOverrides() {
         const data = await this._readJson(OVERRIDES_PATH, {});
         return data && typeof data === 'object' ? data : {};
@@ -188,6 +216,7 @@ class RelationsStore {
         if (!(file instanceof TFile) || !result || result.status !== 'ok') return null;
         const snapshot = await this._snapshot(file);
         const relations = await this._filterTombstones(file.path, this._normalizeRelations(result));
+        const risks = this._normalizeRisks(result, file.path);
         const store = await this._readStore();
         const indexedAt = new Date().toISOString();
         store.files[this._normalizePath(file.path)] = {
@@ -195,6 +224,9 @@ class RelationsStore {
             mtime: snapshot.mtime,
             indexedAt,
             relations,
+            risks,
+            riskAnalysisStatus: result.risk_analysis_status || 'skipped',
+            networkMode: result.network_mode || 'local',
         };
         await this._writeStore(store);
         this.app.workspace.trigger('understory:relations-updated', file.path);
@@ -215,18 +247,35 @@ class RelationsStore {
                 status: 'missing',
                 stale: true,
                 relations: [],
+                risks: [],
                 diagnostics: buildRelationDiagnostics([]),
                 entry: null,
             };
         }
-        const relations = annotateRelations(entry.relations || [], pathIndex);
+        const relations = annotateRelations(entry.relations || [], pathIndex, {
+            internalPrefixes: this._internalRelationTargetPrefixes(),
+        });
         const entryForResponse = { ...entry, relations };
         if (file instanceof TFile) {
             const snapshot = await this._snapshot(file);
             const stale = entry.hash !== snapshot.hash || Number(entry.mtime || 0) !== Number(snapshot.mtime || 0);
-            return { status: 'ok', stale, relations, diagnostics: buildRelationDiagnostics(relations), entry: entryForResponse };
+            return {
+                status: 'ok',
+                stale,
+                relations,
+                risks: entry.risks || [],
+                diagnostics: buildRelationDiagnostics(relations),
+                entry: entryForResponse,
+            };
         }
-        return { status: 'ok', stale: false, relations, diagnostics: buildRelationDiagnostics(relations), entry: entryForResponse };
+        return {
+            status: 'ok',
+            stale: false,
+            relations,
+            risks: entry.risks || [],
+            diagnostics: buildRelationDiagnostics(relations),
+            entry: entryForResponse,
+        };
     }
 
     async _updateRelationStatus(filePath, targetTitle, status) {
@@ -269,10 +318,46 @@ class RelationsStore {
 
     async discoverAndCache(file, refresh = true) {
         if (!(file instanceof TFile)) return null;
-        const result = await this._runNoWriteDiscovery(file, refresh);
-        await this.updateFromResult(file, result);
-        this._showEngineGuidance(result);
-        return result;
+        const hosted = !!this.plugin._shouldUseHostedDiscovery?.();
+        try {
+            const result = await this._runNoWriteDiscovery(file, refresh);
+            await this.updateFromResult(file, result);
+            if (hosted) await this._recordHostedActivity(file, result);
+            else this._showEngineGuidance(result);
+            return result;
+        } catch (error) {
+            if (hosted) await this._recordHostedActivity(file, null, error);
+            throw error;
+        }
+    }
+
+    async _recordHostedActivity(file, result, error = null) {
+        if (typeof this.plugin._addLogEntry !== 'function') return;
+        const relations = Array.isArray(result?.relations) ? result.relations : [];
+        const titles = relations
+            .map((relation) => String(relation?.title || relation?.target || '').trim())
+            .filter(Boolean)
+            .slice(0, 10);
+        const entry = {
+            time: typeof this.plugin._formatTime === 'function'
+                ? this.plugin._formatTime(new Date())
+                : new Date().toISOString(),
+            file: file.basename || file.name || file.path,
+            filePath: this._normalizePath(file.path),
+            status: error ? 'error' : (result?.status || 'ok'),
+            count: error ? 0 : relations.length,
+            relations: titles,
+            source: 'hosted',
+        };
+        if (error) {
+            entry.errorCategory = Number(error?.status || 0) === 401 ? 'session_expired' : 'hosted_request_failed';
+            entry.message = 'Hosted analysis request failed.';
+        }
+        try {
+            await this.plugin._addLogEntry(entry);
+        } catch (error) {
+            this.plugin.hostedActivityLogError = error;
+        }
     }
 
     _showEngineGuidance(result) {
@@ -282,18 +367,19 @@ class RelationsStore {
         if (indexFix) {
             new Notice(t(this.plugin, 'embedding_index_missing_notice'), 10000);
             if (this.plugin.checkEmbeddingHealth) {
-                this.plugin.checkEmbeddingHealth(false, true).catch((error) => {
-                    console.warn('[Understory] Failed to refresh semantic embedding status:', redactSensitiveText(String(error?.message || error), this.plugin.settings));
-                });
+                this.plugin.checkEmbeddingHealth(false, true).catch(() => undefined);
             }
         }
         if (warnings.length || fixes.length) {
             const detail = JSON.stringify({ warnings, fixes });
-            console.warn('[Understory] Engine guidance:', redactSensitiveText(detail, this.plugin.settings));
+            this.plugin.lastEngineGuidance = redactSensitiveText(detail, this.plugin.settings);
         }
     }
 
     async _runNoWriteDiscovery(file, refresh) {
+        if (this.plugin._shouldUseHostedDiscovery?.() && this.plugin.hostedDiscoverRelations) {
+            return this.plugin.hostedDiscoverRelations(file, { interactiveConsent: refresh !== false });
+        }
         const { spawn } = require('child_process');
         if (this.plugin._ensureEngineReady && !(await this.plugin._ensureEngineReady(true))) {
             throw new Error('Understory engine is not ready');
@@ -449,6 +535,46 @@ class RelationsStore {
         await this.app.vault.modify(file, newContent);
         return true;
     }
+
+    async syncSuggestedRelationsIntoBody(file, relations) {
+        if (!(file instanceof TFile)) return false;
+        const suggestions = (Array.isArray(relations) ? relations : [])
+            .filter((relation) => relation && relation.status !== 'rejected' && relation.target)
+            .slice(0, 8);
+        const replace = (source) => {
+            const content = String(source || '');
+            const start = content.indexOf(SUGGESTIONS_START);
+            const end = content.indexOf(SUGGESTIONS_END);
+            let clean = content;
+            if (start >= 0 && end > start) {
+                clean = `${content.slice(0, start).replace(/\s+$/, '')}${content.slice(end + SUGGESTIONS_END.length)}`;
+            }
+            if (!suggestions.length) return `${clean.replace(/\s+$/, '')}\n`;
+            const heading = t(this.plugin, 'hosted_body_suggestions_heading');
+            const intro = t(this.plugin, 'hosted_body_suggestions_intro');
+            const rows = suggestions.map((relation) => {
+                const target = String(relation.target).replace(/\.md$/i, '');
+                const score = Number.isFinite(Number(relation.score)) ? ` (${Number(relation.score).toFixed(2)})` : '';
+                return `- [[${target}]]${score}`;
+            });
+            const block = `${SUGGESTIONS_START}\n## ${heading}\n\n${intro}\n\n${rows.join('\n')}\n${SUGGESTIONS_END}`;
+            return `${clean.replace(/\s+$/, '')}\n\n${block}\n`;
+        };
+        if (typeof this.app.vault.process === 'function') {
+            let changed = false;
+            await this.app.vault.process(file, (content) => {
+                const next = replace(content);
+                changed = next !== content;
+                return next;
+            });
+            return changed;
+        }
+        const content = await this.app.vault.read(file);
+        const next = replace(content);
+        if (next === content) return false;
+        await this.app.vault.modify(file, next);
+        return true;
+    }
 }
 
-module.exports = { RelationsStore, RELATIONS_PATH, OVERRIDES_PATH };
+module.exports = { RelationsStore, RELATIONS_PATH, OVERRIDES_PATH, SUGGESTIONS_START, SUGGESTIONS_END };

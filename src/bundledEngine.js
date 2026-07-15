@@ -1,4 +1,4 @@
-const crypto = require('crypto');
+const nodeCrypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const bundledEnginePayload = require('./bundledEnginePayload');
@@ -19,8 +19,7 @@ function vaultBasePath(app) {
 }
 
 function configDirName(app) {
-    const value = String(app?.vault?.configDir || '.obsidian').trim();
-    return value || '.obsidian';
+    return String(app?.vault?.configDir || '').trim();
 }
 
 function pluginId(plugin) {
@@ -49,8 +48,9 @@ function pluginInstallDir(plugin, options = {}) {
     }
 
     const base = options.vaultBasePath || vaultBasePath(plugin?.app);
-    if (base) {
-        return path.resolve(base, configDirName(plugin?.app), 'plugins', pluginId(plugin));
+    const configDir = configDirName(plugin?.app);
+    if (base && configDir) {
+        return path.resolve(base, configDir, 'plugins', pluginId(plugin));
     }
 
     return path.resolve(fallbackPluginDir() || '.');
@@ -73,7 +73,7 @@ function safePayloadParts(relativePath) {
 }
 
 function sha256(buffer) {
-    return crypto.createHash('sha256').update(buffer).digest('hex');
+    return nodeCrypto.createHash('sha256').update(buffer).digest('hex');
 }
 
 async function fileMatches(targetPath, expectedSha256, fsImpl = fs) {

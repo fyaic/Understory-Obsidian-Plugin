@@ -764,7 +764,7 @@ def init_index(vault: Optional[Path] = None) -> dict:
 
     返回: {"status": "ok" | "error", "message": str, ...}
     """
-    vault = vault or detect_vault_path()
+    vault = Path(vault or detect_vault_path()).expanduser().resolve()
     db = _cache_db()
     try:
         if not embedding_allowed():
@@ -1405,7 +1405,7 @@ def refresh_relations(doc_path: str | Path, vault: Optional[Path] = None, auto_w
     返回:
         {"status": "ok" | "skipped" | "error", ...}
     """
-    vault = vault or detect_vault_path()
+    vault = Path(vault or detect_vault_path()).expanduser().resolve()
     doc = Path(doc_path).expanduser()
     if not doc.is_absolute():
         doc = vault / doc

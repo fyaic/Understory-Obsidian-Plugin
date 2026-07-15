@@ -1,4 +1,4 @@
-const { Plugin, Notice } = require('obsidian');
+const { Plugin: ObsidianPlugin, Notice } = require('obsidian');
 const {
     UnderstorySettingTab,
     isLikelyEngineDir,
@@ -6,16 +6,23 @@ const {
 const { registerCoreCommands } = require('./commands');
 const graphifyLayer = require('./graphifyLayer');
 const linkDiscoveryMethods = require('./linkDiscovery');
+const hostedClientMethods = require('./hostedClient');
+const hostedDiscoveryMethods = require('./hostedDiscovery');
+const hostedAnalysisMethods = require('./hostedAnalysis');
+const { registerUnderstoryAuthProtocol } = require('./authProtocol');
 const { RelationsStore } = require('./relationsStore');
 const { createAgentApi } = require('./agentApi');
 const { ensureBundledEngine } = require('./bundledEngine');
 const { UnderstorySidebarView, VIEW_TYPE_UNDERSTORY_SIDEBAR, UNDERSTORY_ICON } = require('./sidebarView');
 const { t } = require('./i18n');
+const { recordBackgroundError } = require('./safety');
 
-class UnderstoryPlugin extends Plugin {
+class UnderstoryPlugin extends ObsidianPlugin {
     async onload() {
         await this.loadSettings();
-        await this._ensureBundledEngineInstalled();
+        if ((this.settings.networkMode || 'hosted') !== 'hosted') {
+            await this._ensureBundledEngineInstalled();
+        }
 
         this.timers = new Map();
         this.relationsStore = new RelationsStore(this);
@@ -26,13 +33,27 @@ class UnderstoryPlugin extends Plugin {
             plugin: this,
         });
 
-        this.addSettingTab(new UnderstorySettingTab(this.app, this));
+        this.settingTab = new UnderstorySettingTab(this.app, this);
+        this.addSettingTab(this.settingTab);
         this.registerView(
             VIEW_TYPE_UNDERSTORY_SIDEBAR,
             (leaf) => new UnderstorySidebarView(leaf, this)
         );
         this.addRibbonIcon(UNDERSTORY_ICON, t(this, 'action_show_understory'), () => this.openSidebar());
         registerCoreCommands(this);
+        registerUnderstoryAuthProtocol(this);
+        const resumePendingLogin = () => {
+            this.hostedResumePendingLogin?.().catch((error) => {
+                recordBackgroundError(this, 'resume-account-login', error);
+            });
+        };
+        this.registerDomEvent(window, 'focus', resumePendingLogin);
+        const activeDocument = this.app.workspace?.containerEl?.ownerDocument || window.document;
+        if (activeDocument) {
+            this.registerDomEvent(activeDocument, 'visibilitychange', () => {
+                if (activeDocument.visibilityState === 'visible') resumePendingLogin();
+            });
+        }
 
         this.isRunning = false;
         this.runQueue = Promise.resolve();
@@ -46,9 +67,15 @@ class UnderstoryPlugin extends Plugin {
         this._initGraphifyAI();
 
         this._runWhenWorkspaceReady(() => {
+            const hostedMode = (this.settings.networkMode || 'hosted') === 'hosted';
             this.registerEvent(this.app.vault.on('create', (file) => {
                 if (file.extension === 'md') this.scheduleLink(file);
             }));
+            if (hostedMode) {
+                this.registerEvent(this.app.vault.on('modify', (file) => {
+                    if (file?.extension === 'md') this.scheduleLink(file);
+                }));
+            }
             this.registerEvent(this.app.vault.on('delete', (file) => {
                 this._clearScheduledLink(file?.path);
             }));
@@ -59,20 +86,28 @@ class UnderstoryPlugin extends Plugin {
                 }
             }));
 
-            if (this.settings.autoRefreshEnabled) {
+            if (!hostedMode && this.settings.autoRefreshEnabled) {
                 this.checkAndStartRefresh();
             }
 
-            if (this.settings.daemonEnabled) {
-                this.startDaemon().catch((error) => console.warn('[Understory] Failed to start daemon:', error));
+            if (!hostedMode && this.settings.daemonEnabled) {
+                this.startDaemon().catch(() => undefined);
             }
 
+            if (hostedMode) {
+                this.initHostedAnalysis?.();
+                resumePendingLogin();
+                if (this._hostedAccessToken?.()) {
+                    this.refreshHostedConfig(false)
+                        .then(() => this.refreshHostedAccountSurfaces())
+                        .catch(() => undefined);
+                }
+            }
         });
-
-        new Notice(t(this, 'plugin_enabled'));
     }
 
     async _ensureBundledEngineInstalled() {
+        if (this.settings?.networkMode === 'hosted') return;
         try {
             const bundledEngine = await ensureBundledEngine(this, this.bundledEngineOptions || {});
             this.bundledEngine = bundledEngine;
@@ -85,13 +120,11 @@ class UnderstoryPlugin extends Plugin {
                 await this.saveSettings();
             }
         } catch (error) {
-            console.warn('[Understory] Failed to install bundled engine:', error);
+            this.engineInstallError = error;
         }
 
         if (this.checkEngineHealth) {
-            this.checkEngineHealth(false).catch((error) => {
-                console.warn('[Understory] Engine health check failed:', error);
-            });
+            this.checkEngineHealth(false).catch(() => undefined);
         }
     }
 
@@ -142,6 +175,15 @@ class UnderstoryPlugin extends Plugin {
         await this.ensureSidebarLeaf({ reveal: true });
     }
 
+    refreshHostedAccountSurfaces() {
+        if (this.settingTab && typeof this.settingTab.display === 'function') {
+            this.settingTab.display();
+        }
+        if (this.app.workspace && typeof this.app.workspace.trigger === 'function') {
+            this.app.workspace.trigger('understory:account-updated');
+        }
+    }
+
 }
 
 function mixinPrototype(target, source) {
@@ -155,5 +197,8 @@ mixinPrototype(UnderstoryPlugin.prototype, graphifyLayer.core);
 mixinPrototype(UnderstoryPlugin.prototype, graphifyLayer.views);
 mixinPrototype(UnderstoryPlugin.prototype, graphifyLayer.runtime);
 mixinPrototype(UnderstoryPlugin.prototype, linkDiscoveryMethods);
+mixinPrototype(UnderstoryPlugin.prototype, hostedClientMethods);
+mixinPrototype(UnderstoryPlugin.prototype, hostedDiscoveryMethods);
+mixinPrototype(UnderstoryPlugin.prototype, hostedAnalysisMethods);
 
 module.exports = UnderstoryPlugin;

@@ -1,19 +1,33 @@
 {
   "name": "understory-obsidian-plugin",
-  "version": "1.8.11",
+  "version": "1.13.0",
   "private": true,
-  "description": "Understory Obsidian plugin release package.",
+  "description": "Official Understory release package for related-note discovery and knowledge maintenance.",
   "scripts": {
     "build": "python scripts/bundle_obsidian_plugin.py --plugin-dir src --out main.js",
     "check": "python scripts/check_release.py",
-    "test": "node --test tests/*.test.js"
+    "lint": "eslint src scripts tests package.json --max-warnings=0",
+    "test": "node --test tests/*.test.js",
+    "verify": "npm run lint && npm test && npm run build && npm run check"
   },
   "keywords": [
     "obsidian",
     "obsidian-plugin",
     "knowledge-management",
-    "local-first",
+    "hosted-service",
     "understory"
   ],
-  "license": "PolyForm-Perimeter-1.0.0"
+  "license": "PolyForm-Perimeter-1.0.0",
+  "devDependencies": {
+    "@codemirror/state": "6.5.0",
+    "@codemirror/view": "6.38.6",
+    "@eslint/js": "9.39.5",
+    "@eslint/json": "0.14.0",
+    "@types/node": "20.12.12",
+    "eslint": "9.39.5",
+    "eslint-plugin-obsidianmd": "0.4.1",
+    "obsidian": "1.8.7",
+    "typescript": "5.4.5",
+    "typescript-eslint": "8.35.1"
+  }
 }

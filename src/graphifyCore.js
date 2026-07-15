@@ -1,7 +1,6 @@
 const { Notice, TFile } = require('obsidian');
-const { GraphifyContentModal, MAX_LOG_ENTRIES } = require('./utils');
 const { t } = require('./i18n');
-const { canUseWebhook } = require('./safety');
+const { canUseWebhook, recordBackgroundError } = require('./safety');
 
 class GraphifyCoreMethods {
     _vaultBasePath() {
@@ -18,6 +17,7 @@ class GraphifyCoreMethods {
     }
 
     _initGraphifyAI() {
+        if ((this.settings?.networkMode || 'hosted') === 'hosted') return;
         // 1. \u547d\u4ee4\uff1a\u624b\u52a8\u89e6\u53d1\uff08\u7eaf UI \u6ce8\u518c\uff0c\u65e0 IO\uff09
         this.addCommand({
             id: 'graphify-ingest-now',
@@ -76,23 +76,26 @@ class GraphifyCoreMethods {
         try {
             if (!fs.existsSync(scriptsDir)) {
                 if (this._ensureEngineReady && !(await this._ensureEngineReady(false))) {
-                    console.warn('[Understory] Lazy init skipped because engine is not ready');
                     return;
                 }
                 // \u90e8\u7f72\u9aa8\u67b6\uff1a\u8c03\u7528 kg \u7684 deploy_graphify.py
-                console.log('[Understory] Lazy init: deploying .understory skeleton...');
-                await this._runPythonScript(
-                    this._enginePath ? this._enginePath('scripts', 'deploy_graphify.py') : `${this.settings.graphifyDir}/scripts/deploy_graphify.py`,
-                    ['--vault', base]
-                ).catch((e) => console.error('[Understory] deploy failed:', e));
+                try {
+                    await this._runPythonScript(
+                        this._enginePath ? this._enginePath('scripts', 'deploy_graphify.py') : `${this.settings.graphifyDir}/scripts/deploy_graphify.py`,
+                        ['--vault', base]
+                    );
+                } catch (error) {
+                    recordBackgroundError(this, 'deploy-local-engine', error);
+                    return;
+                }
                 if (!this.settings.graphifyInitialized && this.settings.notificationLevel !== 'silent') {
                     new Notice(t(this, 'graphify_initialized_notice'), 8000);
                 }
                 this.settings.graphifyInitialized = true;
                 await this.saveSettings();
             }
-        } catch (e) {
-            console.error('[Understory] Lazy init error:', e);
+        } catch (error) {
+            recordBackgroundError(this, 'initialize-local-engine', error);
         }
         // \u542f\u52a8\u5468\u671f\u68c0\u67e5\u5668\uff08\u5ef6\u8fdf 60s\uff0c\u907f\u514d\u4e0e\u51b7\u542f\u52a8\u4e89\u62a2\uff09
         window.setTimeout(() => {
@@ -109,9 +112,8 @@ class GraphifyCoreMethods {
         if (this._isPathExcluded(path)) return;
         if (this.ingestTimers.has(path)) return; // \u4e0e scheduleLink \u540c\u6b3e\u9632\u6296\uff1a\u4e0d\u91cd\u7f6e
         const delay = (this.settings.debounceMinutes || 10) * 60 * 1000;
-        const timer = setTimeout(() => this.runIngest(file), delay);
+        const timer = window.setTimeout(() => this.runIngest(file), delay);
         this.ingestTimers.set(path, timer);
-        console.log(`[Understory] Scheduled ingest for ${path} in ${this.settings.debounceMinutes}min`);
     }
 
     async runIngest(file, manual = false) {
@@ -124,7 +126,7 @@ class GraphifyCoreMethods {
             }
         });
         this.runQueue = task.catch((error) => {
-            console.error('[Understory] Ingest queue failed:', error);
+            recordBackgroundError(this, 'ingest-queue', error);
         });
         return task;
     }
@@ -138,16 +140,14 @@ class GraphifyCoreMethods {
         if (!fs.existsSync(scriptPath)) {
             await this._lazyInitGraphify();
             if (!fs.existsSync(scriptPath)) {
-                console.warn('[Understory] ingest script missing, skip');
                 return;
             }
         }
         try {
             await this._runPythonScript(scriptPath, [absPath, '--vault', base]);
-            console.log(`[Understory] Ingest OK: ${file.basename}`);
             if (manual) new Notice(t(this, 'ingest_done_notice'), 3000);
-        } catch (e) {
-            console.error(`[Understory] Ingest failed: ${file.basename}`, e);
+        } catch (error) {
+            recordBackgroundError(this, 'ingest-note', error);
             if (manual) new Notice(t(this, 'ingest_failed_notice'), 5000);
             // \u81ea\u52a8\u89e6\u53d1\u7684\u5931\u8d25\u53ea\u5199\u65e5\u5fd7\uff0c\u4e0d\u6253\u6270\u7528\u6237
         }
@@ -166,7 +166,6 @@ class GraphifyCoreMethods {
             return;
         }
         if (now - last > threshold) {
-            console.log('[Understory] Scheduled lint + graph starting...');
             await this.runLintAndGraph(false);
         }
     }
@@ -186,8 +185,8 @@ class GraphifyCoreMethods {
             try {
                 await this._runPythonScript(`${sdir}/${script}`, args, timeoutMs);
                 return true;
-            } catch (e) {
-                console.error(`[Understory] ${label} \u5931\u8d25:`, e);
+            } catch (error) {
+                recordBackgroundError(this, `local-analysis-${label}`, error);
                 return false;
             }
         };
@@ -195,8 +194,8 @@ class GraphifyCoreMethods {
             // \u5168\u5e93\u68c0\u67e5\uff1aLLM \u77db\u76fe\u5224\u5b9a\u5df2\u5728 Python \u7aef\u505a\u65f6\u95f4\u9884\u7b97\uff08\u226445s\uff09\uff0c\u8fd9\u91cc 5 \u5206\u949f\u515c\u5e95\u8d85\u65f6
             try {
                 await this._runPythonScript(`${sdir}/lint.py`, ['--vault', base, '--fix'], 5 * 60 * 1000);
-            } catch (e) {
-                console.error('[Understory] lint \u5931\u8d25:', e);
+            } catch (error) {
+                recordBackgroundError(this, 'local-analysis-lint', error);
             }
             // \u77e5\u8bc6\u7f51\u7edc\u5206\u6790 / \u7d22\u5f15 / \u901a\u77e5\uff1a\u5f7c\u6b64\u72ec\u7acb\uff0c\u786e\u4fdd\u5206\u6790\u7d22\u5f15\u603b\u80fd\u751f\u6210
             await step('graph_analyzer.py', 3 * 60 * 1000, 'graph');
@@ -215,7 +214,11 @@ class GraphifyCoreMethods {
                 new Notice(t(this, 'high_conflict_notice', { count: highCount }), 10000);
             }
             if (this.settings.conflictBlockEnabled && (this.settings.presentationMode || 'sidebar') !== 'sidebar') {
-                try { await this._updateConflictBlocksInVault(); } catch (e) { console.error('[Understory] conflict blocks:', e); }
+                try {
+                    await this._updateConflictBlocksInVault();
+                } catch (error) {
+                    recordBackgroundError(this, 'update-conflict-blocks', error);
+                }
             }
             if (manual) {
                 const total = this._countOpenConflicts();
@@ -288,8 +291,11 @@ class GraphifyCoreMethods {
         for (const [docPath, issues] of byDoc.entries()) {
             const file = this.app.vault.getAbstractFileByPath(docPath);
             if (file instanceof TFile) {
-                await this._insertConflictBlock(file, issues).catch(
-                    (e) => console.error('[Understory] conflict block failed:', docPath, e));
+                try {
+                    await this._insertConflictBlock(file, issues);
+                } catch (error) {
+                    recordBackgroundError(this, `update-conflict-block:${docPath}`, error);
+                }
             }
         }
     }

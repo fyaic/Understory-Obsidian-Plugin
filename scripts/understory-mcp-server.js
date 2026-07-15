@@ -216,7 +216,11 @@ async function handleRequest(message, serverOptions) {
 
     if (message.method === 'tools/list') {
         return response(id, {
-            tools: TOOL_DEFINITIONS.map(({ call, ...tool }) => tool),
+            tools: TOOL_DEFINITIONS.map((tool) => ({
+                name: tool.name,
+                description: tool.description,
+                inputSchema: tool.inputSchema,
+            })),
         });
     }
 

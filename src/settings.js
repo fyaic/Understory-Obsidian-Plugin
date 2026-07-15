@@ -1,8 +1,7 @@
-const { PluginSettingTab, Setting, Notice, TFile, setIcon } = require('obsidian');
+const { PluginSettingTab, Setting, Notice, setIcon } = require('obsidian');
 const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const { UNDERSTORY_SETTINGS_LOGO_DATA_URI } = require('./brandAssets');
 const {
     USAGE_MODES,
     agentProfilesForLanguage,
@@ -13,14 +12,28 @@ const {
     writeAgentAccessFile,
 } = require('./agentAccess');
 const { getLanguage, t } = require('./i18n');
+const { recordBackgroundError } = require('./safety');
 
 const ENGINE_DIR_ENV = 'UNDERSTORY_ENGINE_DIR';
 const LEGACY_ENGINE_DIR_ENV = 'GRAPHIFY_ENGINE_DIR';
 const PYTHON_PATH_ENV = 'UNDERSTORY_PYTHON_PATH';
+const DEFAULT_PYTHON_COMMAND = 'python';
+const WEBHOOK_URL_EXAMPLE = 'https://hooks.slack.com/...';
 const ENGINE_DIR_CANDIDATE_NAMES = [
     'understory-graphify-engine',
     'Understory-graphify-engine',
     'Understory-Graphify-Engine',
+];
+
+const SETTINGS_PAGES = [
+    ['account', 'settings_nav_account', 'user'],
+    ['usage', 'settings_nav_usage', 'gauge'],
+    ['workflow', 'settings_nav_workflow', 'sliders-horizontal'],
+    ['scope', 'settings_nav_scope', 'folder-tree'],
+    ['suggestions', 'settings_nav_suggestions', 'sparkles'],
+    ['activity', 'settings_nav_activity', 'history'],
+    ['agents', 'settings_tab_agents', 'bot'],
+    ['advanced', 'settings_nav_advanced', 'wrench'],
 ];
 
 function envValue(name, env) {
@@ -264,22 +277,36 @@ function providerPreset(name) {
 }
 
 const DEFAULT_SETTINGS = {
+    settingsSchemaVersion: 2,
     graphifyDir: getDefaultEngineDir(),
     pythonPath: getDefaultPythonPath(),
     debounceMinutes: 10,
     linkLog: [],
     uiLanguage: 'en',
-    networkMode: 'local',
     agentProfileId: 'generic',
     agentUsageModeId: 'memory',
-    embeddingProvider: 'zhipu',
-    embeddingBaseUrl: PROVIDER_PRESETS.zhipu.baseUrl,
-    embeddingModel: PROVIDER_PRESETS.zhipu.embeddingModel,
+    networkMode: 'hosted',
+    hostedServerUrl: 'https://understory.bondie.io',
+    hostedAccountCenterUrl: 'https://account.bondie.io/account',
+    hostedAccessToken: '',
+    hostedClientInstanceId: '',
+    hostedBillingIdempotency: {},
+    hostedLoginState: '',
+    hostedLoginStartedAt: 0,
+    hostedLoginExpiresAt: 0,
+    hostedUser: null,
+    hostedSubscription: null,
+    hostedRuntimeConfig: null,
+    hostedConsentAccepted: false,
+    hostedLastSync: 0,
+    embeddingProvider: 'hosted',
+    embeddingBaseUrl: '',
+    embeddingModel: '',
     embeddingDimensions: 1024,
     embeddingApiKey: '',
-    llmProvider: 'zhipu',
-    llmBaseUrl: PROVIDER_PRESETS.zhipu.baseUrl,
-    llmModel: PROVIDER_PRESETS.zhipu.llmModel,
+    llmProvider: 'hosted',
+    llmBaseUrl: '',
+    llmModel: '',
     llmApiKey: '',
     presentationMode: 'sidebar',
     sidebarRefreshOnEdit: true,
@@ -335,254 +362,249 @@ class UnderstorySettingTab extends PluginSettingTab {
         super(app, plugin);
         this.plugin = plugin;
         this._activeScopeTab = 'whitelist';
+        this._activeSettingsPage = 'account';
     }
 
     display() {
         const { containerEl } = this;
         containerEl.empty();
+        containerEl.addClass('understory-settings-tab');
 
-        this._injectStyles(containerEl);
+        this._renderSettingsHeader(containerEl);
 
-        const header = containerEl.createDiv({ cls: 'understory-settings-header' });
-        const brand = header.createDiv({ cls: 'understory-settings-brand' });
-        const logo = brand.createEl('img', { cls: 'understory-settings-logo' });
-        logo.setAttribute('src', UNDERSTORY_SETTINGS_LOGO_DATA_URI);
-        logo.setAttribute('alt', 'Understory logo');
-        brand.createDiv({ text: t(this.plugin, 'settings_title'), cls: 'understory-settings-title' });
-        this._renderLanguageToggle(header);
-
-        const tabIds = this._settingsTabs().map((tab) => tab.id);
-        const activeTab = tabIds.includes(this._activeSettingsTab) ? this._activeSettingsTab : 'setup';
-        this._activeSettingsTab = activeTab;
-        this._renderSettingsTabs(containerEl, activeTab);
-        const pageEl = containerEl.createDiv({ cls: 'understory-settings-page' });
-
-        if (activeTab === 'models') {
-            this._renderModelsTab(pageEl);
-        } else if (activeTab === 'suggestions') {
-            this._renderSuggestionsTab(pageEl);
-        } else if (activeTab === 'agents') {
-            this._renderAgentAccessTab(pageEl);
-        } else if (activeTab === 'maintenance') {
-            this._renderMaintenanceTab(pageEl);
-        } else {
-            this._activeSettingsTab = 'setup';
-            this._renderSetupTab(pageEl);
+        const account = this.plugin.hostedAccountSummary ? this.plugin.hostedAccountSummary() : { status: 'disconnected' };
+        const connected = account.status === 'connected';
+        const hostedMode = (this.plugin.settings.networkMode || 'hosted') === 'hosted';
+        const navigationEnabled = connected || !hostedMode;
+        if (!connected && hostedMode) this._activeSettingsPage = 'account';
+        if (!hostedMode && ['account', 'usage'].includes(this._activeSettingsPage)) {
+            this._activeSettingsPage = 'advanced';
         }
-    }
 
-    _settingsTabs() {
-        return [
-            { id: 'setup', label: t(this.plugin, 'settings_tab_setup') },
-            { id: 'models', label: t(this.plugin, 'settings_tab_models') },
-            { id: 'suggestions', label: t(this.plugin, 'settings_tab_suggestions') },
-            { id: 'maintenance', label: t(this.plugin, 'settings_tab_maintenance') },
-            { id: 'agents', label: t(this.plugin, 'settings_tab_agents') },
-        ];
-    }
-
-    _renderSettingsTabs(containerEl, activeTab) {
-        const toggle = containerEl.createDiv({ cls: 'understory-settings-toggle' });
-        toggle.createDiv({
-            cls: 'understory-settings-toggle-label',
-            text: t(this.plugin, 'settings_page_toggle_label'),
+        const shell = containerEl.createDiv({
+            cls: `understory-settings-shell${navigationEnabled ? '' : ' is-onboarding'}`,
         });
+        if (navigationEnabled) this._renderSettingsNavigation(shell, { hostedMode });
+        const body = shell.createDiv({ cls: 'understory-settings-body' });
 
-        const tabs = this._settingsTabs();
-        const tablist = toggle.createDiv({ cls: 'understory-settings-tablist' });
-        tablist.setAttribute('role', 'tablist');
-        tablist.setAttribute('aria-label', t(this.plugin, 'settings_page_toggle_label'));
+        if (this._activeSettingsPage === 'workflow') {
+            this._renderWorkflowPage(body);
+        } else if (this._activeSettingsPage === 'usage') {
+            this._renderUsagePage(body);
+        } else if (this._activeSettingsPage === 'scope') {
+            this._renderScopePage(body);
+        } else if (this._activeSettingsPage === 'suggestions') {
+            this._renderSuggestionsPage(body);
+        } else if (this._activeSettingsPage === 'activity') {
+            this._renderActivityPage(body);
+        } else if (this._activeSettingsPage === 'agents') {
+            this._renderAgentAccessTab(body);
+        } else if (this._activeSettingsPage === 'advanced') {
+            this._renderAdvancedPage(body);
+        } else {
+            this._activeSettingsPage = 'account';
+            this._renderAccountPage(body);
+        }
+    }
 
-        for (const tab of tabs) {
-            const isActive = tab.id === activeTab;
-            const button = tablist.createEl('button', {
-                text: tab.label,
-                cls: `understory-settings-toggle-button${isActive ? ' is-active' : ''}`,
+    _renderSettingsHeader(containerEl) {
+        const header = containerEl.createDiv({ cls: 'understory-settings-header' });
+        const copy = header.createDiv({ cls: 'understory-settings-header-copy' });
+        copy.createDiv({ text: t(this.plugin, 'settings_title'), cls: 'understory-settings-title' });
+        copy.createEl('p', { text: t(this.plugin, 'settings_subtitle') });
+        this._renderLanguageToggle(header);
+    }
+
+    _renderSettingsNavigation(containerEl, { hostedMode = true } = {}) {
+        const nav = containerEl.createDiv({ cls: 'understory-settings-nav', attr: { role: 'tablist' } });
+        const pages = hostedMode
+            ? SETTINGS_PAGES
+            : SETTINGS_PAGES.filter(([id]) => !['account', 'usage'].includes(id));
+        for (const [id, labelKey, iconName] of pages) {
+            const button = nav.createEl('button', {
+                cls: 'understory-settings-nav-button',
+                attr: {
+                    type: 'button',
+                    role: 'tab',
+                    'aria-selected': String(this._activeSettingsPage === id),
+                },
             });
-            button.type = 'button';
-            button.tabIndex = isActive ? 0 : -1;
-            button.setAttribute('role', 'tab');
-            button.setAttribute('aria-selected', isActive ? 'true' : 'false');
-            button.setAttribute('data-settings-page', tab.id);
+            const icon = button.createSpan({ cls: 'understory-settings-nav-icon', attr: { 'aria-hidden': 'true' } });
+            setIcon(icon, iconName);
+            button.createSpan({ text: t(this.plugin, labelKey), cls: 'understory-settings-nav-label' });
+            if (this._activeSettingsPage === id) button.addClass('is-active');
             button.addEventListener('click', () => {
-                this._activeSettingsTab = tab.id;
-                this.display();
-            });
-            button.addEventListener('keydown', (event) => {
-                const currentIndex = tabs.findIndex((candidate) => candidate.id === tab.id);
-                const delta = event.key === 'ArrowRight' || event.key === 'ArrowDown'
-                    ? 1
-                    : event.key === 'ArrowLeft' || event.key === 'ArrowUp'
-                        ? -1
-                        : 0;
-                if (!delta) return;
-                event.preventDefault?.();
-                const nextIndex = (currentIndex + delta + tabs.length) % tabs.length;
-                this._activeSettingsTab = tabs[nextIndex].id;
+                this._activeSettingsPage = id;
                 this.display();
             });
         }
+    }
+
+    _renderPageIntro(containerEl, titleKey, descKey) {
+        const intro = containerEl.createDiv({ cls: 'understory-settings-page-intro' });
+        intro.createDiv({ text: t(this.plugin, titleKey), cls: 'understory-settings-page-title' });
+        intro.createEl('p', { text: t(this.plugin, descKey) });
+        return intro;
     }
 
     _renderTabIntro(containerEl, titleKey, descKey) {
-        const intro = containerEl.createDiv({ cls: 'understory-tab-intro' });
-        intro.createDiv({ text: t(this.plugin, titleKey), cls: 'understory-tab-intro-title' });
-        intro.createDiv({ text: t(this.plugin, descKey), cls: 'understory-tab-intro-desc' });
+        return this._renderPageIntro(containerEl, titleKey, descKey);
     }
 
-    _setupStatusInfo() {
-        const health = this.plugin.engineHealth;
-        const engineDir = String(this.plugin.settings.graphifyDir || '').trim();
-        if (!engineDir) {
-            return {
-                status: 'needed',
-                title: t(this.plugin, 'setup_needed_title'),
-                desc: t(this.plugin, 'setup_needed_desc'),
-            };
-        }
-        if (!health) {
-            return {
-                status: 'unchecked',
-                title: t(this.plugin, 'setup_unchecked_title'),
-                desc: t(this.plugin, 'setup_unchecked_desc'),
-            };
-        }
-        if (health.status === 'ready') {
-            return {
-                status: 'ready',
-                title: t(this.plugin, 'setup_ready_title'),
-                desc: t(this.plugin, 'setup_ready_desc'),
-            };
-        }
-        if (health.status === 'warning') {
-            return {
-                status: 'warning',
-                title: t(this.plugin, 'setup_warning_title'),
-                desc: health.message || t(this.plugin, 'setup_warning_desc'),
-            };
-        }
-        return {
-            status: 'error',
-            title: t(this.plugin, 'setup_error_title'),
-            desc: health.message || t(this.plugin, 'setup_error_desc'),
-        };
+    _renderAccountPage(containerEl) {
+        this._renderPageIntro(containerEl, 'account_home_title', 'account_home_desc');
+        this._renderAccountHome(containerEl);
     }
 
-    _renderSetupSteps(containerEl) {
-        const steps = [
-            [t(this.plugin, 'setup_step_engine_title'), t(this.plugin, 'setup_step_engine_desc')],
-            [t(this.plugin, 'setup_step_python_title'), t(this.plugin, 'setup_step_python_desc')],
-            [t(this.plugin, 'setup_step_check_title'), t(this.plugin, 'setup_step_check_desc')],
-        ];
-        this._renderNumberedSteps(containerEl, steps);
-    }
-
-    _renderNumberedSteps(containerEl, steps) {
-        const list = containerEl.createDiv({ cls: 'understory-setup-steps' });
-        for (let index = 0; index < steps.length; index += 1) {
-            const [title, desc] = steps[index];
-            const row = list.createDiv({ cls: 'understory-setup-step' });
-            row.createDiv({ text: String(index + 1), cls: 'understory-setup-step-number' });
-            const body = row.createDiv({ cls: 'understory-setup-step-body' });
-            body.createDiv({ text: title, cls: 'understory-setup-step-title' });
-            body.createDiv({ text: desc, cls: 'understory-setup-step-desc' });
+    _renderUsagePage(containerEl) {
+        this._renderPageIntro(containerEl, 'usage_page_title', 'usage_page_desc');
+        const account = this.plugin.hostedAccountSummary ? this.plugin.hostedAccountSummary() : { status: 'disconnected' };
+        if (account.status !== 'connected') {
+            const empty = containerEl.createDiv({ cls: 'understory-settings-panel understory-usage-empty' });
+            const icon = empty.createDiv({ cls: 'understory-state-icon', attr: { 'aria-hidden': 'true' } });
+            setIcon(icon, 'log-in');
+            empty.createDiv({ text: t(this.plugin, 'usage_login_title'), cls: 'understory-settings-panel-title' });
+            empty.createEl('p', { text: t(this.plugin, 'usage_login_desc') });
+            const actions = empty.createDiv({ cls: 'understory-account-actions' });
+            this._accountActionButton(actions, t(this.plugin, 'hosted_login_button'), () => this.plugin.hostedLogin(true), { cta: true, icon: 'log-in' });
+            return;
         }
+
+        const usage = this.plugin.hostedUsageSummary;
+        if (!usage) {
+            const loading = containerEl.createDiv({ cls: 'understory-settings-panel understory-usage-loading', attr: { 'aria-live': 'polite' } });
+            loading.createDiv({ cls: 'understory-skeleton-line is-title' });
+            loading.createDiv({ cls: 'understory-skeleton-line' });
+            loading.createDiv({ cls: 'understory-skeleton-line is-short' });
+            if (this._usageError) {
+                loading.createDiv({ cls: 'understory-inline-error', text: t(this.plugin, 'usage_load_failed') });
+                const retry = loading.createDiv({ cls: 'understory-account-actions' });
+                this._accountActionButton(retry, t(this.plugin, 'usage_refresh_button'), async () => {
+                    this._usageError = '';
+                    this._usageAutoLoadAttempted = false;
+                    this.display();
+                }, { icon: 'refresh-cw' });
+                return;
+            }
+            if (!this._usageLoadInFlight && !this._usageAutoLoadAttempted && typeof this.plugin.refreshHostedUsage === 'function') {
+                this._usageLoadInFlight = true;
+                this._usageAutoLoadAttempted = true;
+                this._usageError = '';
+                this.plugin.refreshHostedUsage(false)
+                    .catch((error) => { this._usageError = String(error.message || error); })
+                    .finally(() => {
+                        this._usageLoadInFlight = false;
+                        if (this._activeSettingsPage === 'usage') this.display();
+                    });
+            }
+            return;
+        }
+
+        const access = usage.provider_access || {};
+        const service = containerEl.createDiv({ cls: `understory-service-row is-${access.status || 'not_ready'}` });
+        const serviceIcon = service.createDiv({ cls: 'understory-service-row-icon', attr: { 'aria-hidden': 'true' } });
+        setIcon(serviceIcon, access.status === 'ready' ? 'check-circle-2' : 'circle-alert');
+        const serviceCopy = service.createDiv({ cls: 'understory-service-row-copy' });
+        serviceCopy.createEl('strong', { text: t(this.plugin, `provider_status_${access.status || 'not_ready'}`) });
+        serviceCopy.createEl('span', { text: t(this.plugin, 'usage_managed_service_desc') });
+        this._accountActionButton(service, t(this.plugin, 'usage_refresh_button'), async () => {
+            await this.plugin.refreshHostedUsage(true);
+            this.display();
+        }, { icon: 'refresh-cw' });
+
+        const metrics = containerEl.createDiv({ cls: 'understory-usage-metrics' });
+        this._renderUsageMetric(metrics, t(this.plugin, 'usage_requests_label'), String(usage.requests || 0));
+        this._renderUsageMetric(metrics, t(this.plugin, 'usage_input_label'), Number(usage.input_units || 0).toLocaleString());
+        this._renderUsageMetric(metrics, t(this.plugin, 'usage_output_label'), Number(usage.output_units || 0).toLocaleString());
+        if (this.plugin.settings?.hostedRuntimeConfig?.billing?.enabled === true) {
+            this._renderUsageMetric(metrics, t(this.plugin, 'usage_cost_label'), `$${Number(usage.estimated_cost_usd || 0).toFixed(4)}`);
+        }
+
+        const breakdown = containerEl.createDiv({ cls: 'understory-settings-panel understory-usage-breakdown' });
+        this._renderPanelHeader(breakdown, 'usage_breakdown_title', 'usage_breakdown_desc');
+        const rows = breakdown.createDiv({ cls: 'understory-usage-rows' });
+        for (const feature of ['relation_discovery', 'risk_analysis', 'principle_extraction', 'vault_analysis', 'reasoning', 'embedding']) {
+            const item = usage.by_feature?.[feature] || {};
+            const row = rows.createDiv({ cls: 'understory-usage-row' });
+            const rowIcon = row.createSpan({ cls: 'understory-usage-row-icon', attr: { 'aria-hidden': 'true' } });
+            setIcon(rowIcon, ({
+                relation_discovery: 'network',
+                risk_analysis: 'shield-alert',
+                principle_extraction: 'list-checks',
+                vault_analysis: 'scan-line',
+                reasoning: 'brain-circuit',
+                embedding: 'scan-search',
+            })[feature]);
+            const copy = row.createDiv({ cls: 'understory-usage-row-copy' });
+            copy.createEl('strong', { text: t(this.plugin, `usage_feature_${feature}`) });
+            copy.createEl('span', { text: t(this.plugin, 'usage_feature_summary', {
+                requests: String(item.requests || 0),
+                units: Number((item.input_units || 0) + (item.output_units || 0)).toLocaleString(),
+            }) });
+        }
+        breakdown.createDiv({
+            cls: 'understory-usage-last-used',
+            text: usage.last_used_at
+                ? t(this.plugin, 'usage_last_used', { time: new Date(usage.last_used_at).toLocaleString() })
+                : t(this.plugin, 'usage_never_used'),
+        });
     }
 
-    _renderAgentMultiVaultSteps(containerEl) {
-        const steps = [
-            [t(this.plugin, 'agent_multi_vault_step_open_title'), t(this.plugin, 'agent_multi_vault_step_open_desc')],
-            [t(this.plugin, 'agent_multi_vault_step_prepare_title'), t(this.plugin, 'agent_multi_vault_step_prepare_desc')],
-            [t(this.plugin, 'agent_multi_vault_step_copy_title'), t(this.plugin, 'agent_multi_vault_step_copy_desc')],
-        ];
-        this._renderNumberedSteps(containerEl, steps);
+    _renderUsageMetric(parent, label, value) {
+        const item = parent.createDiv({ cls: 'understory-usage-metric' });
+        item.createEl('strong', { text: value });
+        item.createSpan({ text: label });
     }
 
-    _renderSetupTab(containerEl) {
-        this._renderTabIntro(containerEl, 'setup_page_title', 'setup_page_desc');
+    _renderWorkflowPage(containerEl) {
+        this._renderPageIntro(containerEl, 'workflow_page_title', 'workflow_page_desc');
 
-        const info = this._setupStatusInfo();
-        const card = containerEl.createDiv({ cls: `understory-setup-card is-${info.status}` });
-        card.createDiv({ text: info.title, cls: 'understory-setup-card-title' });
-        card.createDiv({ text: info.desc, cls: 'understory-setup-card-desc' });
+        const timingPanel = containerEl.createDiv({ cls: 'understory-settings-panel' });
+        this._renderPanelHeader(timingPanel, 'workflow_timing_title', 'workflow_timing_desc');
 
-        this._renderSetupSteps(containerEl);
-
-        new Setting(containerEl)
-            .setName(t(this.plugin, 'engine_dir_name'))
-            .setDesc(t(this.plugin, 'engine_dir_user_desc'))
-            .addText((text) => text
-                .setPlaceholder(t(this.plugin, 'engine_dir_placeholder'))
-                .setValue(this.plugin.settings.graphifyDir)
+        new Setting(timingPanel)
+            .setName(t(this.plugin, 'background_refresh_name'))
+            .setDesc(t(this.plugin, 'background_refresh_desc'))
+            .addToggle((toggle) => toggle
+                .setValue(this.plugin.settings.sidebarRefreshOnEdit !== false)
                 .onChange(async (value) => {
-                    this.plugin.settings.graphifyDir = value.trim();
+                    this.plugin.settings.sidebarRefreshOnEdit = value;
+                    if (!value) this.plugin._clearHostedScheduledWork?.();
                     await this.plugin.saveSettings();
-                }));
-
-        new Setting(containerEl)
-            .setName(t(this.plugin, 'python_path_name'))
-            .setDesc(t(this.plugin, 'python_path_user_desc'))
-            .addText((text) => text
-                .setPlaceholder('python')
-                .setValue(this.plugin.settings.pythonPath)
-                .onChange(async (value) => {
-                    this.plugin.settings.pythonPath = value.trim() || 'python';
-                    await this.plugin.saveSettings();
-                }));
-
-        new Setting(containerEl)
-            .setName(t(this.plugin, 'setup_check_name'))
-            .setDesc(t(this.plugin, 'setup_check_desc'))
-            .addButton((button) => button
-                .setButtonText(t(this.plugin, 'engine_check_button'))
-                .setCta()
-                .onClick(async () => {
-                    if (!this.plugin.checkEngineHealth) {
-                        new Notice(t(this.plugin, 'engine_check_unavailable'));
-                        return;
-                    }
-                    await this.plugin.checkEngineHealth(true, true);
-                    await this.plugin.checkEmbeddingHealth?.(false, true);
                     this.display();
                 }));
 
-        this._renderEmbeddingStatusCard(containerEl);
-    }
+        if (this.plugin.settings.sidebarRefreshOnEdit !== false) {
+            new Setting(timingPanel)
+                .setName(t(this.plugin, 'debounce_name'))
+                .setDesc(t(this.plugin, 'debounce_desc'))
+                .addSlider((slider) => slider
+                    .setLimits(1, 30, 1)
+                    .setValue(this.plugin.settings.debounceMinutes)
+                    .setDynamicTooltip()
+                    .onChange(async (value) => {
+                        this.plugin.settings.debounceMinutes = value;
+                        await this.plugin.saveSettings();
+                    }));
+        }
 
-    _renderModelsTab(containerEl) {
-        this._renderTabIntro(containerEl, 'models_page_title', 'models_page_desc');
-        this._renderPrivacySettings(containerEl);
-    }
-
-    _renderSuggestionsTab(containerEl) {
-        this._renderTabIntro(containerEl, 'suggestions_page_title', 'suggestions_page_desc');
-
-        new Setting(containerEl)
-            .setName(t(this.plugin, 'debounce_name'))
-            .setDesc(t(this.plugin, 'debounce_desc'))
-            .addSlider((slider) => slider
-                .setLimits(1, 30, 1)
-                .setValue(this.plugin.settings.debounceMinutes)
-                .setDynamicTooltip()
+        const consentPanel = containerEl.createDiv({ cls: 'understory-settings-panel' });
+        this._renderPanelHeader(consentPanel, 'workflow_consent_title', 'workflow_consent_desc');
+        new Setting(consentPanel)
+            .setName(t(this.plugin, 'hosted_consent_name'))
+            .setDesc(t(this.plugin, 'hosted_consent_desc'))
+            .addToggle((toggle) => toggle
+                .setValue(!!this.plugin.settings.hostedConsentAccepted)
                 .onChange(async (value) => {
-                    this.plugin.settings.debounceMinutes = value;
+                    this.plugin.settings.hostedConsentAccepted = value;
+                    if (!value) this.plugin._clearHostedScheduledWork?.();
                     await this.plugin.saveSettings();
                 }));
 
-        containerEl.createDiv({ text: t(this.plugin, 'excluded_folders_title'), cls: 'understory-section-title-text' });
-        containerEl.createDiv({
-            text: t(this.plugin, 'excluded_folders_desc'),
-            cls: 'setting-item-description'
-        }).style.marginBottom = '8px';
-        this._renderFolderTree(containerEl, 'excludedFolders', 'refreshFolders', t(this.plugin, 'excluded_selected'));
+        const placementPanel = containerEl.createDiv({ cls: 'understory-settings-panel' });
+        this._renderPanelHeader(placementPanel, 'workflow_placement_title', 'workflow_placement_desc');
 
-        containerEl.createDiv({ text: t(this.plugin, 'relation_title'), cls: 'understory-section-title-text' });
-        containerEl.createDiv({
-            text: t(this.plugin, 'relation_desc'),
-            cls: 'setting-item-description'
-        }).style.marginBottom = '8px';
-
-        new Setting(containerEl)
+        new Setting(placementPanel)
             .setName(t(this.plugin, 'presentation_mode_name'))
             .setDesc(t(this.plugin, 'presentation_mode_desc'))
             .addDropdown((dropdown) => dropdown
@@ -598,7 +620,109 @@ class UnderstorySettingTab extends PluginSettingTab {
                     }
                 }));
 
-        new Setting(containerEl)
+        new Setting(placementPanel)
+            .setName(t(this.plugin, 'open_sidebar_on_load_name'))
+            .setDesc(t(this.plugin, 'open_sidebar_on_load_desc'))
+            .addToggle((toggle) => toggle
+                .setValue(!!this.plugin.settings.openSidebarOnLoad)
+                .onChange(async (value) => {
+                    this.plugin.settings.openSidebarOnLoad = value;
+                    await this.plugin.saveSettings();
+                }));
+    }
+
+    _renderScopePage(containerEl) {
+        this._renderPageIntro(containerEl, 'scope_page_title', 'scope_page_desc');
+
+        const folders = this._getAllFolders();
+        const excluded = this._sortFolders(this.plugin.settings.excludedFolders || []);
+        const included = this._sortFolders(this.plugin.settings.refreshFolders || []);
+        const stats = containerEl.createDiv({ cls: 'understory-settings-summary-grid' });
+        this._renderSummaryStat(stats, t(this.plugin, 'scope_total_folders_label'), String(folders.length));
+        this._renderSummaryStat(stats, t(this.plugin, 'scope_excluded_folders_label'), String(excluded.length));
+        this._renderSummaryStat(stats, t(this.plugin, 'scope_included_folders_label'), included.length ? String(included.length) : t(this.plugin, 'scope_all_folders_value'));
+
+        const excludePanel = containerEl.createDiv({ cls: 'understory-settings-panel' });
+        this._renderPanelHeader(excludePanel, 'excluded_folders_title', 'excluded_folders_desc');
+        this._renderFolderTree(excludePanel, 'excludedFolders', 'refreshFolders', t(this.plugin, 'excluded_selected'));
+
+        const includePanel = containerEl.createDiv({ cls: 'understory-settings-panel' });
+        this._renderPanelHeader(includePanel, 'refresh_folders_title', 'refresh_folders_desc');
+        this._renderFolderTree(includePanel, 'refreshFolders', 'excludedFolders', t(this.plugin, 'refresh_selected'));
+
+        const refreshPanel = containerEl.createDiv({ cls: 'understory-settings-panel' });
+        this._renderPanelHeader(refreshPanel, 'scope_refresh_title', 'scope_refresh_desc');
+
+        new Setting(refreshPanel)
+            .setName(t(this.plugin, 'auto_refresh_name'))
+            .setDesc(t(this.plugin, 'auto_refresh_desc'))
+            .addToggle((toggle) => toggle
+                .setValue(this.plugin.settings.autoRefreshEnabled)
+                .onChange(async (value) => {
+                    this.plugin.settings.autoRefreshEnabled = value;
+                    await this.plugin.saveSettings();
+                    if (value) await this.plugin.checkAndStartRefresh();
+                    this.display();
+                }));
+
+        if (this.plugin.settings.autoRefreshEnabled) {
+            new Setting(refreshPanel)
+                .setName(t(this.plugin, 'refresh_frequency_name'))
+                .setDesc(t(this.plugin, 'refresh_frequency_desc'))
+                .addDropdown((dropdown) => dropdown
+                    .addOption('weekly', t(this.plugin, 'weekly'))
+                    .addOption('monthly', t(this.plugin, 'monthly'))
+                    .setValue(this.plugin.settings.refreshFrequency)
+                    .onChange(async (value) => {
+                        this.plugin.settings.refreshFrequency = value;
+                        await this.plugin.saveSettings();
+                    }));
+
+            const lastRefresh = this.plugin.settings.lastRefreshTime;
+            refreshPanel.createDiv({
+                text: lastRefresh > 0
+                    ? t(this.plugin, 'last_refresh', { time: new Date(lastRefresh).toLocaleString() })
+                    : t(this.plugin, 'last_refresh_never'),
+                cls: 'setting-item-description understory-settings-inline-note'
+            });
+
+            if (this.plugin.settings.refreshInProgress) {
+                const idx = this.plugin.settings.refreshQueueIndex || 0;
+                const total = (this.plugin.settings.refreshQueue || []).length;
+                refreshPanel.createDiv({
+                    text: t(this.plugin, 'refresh_progress', { current: idx, total }),
+                    cls: 'setting-item-description understory-settings-inline-note'
+                });
+            }
+
+            new Setting(refreshPanel)
+                .addButton((button) => {
+                    if (this.plugin.settings.refreshInProgress) {
+                        button.setButtonText(t(this.plugin, 'cancel_refresh_button'))
+                            .setWarning()
+                            .onClick(async () => {
+                                await this.plugin.cancelRefresh();
+                                this.display();
+                            });
+                    } else {
+                        button.setButtonText(t(this.plugin, 'run_refresh_button'))
+                            .setCta()
+                            .onClick(async () => {
+                                await this.plugin.startRefreshQueue();
+                                this.display();
+                            });
+                    }
+                });
+        }
+    }
+
+    _renderSuggestionsPage(containerEl) {
+        this._renderPageIntro(containerEl, 'suggestions_page_title', 'suggestions_page_desc');
+
+        const sidebarPanel = containerEl.createDiv({ cls: 'understory-settings-panel' });
+        this._renderPanelHeader(sidebarPanel, 'suggestions_sidebar_title', 'suggestions_sidebar_desc');
+
+        new Setting(sidebarPanel)
             .setName(t(this.plugin, 'sidebar_group_name'))
             .setDesc(t(this.plugin, 'sidebar_group_desc'))
             .addDropdown((dropdown) => dropdown
@@ -610,7 +734,7 @@ class UnderstorySettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
-        new Setting(containerEl)
+        new Setting(sidebarPanel)
             .setName(t(this.plugin, 'sidebar_scores_name'))
             .setDesc(t(this.plugin, 'sidebar_scores_desc'))
             .addToggle((toggle) => toggle
@@ -620,7 +744,7 @@ class UnderstorySettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
-        new Setting(containerEl)
+        new Setting(sidebarPanel)
             .setName(t(this.plugin, 'sidebar_conflicts_name'))
             .setDesc(t(this.plugin, 'sidebar_conflicts_desc'))
             .addToggle((toggle) => toggle
@@ -630,7 +754,80 @@ class UnderstorySettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
-        new Setting(containerEl)
+        if ((this.plugin.settings.networkMode || 'hosted') === 'hosted') {
+            const analysisPanel = containerEl.createDiv({ cls: 'understory-settings-panel' });
+            this._renderPanelHeader(analysisPanel, 'hosted_analysis_panel_title', 'hosted_analysis_panel_desc');
+            new Setting(analysisPanel)
+                .setName(t(this.plugin, 'hosted_analysis_schedule_name'))
+                .setDesc(t(this.plugin, 'hosted_analysis_schedule_desc'))
+                .addToggle((toggle) => toggle
+                    .setValue(!!this.plugin.settings.lintEnabled)
+                    .onChange(async (value) => {
+                        this.plugin.settings.lintEnabled = value;
+                        if (!value && this.plugin.periodicTimer) {
+                            window.clearInterval(this.plugin.periodicTimer);
+                            this.plugin.periodicTimer = null;
+                        }
+                        await this.plugin.saveSettings();
+                        if (value) this.plugin.initHostedAnalysis?.();
+                    }))
+                .addDropdown((dropdown) => dropdown
+                    .addOption('weekly', t(this.plugin, 'weekly'))
+                    .addOption('monthly', t(this.plugin, 'monthly'))
+                    .setValue(this.plugin.settings.lintFrequency || 'weekly')
+                    .onChange(async (value) => {
+                        this.plugin.settings.lintFrequency = value;
+                        await this.plugin.saveSettings();
+                    }));
+
+            const lastLint = Number(this.plugin.settings.lastLintTime || 0);
+            const openHigh = this.plugin._countOpenConflicts ? this.plugin._countOpenConflicts('high') : 0;
+            const openAll = this.plugin._countOpenConflicts ? this.plugin._countOpenConflicts() : 0;
+            analysisPanel.createEl('div', {
+                text: lastLint > 0
+                    ? t(this.plugin, 'last_lint', { time: new Date(lastLint).toLocaleString(), all: openAll, high: openHigh })
+                    : t(this.plugin, 'last_lint_never'),
+                cls: 'setting-item-description understory-settings-inline-note'
+            });
+
+            const actions = new Setting(analysisPanel);
+            actions.addButton((button) => button
+                .setButtonText(t(this.plugin, 'hosted_extract_principles_button'))
+                .onClick(async () => {
+                    try {
+                        await this.plugin.hostedExtractPrinciplesForFile();
+                    } catch (error) {
+                        recordBackgroundError(this.plugin, 'extract-hosted-principles', error);
+                        new Notice(t(this.plugin, 'hosted_action_failed', { message: String(error.message || error).slice(0, 100) }), 8000);
+                    }
+                }));
+            actions.addButton((button) => button
+                .setButtonText(this.plugin.settings.lintInProgress ? t(this.plugin, 'lint_running_button') : t(this.plugin, 'hosted_analyze_vault_button'))
+                .setCta()
+                .setDisabled(!!this.plugin.settings.lintInProgress)
+                .onClick(async () => {
+                    try {
+                        await this.plugin.runHostedVaultAnalysis(true);
+                        this.display();
+                    } catch (error) {
+                        recordBackgroundError(this.plugin, 'analyze-hosted-vault', error);
+                        new Notice(t(this.plugin, 'hosted_action_failed', { message: String(error.message || error).slice(0, 100) }), 8000);
+                    }
+                }));
+
+            const reportsPanel = containerEl.createDiv({ cls: 'understory-settings-panel' });
+            this._renderPanelHeader(reportsPanel, 'suggestions_reports_title', 'suggestions_reports_desc');
+            new Setting(reportsPanel)
+                .addButton((button) => button.setButtonText(t(this.plugin, 'open_conflicts_button')).onClick(() => this.plugin._openConflictsView()))
+                .addButton((button) => button.setButtonText(t(this.plugin, 'open_orphans_button')).onClick(() => this.plugin._openOrphansView()))
+                .addButton((button) => button.setButtonText(t(this.plugin, 'open_index_button')).onClick(() => this.plugin._openGraphifyIndex()));
+            return;
+        }
+
+        const analysisPanel = containerEl.createDiv({ cls: 'understory-settings-panel' });
+        this._renderPanelHeader(analysisPanel, 'suggestions_analysis_title', 'suggestions_analysis_desc');
+
+        new Setting(analysisPanel)
             .setName(t(this.plugin, 'ingest_name'))
             .setDesc(t(this.plugin, 'ingest_desc'))
             .addToggle((toggle) => toggle
@@ -643,8 +840,9 @@ class UnderstorySettingTab extends PluginSettingTab {
 
     _renderMaintenanceTab(containerEl) {
         this._renderTabIntro(containerEl, 'maintenance_page_title', 'maintenance_page_desc');
+        const analysisPanel = containerEl.createDiv({ cls: 'understory-settings-panel' });
 
-        new Setting(containerEl)
+        new Setting(analysisPanel)
             .setName(t(this.plugin, 'lint_name'))
             .setDesc(t(this.plugin, 'lint_desc'))
             .addToggle((toggle) => toggle
@@ -656,7 +854,7 @@ class UnderstorySettingTab extends PluginSettingTab {
                 }));
 
         if (this.plugin.settings.lintEnabled) {
-            new Setting(containerEl)
+            new Setting(analysisPanel)
                 .setName(t(this.plugin, 'lint_frequency_name'))
                 .setDesc(t(this.plugin, 'lint_frequency_desc'))
                 .addDropdown((dropdown) => dropdown
@@ -668,7 +866,7 @@ class UnderstorySettingTab extends PluginSettingTab {
                         await this.plugin.saveSettings();
                     }));
 
-            new Setting(containerEl)
+            new Setting(analysisPanel)
                 .setName(t(this.plugin, 'conflict_block_name'))
                 .setDesc(t(this.plugin, 'conflict_block_desc'))
                 .addDropdown((dropdown) => dropdown
@@ -687,7 +885,7 @@ class UnderstorySettingTab extends PluginSettingTab {
                         await this.plugin.saveSettings();
                     }));
 
-            new Setting(containerEl)
+            new Setting(analysisPanel)
                 .setName(t(this.plugin, 'notify_high_name'))
                 .setDesc(t(this.plugin, 'notify_high_desc'))
                 .addToggle((toggle) => toggle
@@ -698,7 +896,7 @@ class UnderstorySettingTab extends PluginSettingTab {
                     }));
 
             const webhookAvailable = (this.plugin.settings.networkMode || 'local') !== 'local';
-            new Setting(containerEl)
+            new Setting(analysisPanel)
                 .setName(t(this.plugin, 'webhook_enabled_name'))
                 .setDesc(webhookAvailable ? t(this.plugin, 'webhook_enabled_desc') : t(this.plugin, 'webhook_local_desc'))
                 .addToggle((toggle) => toggle
@@ -711,11 +909,11 @@ class UnderstorySettingTab extends PluginSettingTab {
                     }));
 
             if (this.plugin.settings.webhookEnabled && webhookAvailable) {
-                new Setting(containerEl)
+                new Setting(analysisPanel)
                     .setName(t(this.plugin, 'webhook_name'))
                     .setDesc(t(this.plugin, 'webhook_desc'))
                     .addText((text) => text
-                        .setPlaceholder('https://hooks.slack.com/...')
+                        .setPlaceholder(WEBHOOK_URL_EXAMPLE)
                         .setValue(this.plugin.settings.webhookUrl)
                         .onChange(async (value) => {
                             this.plugin.settings.webhookUrl = value.trim();
@@ -736,14 +934,42 @@ class UnderstorySettingTab extends PluginSettingTab {
             const lastLint = this.plugin.settings.lastLintTime;
             const openHigh = this.plugin._countOpenConflicts ? this.plugin._countOpenConflicts('high') : 0;
             const openAll = this.plugin._countOpenConflicts ? this.plugin._countOpenConflicts() : 0;
-            containerEl.createDiv({
+            analysisPanel.createEl('div', {
                 text: lastLint > 0
                     ? t(this.plugin, 'last_lint', { time: new Date(lastLint).toLocaleString(), all: openAll, high: openHigh })
                     : t(this.plugin, 'last_lint_never'),
-                cls: 'setting-item-description'
-            }).style.marginBottom = '8px';
+                cls: 'setting-item-description understory-settings-inline-note'
+            });
 
-            new Setting(containerEl)
+            const reportsPanel = containerEl.createDiv({ cls: 'understory-settings-panel' });
+            this._renderPanelHeader(reportsPanel, 'suggestions_reports_title', 'suggestions_reports_desc');
+            new Setting(reportsPanel)
+                .addButton((button) => button
+                    .setButtonText(this.plugin.settings.lintInProgress ? t(this.plugin, 'lint_running_button') : t(this.plugin, 'lint_run_button'))
+                    .setCta()
+                    .setDisabled(!!this.plugin.settings.lintInProgress)
+                    .onClick(() => {
+                        if (this.plugin.settings.lintInProgress) {
+                            new Notice(t(this.plugin, 'lint_running_notice'), 4000);
+                            return;
+                        }
+                        new Notice(t(this.plugin, 'lint_started_notice'), 6000);
+                        this.plugin.runLintAndGraph(true).then(() => this.display());
+                        this.display();
+                    }))
+                .addButton((button) => button
+                    .setButtonText(t(this.plugin, 'open_conflicts_button'))
+                    .onClick(() => this.plugin._openConflictsView()))
+                .addButton((button) => button
+                    .setButtonText(t(this.plugin, 'open_orphans_button'))
+                    .onClick(() => this.plugin._openOrphansView()))
+                .addButton((button) => button
+                    .setButtonText(t(this.plugin, 'open_index_button'))
+                    .onClick(() => this.plugin._openGraphifyIndex()));
+        } else {
+            const reportsPanel = containerEl.createDiv({ cls: 'understory-settings-panel' });
+            this._renderPanelHeader(reportsPanel, 'suggestions_reports_title', 'suggestions_reports_desc');
+            new Setting(reportsPanel)
                 .addButton((button) => button
                     .setButtonText(this.plugin.settings.lintInProgress ? t(this.plugin, 'lint_running_button') : t(this.plugin, 'lint_run_button'))
                     .setCta()
@@ -767,93 +993,120 @@ class UnderstorySettingTab extends PluginSettingTab {
                     .setButtonText(t(this.plugin, 'open_index_button'))
                     .onClick(() => this.plugin._openGraphifyIndex()));
         }
+    }
 
-        containerEl.createDiv({ text: t(this.plugin, 'relation_logs_title'), cls: 'understory-section-title-text' });
-        containerEl.createDiv({
-            text: t(this.plugin, 'relation_logs_desc'),
-            cls: 'setting-item-description'
-        }).style.marginBottom = '8px';
-        this._renderLogs(containerEl);
+    _renderActivityPage(containerEl) {
+        this._renderPageIntro(containerEl, 'activity_page_title', 'activity_page_desc');
 
-        containerEl.createDiv({ text: t(this.plugin, 'refresh_title'), cls: 'understory-section-title-text' });
-
-        new Setting(containerEl)
-            .setName(t(this.plugin, 'auto_refresh_name'))
-            .setDesc(t(this.plugin, 'auto_refresh_desc'))
-            .addToggle((toggle) => toggle
-                .setValue(this.plugin.settings.autoRefreshEnabled)
-                .onChange(async (value) => {
-                    this.plugin.settings.autoRefreshEnabled = value;
-                    await this.plugin.saveSettings();
-                    if (value) await this.plugin.checkAndStartRefresh();
-                    this.display();
-                }));
-
-        if (this.plugin.settings.autoRefreshEnabled) {
-            new Setting(containerEl)
-                .setName(t(this.plugin, 'refresh_frequency_name'))
-                .setDesc(t(this.plugin, 'refresh_frequency_desc'))
-                .addDropdown((dropdown) => dropdown
-                    .addOption('weekly', t(this.plugin, 'weekly'))
-                    .addOption('monthly', t(this.plugin, 'monthly'))
-                    .setValue(this.plugin.settings.refreshFrequency)
-                    .onChange(async (value) => {
-                        this.plugin.settings.refreshFrequency = value;
-                        await this.plugin.saveSettings();
-                    }));
-
-            containerEl.createDiv({ text: t(this.plugin, 'refresh_folders_title'), cls: 'understory-section-subtitle-text' });
-            containerEl.createDiv({
-                text: t(this.plugin, 'refresh_folders_desc'),
-                cls: 'setting-item-description'
-            }).style.marginBottom = '8px';
-            this._renderFolderTree(containerEl, 'refreshFolders', 'excludedFolders', t(this.plugin, 'refresh_selected'));
-
+        const summary = containerEl.createDiv({ cls: 'understory-settings-summary-grid' });
+        const hostedMode = (this.plugin.settings.networkMode || 'hosted') === 'hosted';
+        if (hostedMode) {
+            const logs = Array.isArray(this.plugin.settings.linkLog) ? this.plugin.settings.linkLog : [];
+            const suggestions = logs.reduce((total, item) => total + Number(item.count || 0), 0);
+            const failures = logs.filter((item) => item.status === 'error' || item.status === 'parse_error').length;
+            this._renderSummaryStat(summary, t(this.plugin, 'activity_last_run_label'), logs[0]?.time || t(this.plugin, 'activity_never_value'));
+            this._renderSummaryStat(summary, t(this.plugin, 'activity_recent_runs_label'), String(logs.length));
+            this._renderSummaryStat(summary, t(this.plugin, 'activity_suggestions_label'), String(suggestions));
+            this._renderSummaryStat(summary, t(this.plugin, 'activity_failures_label'), String(failures));
+        } else {
+            const lastLint = this.plugin.settings.lastLintTime;
             const lastRefresh = this.plugin.settings.lastRefreshTime;
-            containerEl.createDiv({ text: t(this.plugin, 'refresh_status_title'), cls: 'understory-section-subtitle-text' });
-            containerEl.createDiv({
-                text: lastRefresh > 0
-                    ? t(this.plugin, 'last_refresh', { time: new Date(lastRefresh).toLocaleString() })
-                    : t(this.plugin, 'last_refresh_never'),
-                cls: 'setting-item-description'
-            }).style.marginBottom = '6px';
-
-            if (this.plugin.settings.refreshInProgress) {
-                const idx = this.plugin.settings.refreshQueueIndex || 0;
-                const total = (this.plugin.settings.refreshQueue || []).length;
-                containerEl.createDiv({
-                    text: t(this.plugin, 'refresh_progress', { current: idx, total }),
-                    cls: 'setting-item-description'
-                }).style.marginBottom = '6px';
-            }
-
-            new Setting(containerEl)
-                .addButton((button) => {
-                    if (this.plugin.settings.refreshInProgress) {
-                        button.setButtonText(t(this.plugin, 'cancel_refresh_button'))
-                            .setWarning()
-                            .onClick(async () => {
-                                await this.plugin.cancelRefresh();
-                                this.display();
-                            });
-                    } else {
-                        button.setButtonText(t(this.plugin, 'run_refresh_button'))
-                            .setCta()
-                            .onClick(async () => {
-                                await this.plugin.startRefreshQueue();
-                                this.display();
-                            });
-                    }
-                });
+            const openHigh = this.plugin._countOpenConflicts ? this.plugin._countOpenConflicts('high') : 0;
+            const openAll = this.plugin._countOpenConflicts ? this.plugin._countOpenConflicts() : 0;
+            this._renderSummaryStat(summary, t(this.plugin, 'activity_last_check_label'), lastLint > 0 ? new Date(lastLint).toLocaleString() : t(this.plugin, 'activity_never_value'));
+            this._renderSummaryStat(summary, t(this.plugin, 'activity_last_update_label'), lastRefresh > 0 ? new Date(lastRefresh).toLocaleString() : t(this.plugin, 'activity_never_value'));
+            this._renderSummaryStat(summary, t(this.plugin, 'activity_open_items_label'), String(openAll));
+            this._renderSummaryStat(summary, t(this.plugin, 'activity_serious_items_label'), String(openHigh));
         }
 
-        containerEl.createDiv({ text: t(this.plugin, 'advanced_index_title'), cls: 'understory-section-title-text' });
-        containerEl.createDiv({
-            text: t(this.plugin, 'advanced_index_desc'),
-            cls: 'setting-item-description'
-        }).style.marginBottom = '8px';
+        if (this.plugin.settings.refreshInProgress) {
+            const idx = this.plugin.settings.refreshQueueIndex || 0;
+            const total = (this.plugin.settings.refreshQueue || []).length;
+            containerEl.createDiv({
+                text: t(this.plugin, 'refresh_progress', { current: idx, total }),
+                cls: 'setting-item-description understory-settings-inline-note'
+            });
+        }
 
-        new Setting(containerEl)
+        const logsPanel = containerEl.createDiv({ cls: 'understory-settings-panel' });
+        this._renderPanelHeader(logsPanel, 'relation_logs_title', 'relation_logs_desc');
+        this._renderLogs(logsPanel);
+    }
+
+    _renderAdvancedPage(containerEl) {
+        this._renderPageIntro(containerEl, 'advanced_index_title', 'advanced_index_desc');
+        this._renderAdvancedSettings(containerEl);
+        this._renderHostedDiagnostics(containerEl);
+    }
+
+    _renderHostedDiagnostics(containerEl) {
+        const summary = this.plugin.hostedAccountSummary ? this.plugin.hostedAccountSummary() : { status: 'disconnected' };
+        const panel = containerEl.createEl('details', { cls: 'understory-settings-panel understory-advanced-disclosure' });
+        panel.createEl('summary', { text: t(this.plugin, 'advanced_diagnostics_title') });
+        const body = panel.createDiv({ cls: 'understory-advanced-disclosure-body' });
+        body.createEl('p', { text: t(this.plugin, 'advanced_diagnostics_desc') });
+        const actions = body.createDiv({ cls: 'understory-account-actions' });
+        this._accountActionButton(actions, t(this.plugin, 'hosted_smoke_run_button'), async () => {
+            await this.plugin.runHostedAccountSmoke(true);
+            this.display();
+        }, { icon: 'stethoscope', disabled: summary.status !== 'connected' });
+        this._accountActionButton(actions, t(this.plugin, 'hosted_smoke_copy_button'), async () => {
+            await this.plugin.copyHostedAccountSmokeSummary(true);
+        }, { icon: 'clipboard-copy', disabled: summary.status !== 'connected' });
+        this._renderAccountSmokeSummary(body, summary.status === 'connected', summary.status === 'pending');
+    }
+
+    _renderPanelHeader(containerEl, titleKey, descKey) {
+        const header = containerEl.createDiv({ cls: 'understory-settings-panel-header' });
+        const copy = header.createDiv();
+        copy.createDiv({ text: t(this.plugin, titleKey), cls: 'understory-settings-panel-title' });
+        copy.createEl('p', { text: t(this.plugin, descKey) });
+        return header;
+    }
+
+    _renderSummaryStat(containerEl, label, value) {
+        const item = containerEl.createDiv({ cls: 'understory-settings-summary-stat' });
+        item.createSpan({ text: label });
+        item.createEl('strong', { text: value });
+    }
+
+    _renderAdvancedSettings(containerEl) {
+        const connectionPanel = containerEl.createEl('details', { cls: 'understory-settings-panel understory-advanced-disclosure' });
+        connectionPanel.createEl('summary', { text: t(this.plugin, 'advanced_connection_title') });
+        const connectionBody = connectionPanel.createDiv({ cls: 'understory-advanced-disclosure-body' });
+        connectionBody.createEl('p', { text: t(this.plugin, 'advanced_connection_desc') });
+        this._renderPrivacySettings(connectionBody);
+
+        const advancedEl = containerEl.createEl('details', { cls: 'understory-settings-panel understory-advanced-disclosure' });
+        advancedEl.createEl('summary', { text: t(this.plugin, 'local_engine_title') });
+        const advancedBody = advancedEl.createDiv({ cls: 'understory-advanced-disclosure-body understory-advanced-body' });
+        advancedBody.createEl('p', { text: t(this.plugin, 'advanced_local_engine_desc') });
+
+        new Setting(advancedBody)
+            .setName(t(this.plugin, 'engine_dir_name'))
+            .setDesc(t(this.plugin, 'engine_dir_desc'))
+            .addText((text) => text
+                .setPlaceholder(t(this.plugin, 'engine_dir_placeholder'))
+                .setValue(this.plugin.settings.graphifyDir)
+                .onChange(async (value) => {
+                    this.plugin.settings.graphifyDir = value.trim();
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(advancedBody)
+            .setName(t(this.plugin, 'python_path_name'))
+            .setDesc(t(this.plugin, 'python_path_desc'))
+            .addText((text) => text
+                .setPlaceholder(DEFAULT_PYTHON_COMMAND)
+                .setValue(this.plugin.settings.pythonPath)
+                .onChange(async (value) => {
+                    this.plugin.settings.pythonPath = value.trim() || 'python';
+                    await this.plugin.saveSettings();
+                }));
+
+        this._renderEngineStatus(advancedBody);
+
+        new Setting(advancedBody)
             .setName(t(this.plugin, 'daemon_name'))
             .setDesc(t(this.plugin, 'daemon_desc'))
             .addToggle((toggle) => toggle
@@ -870,7 +1123,7 @@ class UnderstorySettingTab extends PluginSettingTab {
                     this.display();
                 }));
 
-        new Setting(containerEl)
+        new Setting(advancedBody)
             .setName(t(this.plugin, 'daemon_interval_name'))
             .setDesc(t(this.plugin, 'daemon_interval_desc'))
             .addSlider((slider) => slider
@@ -882,21 +1135,41 @@ class UnderstorySettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
-        containerEl.createDiv({
+        advancedBody.createEl('div', {
             text: this.plugin.daemonProcess
                 ? t(this.plugin, 'daemon_running')
                 : (this.plugin.settings.daemonEnabled
                     ? t(this.plugin, 'daemon_enabled_not_running')
                     : t(this.plugin, 'daemon_stopped')),
-            cls: 'setting-item-description'
-        }).style.marginBottom = '8px';
+            cls: 'setting-item-description understory-spacing-after-sm'
+        });
 
         containerEl.createDiv({ text: t(this.plugin, 'maintenance_diagnostics_title'), cls: 'understory-section-title-text' });
         containerEl.createDiv({
             text: t(this.plugin, 'maintenance_diagnostics_desc'),
-            cls: 'setting-item-description'
-        }).style.marginBottom = '8px';
+            cls: 'setting-item-description understory-spacing-after-sm'
+        });
         this._renderEngineStatus(containerEl);
+    }
+
+    _renderNumberedSteps(containerEl, steps) {
+        const list = containerEl.createDiv({ cls: 'understory-setup-steps' });
+        for (let index = 0; index < steps.length; index += 1) {
+            const [title, desc] = steps[index];
+            const row = list.createDiv({ cls: 'understory-setup-step' });
+            row.createDiv({ text: String(index + 1), cls: 'understory-setup-step-number' });
+            const body = row.createDiv({ cls: 'understory-setup-step-body' });
+            body.createDiv({ text: title, cls: 'understory-setup-step-title' });
+            body.createDiv({ text: desc, cls: 'understory-setup-step-desc' });
+        }
+    }
+
+    _renderAgentMultiVaultSteps(containerEl) {
+        this._renderNumberedSteps(containerEl, [
+            [t(this.plugin, 'agent_multi_vault_step_open_title'), t(this.plugin, 'agent_multi_vault_step_open_desc')],
+            [t(this.plugin, 'agent_multi_vault_step_prepare_title'), t(this.plugin, 'agent_multi_vault_step_prepare_desc')],
+            [t(this.plugin, 'agent_multi_vault_step_copy_title'), t(this.plugin, 'agent_multi_vault_step_copy_desc')],
+        ]);
     }
 
     _agentAccessContext() {
@@ -937,8 +1210,8 @@ class UnderstorySettingTab extends PluginSettingTab {
         section.createDiv({ text: t(this.plugin, titleKey), cls: 'understory-section-title-text' });
         section.createDiv({
             text: t(this.plugin, descKey),
-            cls: 'setting-item-description',
-        }).style.marginBottom = '8px';
+            cls: 'setting-item-description understory-spacing-after-sm',
+        });
         return section;
     }
 
@@ -1142,8 +1415,8 @@ class UnderstorySettingTab extends PluginSettingTab {
         button.type = 'button';
         button.setAttribute('aria-label', current === 'en' ? 'Switch UI to Chinese' : '切换到英文界面');
         button.setAttribute('title', current === 'en' ? 'Switch to Chinese' : 'Switch to English');
-        const icon = button.createSpan({ cls: 'understory-language-toggle-icon' });
-        setIcon(icon, 'globe-2');
+        const icon = button.createSpan({ cls: 'understory-language-toggle-icon', attr: { 'aria-hidden': 'true' } });
+        setIcon(icon, 'languages');
         button.createSpan({ cls: 'understory-language-toggle-label', text: current === 'en' ? 'EN' : '中文' });
         button.addEventListener('click', async () => {
             this.plugin.settings.uiLanguage = next;
@@ -1180,19 +1453,312 @@ class UnderstorySettingTab extends PluginSettingTab {
         });
     }
 
+    _domainFromUrl(value) {
+        try {
+            return new URL(String(value || '')).host || '-';
+        } catch (error) {
+            return String(value || '-').replace(/^https?:\/\//, '').replace(/\/.*$/, '') || '-';
+        }
+    }
+
+    _renderAccountHome(containerEl) {
+        const summary = this.plugin.hostedAccountSummary
+            ? this.plugin.hostedAccountSummary()
+            : {
+                status: 'disconnected',
+                serverUrl: 'https://understory.bondie.io',
+                accountCenterUrl: 'https://account.bondie.io/account',
+                plan: '-',
+                subscriptionStatus: '-',
+                entitlementCount: 0,
+                capabilityCount: 0,
+                lastSync: 0,
+            };
+        const hasSession = summary.status === 'connected';
+        const pending = summary.status === 'pending';
+        const displayUser = summary.displayUser || {};
+        const displayName = String(displayUser.name || '').trim();
+        const displayEmail = String(displayUser.email || '').trim();
+        const hasDistinctDisplayName = !!displayName && displayName.toLowerCase() !== displayEmail.toLowerCase();
+        const panel = containerEl.createDiv({ cls: `understory-account-panel understory-account-panel--settings is-${summary.status}` });
+        const header = panel.createDiv({ cls: 'understory-account-hero' });
+        const avatar = header.createDiv({ cls: 'understory-account-avatar', attr: { 'aria-hidden': 'true' } });
+        if (hasSession && displayUser.picture) {
+            const image = avatar.createEl('img', { attr: { src: displayUser.picture, alt: '' } });
+            image.addEventListener('error', () => {
+                avatar.empty();
+                avatar.createSpan({ cls: 'understory-account-avatar-initials', text: this._accountInitials(displayUser) });
+            });
+        } else if (hasSession) {
+            avatar.createSpan({ cls: 'understory-account-avatar-initials', text: this._accountInitials(displayUser) });
+        } else {
+            setIcon(avatar, pending ? 'loader-circle' : 'log-in');
+        }
+        const copy = header.createDiv({ cls: 'understory-account-hero-copy' });
+        copy.createDiv({ cls: 'understory-account-kicker', text: t(this.plugin, 'hosted_account_kicker') });
+        const titleRow = copy.createDiv({ cls: 'understory-account-title-row' });
+        titleRow.createDiv({
+            cls: 'understory-account-title',
+            text: hasSession && (displayName || displayEmail)
+                ? ((hasDistinctDisplayName ? displayName : displayEmail) || displayName)
+                : t(this.plugin, hasSession
+                ? 'account_connected_title'
+                : (pending ? 'account_pending_title' : 'account_disconnected_title')),
+        });
+        titleRow.createSpan({
+            cls: `understory-account-status understory-account-status--${summary.status}`,
+            text: t(this.plugin, `hosted_status_${summary.status}_compact`),
+        });
+        copy.createEl('p', {
+            text: hasSession && hasDistinctDisplayName && displayEmail
+                ? displayEmail
+                : t(this.plugin, hasSession
+                ? 'account_connected_desc'
+                : (pending ? 'account_pending_desc' : 'account_disconnected_desc')),
+        });
+
+        if (hasSession) {
+            const details = panel.createDiv({ cls: 'understory-account-details' });
+            this._renderAccountDetail(details, t(this.plugin, 'account_summary_plan'), this._friendlyPlan(summary.plan));
+            this._renderAccountDetail(details, t(this.plugin, 'account_summary_membership'), this._friendlyMembership(summary.subscriptionStatus));
+            this._renderAccountDetail(
+                details,
+                t(this.plugin, 'account_summary_ai_service'),
+                t(this.plugin, `provider_status_${summary.providerAccessStatus || 'not_ready'}`)
+            );
+            this._renderAccountDetail(
+                details,
+                t(this.plugin, 'account_summary_last_refresh'),
+                summary.lastSync ? new Date(summary.lastSync).toLocaleString() : t(this.plugin, 'activity_never_value')
+            );
+        }
+
+        const actions = panel.createDiv({ cls: 'understory-account-actions' });
+        if (hasSession) {
+            this._accountActionButton(actions, t(this.plugin, 'account_open_understory_button'), async () => {
+                await this._openUnderstoryWorkspace();
+            }, { cta: true, icon: 'leaf' });
+            this._accountActionButton(actions, t(this.plugin, 'hosted_refresh_button'), async () => {
+                await this.plugin.hostedRefreshStatus(true);
+                await this.plugin.refreshHostedUsage(false);
+                this.display();
+            }, { icon: 'refresh-cw' });
+
+            const billing = this.plugin.settings?.hostedRuntimeConfig?.billing || {};
+            if (billing.checkout_enabled && !['active', 'trialing', 'grace'].includes(summary.subscriptionStatus)) {
+                this._accountActionButton(actions, t(this.plugin, 'hosted_checkout_button'), async () => {
+                    await this.plugin.hostedStartCheckout(true);
+                }, { icon: 'credit-card' });
+            }
+
+            const options = panel.createEl('details', { cls: 'understory-account-options' });
+            options.createEl('summary', { text: t(this.plugin, 'account_options_title') });
+            const optionActions = options.createDiv({ cls: 'understory-account-actions' });
+            this._accountActionButton(optionActions, t(this.plugin, 'hosted_profile_button'), () => {
+                this.plugin.openHostedProfile(true);
+            }, { icon: 'user-round-pen' });
+            this._accountActionButton(optionActions, t(this.plugin, 'hosted_account_security_button'), () => {
+                this.plugin.openHostedAccountSecurity(true);
+            }, { icon: 'shield-check' });
+            this._accountActionButton(optionActions, t(this.plugin, 'hosted_devices_button'), () => {
+                this.plugin.openHostedDevices(true);
+            }, { icon: 'monitor-smartphone' });
+            this._accountActionButton(optionActions, t(this.plugin, 'hosted_account_center_button'), () => {
+                this.plugin.openHostedAccountCenter(true);
+            }, { icon: 'external-link' });
+            if (billing.enabled) {
+                this._accountActionButton(optionActions, t(this.plugin, 'hosted_billing_portal_button'), async () => {
+                    await this.plugin.hostedOpenBillingPortal(true);
+                }, { icon: 'wallet-cards' });
+            }
+            this._accountActionButton(optionActions, t(this.plugin, 'hosted_switch_account_button'), async () => {
+                await this.plugin.hostedSwitchAccount(true);
+                this.display();
+            }, { icon: 'users' });
+            this._accountActionButton(optionActions, t(this.plugin, 'hosted_logout_button'), async () => {
+                await this.plugin.hostedLogout(true);
+                this.display();
+            }, { icon: 'log-out' });
+            this._accountActionButton(optionActions, t(this.plugin, 'hosted_global_logout_button'), async () => {
+                await this.plugin.hostedGlobalLogout(true);
+                this.display();
+            }, { icon: 'shield-off' });
+        } else if (pending) {
+            this._accountActionButton(actions, t(this.plugin, 'hosted_open_login_again'), async () => {
+                await this.plugin.hostedLogin(true);
+                this.display();
+            }, { cta: true, icon: 'external-link' });
+            this._accountActionButton(actions, t(this.plugin, 'hosted_switch_account_button'), async () => {
+                await this.plugin.hostedSwitchAccount(true);
+                this.display();
+            }, { icon: 'users' });
+            this._accountActionButton(actions, t(this.plugin, 'hosted_cancel_login_button'), async () => {
+                await this.plugin.hostedCancelLogin(true);
+                this.display();
+            }, { icon: 'x' });
+        } else {
+            this._accountActionButton(actions, t(this.plugin, 'hosted_login_button'), async () => {
+                await this.plugin.hostedLogin(true);
+                this.display();
+            }, { cta: true, icon: 'log-in' });
+        }
+
+        if (hasSession) this._renderQuickStart(containerEl);
+    }
+
+    _friendlyPlan(value) {
+        const normalized = String(value || '').trim().toLowerCase();
+        if (normalized === 'free') return t(this.plugin, 'plan_free');
+        if (normalized === 'pro') return t(this.plugin, 'plan_pro');
+        if (normalized === 'plus') return t(this.plugin, 'plan_plus');
+        return value || '-';
+    }
+
+    _friendlyMembership(value) {
+        const normalized = String(value || '').trim().toLowerCase();
+        const key = `membership_${normalized}`;
+        const translated = t(this.plugin, key);
+        return translated === key ? (value || '-') : translated;
+    }
+
+    _renderQuickStart(containerEl) {
+        const panel = containerEl.createDiv({ cls: 'understory-settings-panel understory-quick-start' });
+        this._renderPanelHeader(panel, 'quick_start_title', 'quick_start_desc');
+        const steps = panel.createDiv({ cls: 'understory-quick-start-steps' });
+        for (const [iconName, titleKey, descKey] of [
+            ['file-text', 'quick_start_note_title', 'quick_start_note_desc'],
+            ['sparkles', 'quick_start_generate_title', 'quick_start_generate_desc'],
+            ['check-check', 'quick_start_review_title', 'quick_start_review_desc'],
+        ]) {
+            const row = steps.createDiv({ cls: 'understory-quick-start-step' });
+            const icon = row.createSpan({ cls: 'understory-quick-start-icon', attr: { 'aria-hidden': 'true' } });
+            setIcon(icon, iconName);
+            const copy = row.createDiv({ cls: 'understory-quick-start-copy' });
+            copy.createEl('strong', { text: t(this.plugin, titleKey) });
+            copy.createSpan({ text: t(this.plugin, descKey) });
+        }
+        const actions = panel.createDiv({ cls: 'understory-account-actions' });
+        this._accountActionButton(actions, t(this.plugin, 'account_open_understory_button'), async () => {
+            await this._openUnderstoryWorkspace();
+        }, { cta: true, icon: 'leaf' });
+        this._accountActionButton(actions, t(this.plugin, 'quick_start_scope_button'), async () => {
+            this._activeSettingsPage = 'scope';
+            this.display();
+        }, { icon: 'folder-tree' });
+    }
+
+    async _openUnderstoryWorkspace() {
+        await this.plugin.openSidebar();
+        if (this.app.setting && typeof this.app.setting.close === 'function') this.app.setting.close();
+    }
+
+    _accountInitials(displayUser) {
+        const source = String(displayUser?.name || displayUser?.email || 'U').trim();
+        const words = source.split(/\s+/).filter(Boolean);
+        if (words.length > 1) return `${words[0][0]}${words[words.length - 1][0]}`.toUpperCase();
+        return source.slice(0, 1).toUpperCase() || 'U';
+    }
+
+    _renderAccountDetail(parent, label, value) {
+        const item = parent.createDiv({ cls: 'understory-account-detail' });
+        item.createSpan({ text: label });
+        item.createEl('strong', { text: value });
+    }
+
+    _renderAccountSmokeSummary(parent, hasSession, pending) {
+        const box = parent.createDiv({ cls: 'understory-account-smoke' });
+        const header = box.createDiv({ cls: 'understory-account-smoke-header' });
+        header.createEl('strong', { text: t(this.plugin, 'hosted_smoke_summary_title') });
+        const smoke = this.plugin.hostedAccountSmokeLastSummary;
+
+        if (!hasSession) {
+            box.createDiv({
+                cls: 'understory-account-smoke-hint',
+                text: pending ? t(this.plugin, 'hosted_smoke_pending_hint') : t(this.plugin, 'hosted_smoke_disconnected_hint'),
+            });
+            return;
+        }
+
+        if (!smoke || smoke.status !== 'connected') {
+            box.createDiv({
+                cls: 'understory-account-smoke-hint',
+                text: t(this.plugin, 'hosted_smoke_empty_hint'),
+            });
+            return;
+        }
+
+        const grid = box.createDiv({ cls: 'understory-settings-summary-grid understory-account-smoke-grid' });
+        this._renderSummaryStat(grid, t(this.plugin, 'hosted_smoke_status_label'), t(this.plugin, 'hosted_status_connected_compact'));
+        this._renderSummaryStat(
+            grid,
+            t(this.plugin, 'hosted_smoke_provider_keys_label'),
+            smoke.safety?.provider_keys_exposed === false ? 'false' : t(this.plugin, 'hosted_smoke_review_value')
+        );
+        this._renderSummaryStat(grid, t(this.plugin, 'hosted_smoke_usage_requests_label'), String(smoke.usage?.request_count || 0));
+        this._renderSummaryStat(grid, t(this.plugin, 'hosted_smoke_usage_features_label'), String(smoke.usage?.feature_count || 0));
+    }
+
+    _accountActionButton(parent, text, handler, options = {}) {
+        const button = parent.createEl('button');
+        button.type = 'button';
+        if (options.cta) button.addClass('mod-cta');
+        if (options.disabled) button.disabled = true;
+        if (options.icon) {
+            const icon = button.createSpan({ cls: 'understory-button-icon', attr: { 'aria-hidden': 'true' } });
+            setIcon(icon, options.icon);
+        }
+        button.createSpan({ text, cls: 'understory-button-label' });
+        button.addEventListener('click', async (event) => {
+            event.preventDefault();
+            if (button.disabled) return;
+            button.disabled = true;
+            try {
+                await handler();
+            } catch (error) {
+                new Notice(t(this.plugin, 'hosted_action_failed', { message: String(error.message || error).slice(0, 100) }), 8000);
+            } finally {
+                if (!options.disabled) button.disabled = false;
+            }
+        });
+        return button;
+    }
+
     _renderPrivacySettings(containerEl) {
-        containerEl.createEl('h3', { text: t(this.plugin, 'privacy_title') });
-        containerEl.createDiv({
+        containerEl.createDiv({ text: t(this.plugin, 'privacy_title'), cls: 'understory-settings-section-title' });
+        containerEl.createEl('div', {
             text: t(this.plugin, 'privacy_desc'),
             cls: 'setting-item-description understory-privacy-intro'
         });
 
-        const mode = this.plugin.settings.networkMode || 'local';
+        new Setting(containerEl)
+            .setName(t(this.plugin, 'hosted_server_url_name'))
+            .setDesc(t(this.plugin, 'hosted_server_url_desc'))
+            .addText((text) => text
+                .setPlaceholder('https://understory.bondie.io')
+                .setValue(this.plugin.settings.hostedServerUrl || '')
+                .onChange(async (value) => {
+                    this.plugin.settings.hostedServerUrl = value.trim() || 'https://understory.bondie.io';
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
+            .setName(t(this.plugin, 'hosted_account_center_url_name'))
+            .setDesc(t(this.plugin, 'hosted_account_center_url_desc'))
+            .addText((text) => text
+                .setPlaceholder(DEFAULT_SETTINGS.hostedAccountCenterUrl)
+                .setValue(this.plugin.settings.hostedAccountCenterUrl || '')
+                .onChange(async (value) => {
+                    this.plugin.settings.hostedAccountCenterUrl = value.trim() || 'https://account.bondie.io/account';
+                    await this.plugin.saveSettings();
+                }));
+
+        const mode = this.plugin.settings.networkMode || 'hosted';
         new Setting(containerEl)
             .setName(t(this.plugin, 'network_mode_name'))
             .setDesc(t(this.plugin, 'network_mode_desc'))
             .addDropdown((dropdown) => dropdown
                 .addOption('local', t(this.plugin, 'network_mode_local'))
+                .addOption('hosted', t(this.plugin, 'network_mode_hosted'))
                 .addOption('embedding', t(this.plugin, 'network_mode_embedding'))
                 .addOption('full', t(this.plugin, 'network_mode_full'))
                 .setValue(mode)
@@ -1201,31 +1767,43 @@ class UnderstorySettingTab extends PluginSettingTab {
                     if (value === 'local') {
                         this.plugin.settings.webhookEnabled = false;
                     }
+                    if (value === 'hosted') {
+                        this.plugin.settings.embeddingProvider = 'hosted';
+                        this.plugin.settings.llmProvider = 'hosted';
+                    } else {
+                        if (this.plugin.settings.embeddingProvider === 'hosted') {
+                            this._applyProviderPreset('embedding', value === 'local' ? 'none' : 'zhipu');
+                        }
+                        if (this.plugin.settings.llmProvider === 'hosted') {
+                            this._applyProviderPreset('llm', value === 'full' ? 'zhipu' : 'none');
+                        }
+                    }
                     await this.plugin.saveSettings();
                     this.display();
                 }));
 
         containerEl.createDiv({
             text: t(this.plugin, `network_mode_${mode}_summary`),
-            cls: 'setting-item-description understory-privacy-note'
+            cls: 'setting-item-description understory-privacy-summary understory-spacing-after-md'
         });
-
-        this._renderEmbeddingStatusCard(containerEl);
-
-        if (mode === 'local') {
-            containerEl.createDiv({
-                text: t(this.plugin, 'model_config_local_notice'),
-                cls: 'setting-item-description understory-privacy-inline-note'
+        if (mode === 'hosted') {
+            containerEl.createEl('div', {
+                text: t(this.plugin, 'hosted_no_key_notice'),
+                cls: 'setting-item-description understory-privacy-summary understory-spacing-after-md'
             });
             return;
         }
 
-        containerEl.createDiv({
-            text: t(this.plugin, 'provider_terms_notice'),
-            cls: 'setting-item-description understory-privacy-note'
+        containerEl.createEl('div', {
+            text: t(this.plugin, 'api_key_overview'),
+            cls: 'setting-item-description understory-privacy-summary understory-spacing-after-xs'
+        });
+        containerEl.createEl('div', {
+            text: mode === 'local' ? t(this.plugin, 'api_key_local_notice') : t(this.plugin, 'provider_terms_notice'),
+            cls: 'setting-item-description understory-privacy-summary understory-spacing-after-md'
         });
 
-        containerEl.createEl('h4', { text: t(this.plugin, 'embedding_section_title') });
+        containerEl.createDiv({ text: t(this.plugin, 'embedding_section_title'), cls: 'understory-settings-section-title' });
         containerEl.createDiv({
             text: t(this.plugin, 'embedding_setup_notice'),
             cls: 'setting-item-description understory-privacy-note'
@@ -1302,7 +1880,7 @@ class UnderstorySettingTab extends PluginSettingTab {
         }
 
         if (mode !== 'full') {
-            containerEl.createEl('h4', { text: t(this.plugin, 'llm_section_title') });
+            containerEl.createDiv({ text: t(this.plugin, 'llm_section_title'), cls: 'understory-settings-section-title' });
             containerEl.createDiv({
                 text: t(this.plugin, 'llm_disabled_desc'),
                 cls: 'setting-item-description understory-privacy-inline-note'
@@ -1310,7 +1888,7 @@ class UnderstorySettingTab extends PluginSettingTab {
             return;
         }
 
-        containerEl.createEl('h4', { text: t(this.plugin, 'llm_section_title') });
+        containerEl.createDiv({ text: t(this.plugin, 'llm_section_title'), cls: 'understory-settings-section-title' });
         containerEl.createDiv({
             text: t(this.plugin, 'llm_setup_notice'),
             cls: 'setting-item-description understory-privacy-note'
@@ -1511,7 +2089,7 @@ class UnderstorySettingTab extends PluginSettingTab {
                 labelKey: 'embedding_status_configure_button',
                 cta: info.state !== 'local_only',
                 onClick: async () => {
-                    this._activeSettingsTab = 'models';
+                    this._activeSettingsPage = 'advanced';
                     if ((this.plugin.settings.networkMode || 'local') === 'local') {
                         this.plugin.settings.networkMode = 'embedding';
                         this.plugin.embeddingHealth = null;
@@ -1778,7 +2356,6 @@ function mixinPrototype(target, source) {
     }
 }
 
-mixinPrototype(UnderstorySettingTab.prototype, require('./settingsStyles'));
 mixinPrototype(UnderstorySettingTab.prototype, require('./settingsLogs'));
 mixinPrototype(UnderstorySettingTab.prototype, require('./settingsFolders'));
 

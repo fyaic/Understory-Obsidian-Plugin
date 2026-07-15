@@ -9,64 +9,51 @@ class SettingsLogMethods {
         if (logs.length === 0) {
             logContainer.createEl('div', {
                 text: t(this.plugin, 'logs_empty'),
-                cls: 'setting-item-description'
-            }).style.color = 'var(--text-muted)';
+                cls: 'setting-item-description understory-log-empty'
+            });
         } else {
             for (const entry of logs) {
                 const row = logContainer.createDiv({ cls: 'understory-log-row' });
                 row.title = t(this.plugin, 'logs_click_title');
 
-                const topRow = row.createDiv();
-                topRow.style.display = 'flex';
-                topRow.style.justifyContent = 'space-between';
-                topRow.style.alignItems = 'center';
+                const topRow = row.createDiv({ cls: 'understory-log-row-head' });
 
                 topRow.createEl('span', {
                     text: entry.time || '',
-                    cls: 'setting-item-description'
-                }).style.fontSize = '0.75em';
+                    cls: 'setting-item-description understory-log-time'
+                });
 
                 const badge = topRow.createEl('span', { cls: 'understory-log-badge' });
                 if (entry.status === 'ok') {
                     badge.textContent = `+${entry.count || 0}`;
-                    badge.style.background = 'var(--background-modifier-success)';
-                    badge.style.color = 'var(--text-on-accent)';
+                    badge.addClass('is-success');
                 } else if (entry.status === 'error' || entry.status === 'parse_error') {
                     badge.textContent = t(this.plugin, 'log_status_error');
-                    badge.style.background = 'var(--background-modifier-error)';
-                    badge.style.color = 'var(--text-on-accent)';
+                    badge.addClass('is-error');
                 } else if (entry.status === 'skipped') {
                     badge.textContent = t(this.plugin, 'log_status_skipped');
-                    badge.style.background = 'var(--background-modifier-border)';
-                    badge.style.color = 'var(--text-muted)';
+                    badge.addClass('is-skipped');
                 } else {
                     badge.textContent = entry.status || t(this.plugin, 'log_status_unknown');
-                    badge.style.background = 'var(--background-modifier-border)';
+                    badge.addClass('is-neutral');
                 }
 
-                row.createEl('div', { text: entry.file || entry.filePath || '' }).style.fontWeight = '500';
+                row.createEl('div', { text: entry.file || entry.filePath || '', cls: 'understory-log-file' });
 
                 if (entry.relations && entry.relations.length > 0) {
-                    const relsEl = row.createEl('div', {
+                    row.createEl('div', {
                         text: entry.relations.slice(0, 5).join(', ')
-                            + (entry.relations.length > 5 ? ` ${t(this.plugin, 'logs_more_count', { count: entry.relations.length - 5 })}` : '')
+                            + (entry.relations.length > 5 ? ` ${t(this.plugin, 'logs_more_count', { count: entry.relations.length - 5 })}` : ''),
+                        cls: 'understory-log-detail',
                     });
-                    relsEl.style.fontSize = '0.8em';
-                    relsEl.style.color = 'var(--text-muted)';
-                    relsEl.style.whiteSpace = 'nowrap';
-                    relsEl.style.overflow = 'hidden';
-                    relsEl.style.textOverflow = 'ellipsis';
                 }
 
                 if (entry.message) {
-                    const msgEl = row.createEl('div', { text: entry.message });
-                    msgEl.style.fontSize = '0.8em';
-                    msgEl.style.color = (entry.status === 'error' || entry.status === 'parse_error')
-                        ? 'var(--text-error)'
-                        : 'var(--text-muted)';
-                    msgEl.style.whiteSpace = 'nowrap';
-                    msgEl.style.overflow = 'hidden';
-                    msgEl.style.textOverflow = 'ellipsis';
+                    const isError = entry.status === 'error' || entry.status === 'parse_error';
+                    const msgEl = row.createEl('div', {
+                        text: entry.message,
+                        cls: `understory-log-detail${isError ? ' is-error' : ''}`,
+                    });
                     if (entry.errorCategory) {
                         msgEl.textContent = `[${entry.errorCategory}] ${entry.message}`;
                     }

@@ -1,7 +1,6 @@
 const path = require('path');
 
 const DEFAULT_INTERNAL_TARGET_PREFIXES = [
-    '.obsidian/',
     '.understory/',
     '.trash/',
 ];
@@ -31,7 +30,9 @@ function noteTitleFromPath(notePath) {
 
 function isInternalRelationTarget(target, prefixes = DEFAULT_INTERNAL_TARGET_PREFIXES) {
     const normalized = toPosixPath(target).replace(/^\/+/, '').toLowerCase();
-    return prefixes.some((prefix) => normalized === prefix.slice(0, -1) || normalized.startsWith(prefix));
+    const firstSegment = normalized.split('/')[0] || '';
+    return (firstSegment.startsWith('.') && firstSegment !== '.' && firstSegment !== '..')
+        || prefixes.some((prefix) => normalized === prefix.slice(0, -1) || normalized.startsWith(prefix));
 }
 
 function normalizeRelationTarget(target, options = {}) {
