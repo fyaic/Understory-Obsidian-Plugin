@@ -55,11 +55,14 @@ jobs:
           subject-path: "dist/*"
 
       - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
-        with:
-          body_path: RELEASE_NOTES.md
-          fail_on_unmatched_files: true
-          files: |
-            dist/manifest.json
-            dist/main.js
-            dist/styles.css
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            dist/manifest.json \
+            dist/main.js \
+            dist/styles.css \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file RELEASE_NOTES.md

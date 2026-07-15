@@ -137,7 +137,13 @@ def main() -> None:
             raise SystemExit(f"PRIVACY.md is missing required data-flow disclosure: {marker}")
 
     release_workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
-    for marker in ["npm run verify", "git diff --exit-code -- main.js", "actions/attest@v4"]:
+    for marker in [
+        "npm run verify",
+        "git diff --exit-code -- main.js",
+        "actions/attest@v4",
+        "gh release create",
+        "--verify-tag",
+    ]:
         if marker not in release_workflow:
             raise SystemExit(f"Release workflow is missing provenance gate: {marker}")
     if not (ROOT / ".github" / "workflows" / "ci.yml").exists():
