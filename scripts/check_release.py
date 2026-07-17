@@ -13,6 +13,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+LEGACY_ENGINE_ORIGIN_RELEASE = "1.13.0"
+LEGACY_ENGINE_SNAPSHOT_SHA256 = "cac720e1033b6be233b9d4b99059604654e5cdcb78d0b688464d66792eb73743"
 
 
 def engine_snapshot_digest(engine_dir: Path) -> tuple[int, str]:
@@ -104,14 +106,23 @@ def main() -> None:
             raise SystemExit(f"Forbidden local engine state must not be committed: {filename}")
 
     provenance = json.loads((ROOT / "engine-provenance.json").read_text(encoding="utf-8"))
+    if provenance.get("schema_version") != 2:
+        raise SystemExit("engine-provenance.json schema_version must be 2")
     if provenance.get("plugin_release") != version:
         raise SystemExit("engine-provenance.json plugin_release does not match manifest version")
     if provenance.get("source_repository") != "https://github.com/fyaic/Understory-graphify-engine":
         raise SystemExit("engine-provenance.json has an unexpected source repository")
+    snapshot_public_commit = str(provenance.get("snapshot_public_commit") or "")
+    if not re.fullmatch(r"[0-9a-f]{40}", snapshot_public_commit):
+        raise SystemExit("engine-provenance.json snapshot_public_commit must be a full Git commit SHA")
     source_commit = str(provenance.get("source_commit") or "")
     if source_commit == "legacy-unresolved":
-        if version != "1.13.0":
-            raise SystemExit("Only the legacy 1.13.0 snapshot may omit its upstream core commit")
+        if provenance.get("snapshot_origin_release") != LEGACY_ENGINE_ORIGIN_RELEASE:
+            raise SystemExit("Legacy engine provenance must inherit from release 1.13.0")
+        if provenance.get("engine_source_changed") is not False:
+            raise SystemExit("Inherited legacy engine provenance must declare engine_source_changed=false")
+        if provenance.get("snapshot_sha256") != LEGACY_ENGINE_SNAPSHOT_SHA256:
+            raise SystemExit("The inherited legacy engine snapshot digest must remain byte-identical to 1.13.0")
     elif not re.fullmatch(r"[0-9a-f]{40}", source_commit):
         raise SystemExit("engine-provenance.json source_commit must be a full Git commit SHA")
     snapshot_file_count, snapshot_digest = engine_snapshot_digest(ROOT / "understory-graphify-engine")

@@ -1,4 +1,6 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const { test } = require('node:test');
 
 const { installMockObsidian } = require('./helpers/mockObsidian');
@@ -56,7 +58,7 @@ function createSettingsTab({ settings = {}, account, usage } = {}) {
     };
     const plugin = {
         app,
-        manifest: { version: '1.13.0' },
+        manifest: { version: '1.13.1' },
         settings: {
             ...DEFAULT_SETTINGS,
             graphifyDir: '',
@@ -216,6 +218,39 @@ test('hosted advanced page explains managed keys without exposing key inputs', (
     assert.match(text, /Advanced \/ Local & self-hosted/);
     assert.match(text, /Hosted accounts do not require OpenRouter, OpenAI, Zhipu, or custom provider keys/);
     assert.doesNotMatch(text, /Vector model key|Reasoning model key/);
+});
+
+test('advanced diagnostics stay behind one styled disclosure', () => {
+    const tab = createSettingsTab({ account: connectedAccount() });
+    tab._activeSettingsPage = 'advanced';
+
+    tab.display();
+
+    assert.equal(findAllByClass(tab.containerEl, 'understory-advanced-disclosure').length, 4);
+    assert.equal(findAllByClass(tab.containerEl, 'understory-engine-panel').length, 1);
+
+    const diagnostics = findAllByClass(tab.containerEl, 'understory-advanced-disclosure')
+        .find((panel) => findByText(panel, 'Technical diagnostics'));
+    assert.ok(diagnostics);
+    assert.equal(diagnostics.open, false);
+    diagnostics.open = true;
+    diagnostics.dispatchEvent({ type: 'toggle', target: diagnostics });
+    tab.display();
+    const rerenderedDiagnostics = findAllByClass(tab.containerEl, 'understory-advanced-disclosure')
+        .find((panel) => findByText(panel, 'Technical diagnostics'));
+    assert.equal(rerenderedDiagnostics.open, true);
+
+    const styles = fs.readFileSync(path.join(__dirname, '..', 'styles.css'), 'utf8');
+    for (const selector of [
+        '.understory-engine-panel',
+        '.understory-engine-kv-grid',
+        '.understory-engine-checks',
+        '.understory-engine-command-row',
+        '.understory-engine-panel > .setting-item .setting-item-control',
+    ]) {
+        assert.ok(styles.includes(selector), `missing ${selector} styles`);
+    }
+    assert.match(styles, /@media \(max-width: 900px\)[\s\S]*\.understory-settings-shell/);
 });
 
 test('existing local user remains usable without a Bondie session', () => {

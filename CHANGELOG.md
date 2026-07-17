@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.13.1
+
+- Keep local-engine and connection diagnostics collapsed under Advanced so ordinary users never land in a wall of technical status text.
+- Remove the duplicate engine-health rendering and give versions, paths, checks, fixes, commands, and action controls a responsive diagnostic layout.
+- Add regression coverage for the Advanced disclosure hierarchy and its required stylesheet contract.
+- Reuse the byte-identical attested 1.13.0 local-engine snapshot with an explicit inherited-provenance gate; no engine runtime files changed.
+
 ## 1.13.0
 
 - Make Bondie sign-in and the managed Understory service the default path for new installs. New users no longer see provider keys, endpoints, Python, or engine setup before they can use the plugin.
