@@ -147,7 +147,11 @@ class GraphifyViewMethods {
             if (!g.length) continue;
             const group = root.createDiv({ cls: 'understory-conflict-group' });
             const groupTitle = group.createDiv({ cls: 'understory-conflict-group-title' });
-            groupTitle.createEl('h3', { text: `${sevIcon[sev]} ${sevLabel[sev] || sev}` });
+            groupTitle.createDiv({
+                cls: 'understory-conflict-heading',
+                text: `${sevIcon[sev]} ${sevLabel[sev] || sev}`,
+                attr: { role: 'heading', 'aria-level': '3' },
+            });
             groupTitle.createEl('span', { text: t(this, 'conflict_count_suffix', { count: g.length }), cls: 'understory-conflict-count' });
             const table = group.createDiv({ cls: 'understory-conflict-table' });
             const head = table.createDiv({ cls: 'understory-conflict-row understory-conflict-row--head' });

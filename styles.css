@@ -32,7 +32,7 @@
     min-width: 0;
 }
 
-.understory-sidebar-brand h3 {
+.understory-sidebar-heading {
     font-size: var(--font-ui-medium);
     font-weight: 650;
     letter-spacing: 0;
@@ -545,16 +545,13 @@
     margin: 18px 0 6px;
 }
 
-.understory-consent-modal {
+.understory-consent-modal,
+.understory-global-logout-modal {
     max-width: 560px;
 }
 
-.understory-consent-modal h2 {
-    font-size: 1.35em;
-    margin: 0 0 12px;
-}
-
-.understory-consent-modal p {
+.understory-consent-modal p,
+.understory-global-logout-modal p {
     line-height: 1.55;
 }
 
@@ -1688,9 +1685,10 @@
     padding-bottom: 5px;
     margin-top: 2px;
 }
-.understory-conflict-group-title h3 {
+.understory-conflict-heading {
     margin: 0;
     font-size: 1.02em;
+    font-weight: var(--font-semibold);
 }
 .understory-conflict-count {
     color: var(--text-muted);

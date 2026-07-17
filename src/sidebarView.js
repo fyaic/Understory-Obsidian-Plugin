@@ -94,7 +94,11 @@ class UnderstorySidebarView extends ItemView {
     _renderTopbar(root, account) {
         const header = root.createDiv({ cls: 'understory-sidebar-topbar' });
         const brand = header.createDiv({ cls: 'understory-sidebar-brand' });
-        brand.createEl('h3', { text: t(this.plugin, 'sidebar_title') });
+        brand.createDiv({
+            cls: 'understory-sidebar-heading',
+            text: t(this.plugin, 'sidebar_title'),
+            attr: { role: 'heading', 'aria-level': '2' },
+        });
         brand.createDiv({ cls: 'understory-sidebar-subtitle', text: t(this.plugin, 'sidebar_workspace_subtitle') });
         const actions = header.createDiv({ cls: 'understory-sidebar-actions' });
         this._iconButton(

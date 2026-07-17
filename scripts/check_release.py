@@ -65,6 +65,8 @@ def main() -> None:
     description = str(manifest["description"])
     if "obsidian" in description.lower():
         raise SystemExit("manifest.json description must not include the word Obsidian")
+    if manifest.get("authorUrl") != "https://bondie.io":
+        raise SystemExit("manifest.json authorUrl must use the live Bondie homepage")
 
     version = str(manifest["version"])
     if not re.fullmatch(r"\d+\.\d+\.\d+", version):
@@ -202,7 +204,7 @@ def main() -> None:
     release_workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
     for marker in [
         "npm run verify",
-        "git diff --exit-code -- main.js",
+        "git diff --exit-code",
         "actions/attest@v4",
         "gh release create",
         "--verify-tag",
@@ -219,11 +221,21 @@ def main() -> None:
         capture_output=True,
         check=True,
     ).stdout.splitlines()
+    if "main.js" in tracked:
+        raise SystemExit("Generated main.js must be published in releases, not tracked in the source repository")
+    gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
+    if "main.js" not in gitignore:
+        raise SystemExit(".gitignore must exclude the generated main.js release asset")
     forbidden_tracked_names = {".env", ".DS_Store", "id_rsa", "id_ed25519"}
     for filename in tracked:
         path = Path(filename)
         if path.name in forbidden_tracked_names or path.suffix.lower() in {".pem", ".p12", ".pfx"}:
             raise SystemExit(f"Sensitive or local-only file is tracked: {filename}")
+
+    raw_heading_pattern = re.compile(r"createEl\(\s*['\"]h[1-6]['\"]")
+    for source_path in sorted((ROOT / "src").glob("*.js")):
+        if raw_heading_pattern.search(source_path.read_text(encoding="utf-8")):
+            raise SystemExit(f"Use Obsidian or ARIA heading semantics instead of raw headings: {source_path.name}")
 
     subprocess.run(["node", "--check", str(ROOT / "main.js")], check=True)
 

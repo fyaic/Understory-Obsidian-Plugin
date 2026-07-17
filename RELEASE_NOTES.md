@@ -1,22 +1,22 @@
-# Understory 1.13.1
+# Understory 1.13.2
 
-Understory 1.13.1 is a focused interface-quality update for the hosted-first 1.13 release. The normal path remains unchanged: sign in with Bondie, open a note, and generate suggestions without configuring an API key, endpoint, Python environment, or model provider.
+Understory 1.13.2 is a Community-release quality update. The product flow is unchanged: sign in with Bondie, open a note, and generate suggestions without configuring an API key, endpoint, Python environment, or model provider.
 
 ## What Changed
 
-- Advanced diagnostics are now collapsed into a dedicated page section instead of rendering a long technical report by default.
-- The duplicate local-engine health report was removed.
-- Versions, paths, check groups, repair guidance, commands, and diagnostic actions now use a responsive, theme-aware layout.
-- The Account, Usage, Workflow, Scope, Suggestions, Activity, AI agents, and right-sidebar workflows are unchanged.
-- The bundled local engine is byte-identical to 1.13.0; this release records that inheritance without inventing an upstream commit.
+- Release CI now builds `main.js` from the reviewable source instead of requiring a generated bundle in the repository.
+- Two independent clean bundle builds must match byte-for-byte before GitHub attests and publishes the three install assets.
+- Confirmation dialogs use Obsidian's modal title surface, while sidebar and conflict-section headings keep screen-reader semantics without raw heading elements.
+- The public author link and English, Chinese, privacy, provenance, and release documentation are current.
+- Hosted authentication, account state, note analysis, provider routing, local-engine behavior, and saved settings are unchanged.
 
 ## Verification
 
 - Official Obsidian ESLint rules pass with zero warnings.
-- All 100 automated tests pass.
-- The deterministic bundle is rebuilt and checked with `node --check`.
+- All 101 automated tests pass.
+- The deterministic bundle is rebuilt twice, compared byte-for-byte, and checked with `node --check`.
 - Release metadata, engine provenance, embedded engine hashes, and local-engine smoke tests pass.
-- Real Obsidian 1.12.7 smoke testing covers Bondie login, account identity, hosted suggestions and risks, account-attributed usage, all settings pages, and the collapsed Advanced layout.
+- Real Obsidian 1.12.7 smoke testing covers startup, account state, sidebar semantics, consent and logout dialogs, settings, and hosted suggestions without replacing local `data.json`.
 
 ## Payment And Privacy
 

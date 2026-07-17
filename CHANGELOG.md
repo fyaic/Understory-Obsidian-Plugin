@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.13.2
+
+- Build `main.js` from reviewable source during CI and release publishing instead of tracking the generated bundle in the repository.
+- Verify bundle reproducibility with two independent clean builds before release assets are attested.
+- Replace raw UI heading elements with Obsidian modal titles and explicit ARIA heading semantics without changing the visual hierarchy.
+- Repair the public author URL and align English, Chinese, privacy, provenance, and release documentation with the current Community review rules.
+- Reuse the byte-identical attested 1.13.0 local-engine snapshot; hosted login and analysis contracts are unchanged.
+
 ## 1.13.1
 
 - Keep local-engine and connection diagnostics collapsed under Advanced so ordinary users never land in a wall of technical status text.

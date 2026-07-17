@@ -21,10 +21,10 @@ class HostedSnippetConsentModal extends Modal {
     }
 
     onOpen() {
-        const { contentEl } = this;
+        const { contentEl, titleEl } = this;
         contentEl.empty();
         contentEl.addClass?.('understory-consent-modal');
-        contentEl.createEl('h2', { text: t(this.plugin, 'hosted_consent_modal_title') });
+        titleEl.setText(t(this.plugin, 'hosted_consent_modal_title'));
         contentEl.createEl('p', { text: t(this.plugin, 'hosted_consent_modal_desc') });
         const notice = this.plugin.settings?.hostedRuntimeConfig?.consent?.notice;
         if (notice) contentEl.createEl('p', { text: notice, cls: 'setting-item-description' });
