@@ -9343,6 +9343,7 @@ class UnderstorySettingTab extends PluginSettingTab {
         this.plugin = plugin;
         this._activeScopeTab = 'whitelist';
         this._activeSettingsPage = 'account';
+        this._advancedDiagnosticsOpen = false;
     }
 
     display() {
@@ -10084,8 +10085,6 @@ class UnderstorySettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
-        this._renderEngineStatus(advancedBody);
-
         new Setting(advancedBody)
             .setName(t(this.plugin, 'daemon_name'))
             .setDesc(t(this.plugin, 'daemon_desc'))
@@ -10124,12 +10123,17 @@ class UnderstorySettingTab extends PluginSettingTab {
             cls: 'setting-item-description understory-spacing-after-sm'
         });
 
-        containerEl.createDiv({ text: t(this.plugin, 'maintenance_diagnostics_title'), cls: 'understory-section-title-text' });
-        containerEl.createDiv({
-            text: t(this.plugin, 'maintenance_diagnostics_desc'),
-            cls: 'setting-item-description understory-spacing-after-sm'
+        const diagnosticsPanel = containerEl.createEl('details', {
+            cls: 'understory-settings-panel understory-advanced-disclosure',
         });
-        this._renderEngineStatus(containerEl);
+        diagnosticsPanel.open = this._advancedDiagnosticsOpen;
+        diagnosticsPanel.addEventListener('toggle', () => {
+            this._advancedDiagnosticsOpen = diagnosticsPanel.open;
+        });
+        diagnosticsPanel.createEl('summary', { text: t(this.plugin, 'maintenance_diagnostics_title') });
+        const diagnosticsBody = diagnosticsPanel.createDiv({ cls: 'understory-advanced-disclosure-body' });
+        diagnosticsBody.createEl('p', { text: t(this.plugin, 'maintenance_diagnostics_desc') });
+        this._renderEngineStatus(diagnosticsBody);
     }
 
     _renderNumberedSteps(containerEl, steps) {

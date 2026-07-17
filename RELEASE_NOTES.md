@@ -1,39 +1,26 @@
-# Understory 1.13.0
+# Understory 1.13.1
 
-Understory 1.13.0 is the hosted-first public release. A new user can sign in with Bondie, return to the current note, and generate real relation suggestions without configuring a model provider, endpoint, Python environment, or API key.
+Understory 1.13.1 is a focused interface-quality update for the hosted-first 1.13 release. The normal path remains unchanged: sign in with Bondie, open a note, and generate suggestions without configuring an API key, endpoint, Python environment, or model provider.
 
-## Highlights
+## What Changed
 
-- One clear first-run action: **Continue with Bondie**.
-- Stable browser-to-Obsidian login callback and product session exchange.
-- Account identity, fallback avatar, Free membership, service readiness, and Bondie account-management entries.
-- Account usage totals plus request and processing-unit activity by feature.
-- Hosted relation suggestions, risk analysis, principle extraction, and vault semantic review using server-managed provider access.
-- Explicit consent before selected note snippets are sent for hosted analysis.
-- New multi-page settings and a quieter Suggestions/Risks sidebar in English and Chinese.
-- Friendly match percentages and localized risk severity instead of provider/debug labels.
-- Product-only logout by default, with Bondie global logout separated behind confirmation.
-- Existing local/self-hosted/BYOK and local Agent/MCP workflows remain under Advanced.
-
-## Upgrade Notes
-
-- Fresh installs default to hosted mode.
-- Existing installs with saved local mode remain local and do not require a Bondie session.
-- Hosted mode clears client provider-key fields and never receives server-managed upstream keys.
-- The command ID for opening the sidebar is now `open-sidebar`; users with a custom hotkey for the legacy command may need to bind it again.
-- New manually inserted relation sections use the cleaner **Related notes / Confirmed** headings while existing English and Chinese headings remain recognized.
+- Advanced diagnostics are now collapsed into a dedicated page section instead of rendering a long technical report by default.
+- The duplicate local-engine health report was removed.
+- Versions, paths, check groups, repair guidance, commands, and diagnostic actions now use a responsive, theme-aware layout.
+- The Account, Usage, Workflow, Scope, Suggestions, Activity, AI agents, and right-sidebar workflows are unchanged.
+- The bundled local engine is byte-identical to 1.13.0; this release records that inheritance without inventing an upstream commit.
 
 ## Verification
 
 - Official Obsidian ESLint rules pass with zero warnings.
-- All 99 automated tests pass.
-- The release bundle is rebuilt from every `src/*.js` module and passes `node --check`.
-- Release metadata, embedded engine hashes, local-engine smoke, and tag/version consistency are checked in CI.
-- Real Obsidian 1.12.7 smoke testing covered enable/disable/reload, browser login callback, account identity, hosted suggestions and risks, usage observability, accept/ignore/insert actions, Chinese/English UI, and light/dark themes.
+- All 100 automated tests pass.
+- The deterministic bundle is rebuilt and checked with `node --check`.
+- Release metadata, engine provenance, embedded engine hashes, and local-engine smoke tests pass.
+- Real Obsidian 1.12.7 smoke testing covers Bondie login, account identity, hosted suggestions and risks, account-attributed usage, all settings pages, and the collapsed Advanced layout.
 
 ## Payment And Privacy
 
-The current hosted membership is Free and checkout is disabled. The Community listing should be **Optional payments** because Understory connects to a managed service and retains advanced connections to paid APIs.
+The current hosted membership is Free and checkout is disabled. The Community listing should remain **Optional payments** because Understory connects to a managed service and retains advanced connections to paid APIs.
 
 Hosted analysis sends only bounded, consented note paths, titles, and snippets to the Understory service. Model credentials remain server-side. See `PRIVACY.md` for the complete data-flow and retention disclosure.
 
