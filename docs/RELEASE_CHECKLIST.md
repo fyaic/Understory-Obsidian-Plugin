@@ -15,7 +15,7 @@ This patch release fixes the Advanced diagnostics hierarchy and styling. Hosted 
 - [x] Release metadata, privacy/payment disclosures, and tag/version consistency pass.
 - [x] A local-only `api.py init` smoke passes.
 - [x] CI rejects a generated `main.js` diff.
-- [ ] Tag releases attest and upload exactly `manifest.json`, `main.js`, and `styles.css`.
+- [x] Tag releases attest and upload exactly `manifest.json`, `main.js`, and `styles.css`.
 
 ## Real Obsidian Smoke
 
@@ -39,8 +39,14 @@ Environment: Obsidian 1.12.7 on macOS, `AIC-000` plus isolated `Understory-UI-Sm
 
 ## Publish
 
-- [ ] Merge the reviewed 1.13.1 commit to the public repository default branch.
-- [ ] Push Git tag `1.13.1` and verify the attested GitHub release assets.
+- [x] Merge the reviewed 1.13.1 commit to the public repository default branch (`8079a330c2aeb2c79cbca578247c8e6f3d934ec9`).
+- [x] Push Git tag `1.13.1` and verify the attested [GitHub release](https://github.com/fyaic/Understory-Obsidian-Plugin/releases/tag/1.13.1).
+
+Verified release asset digests:
+
+- `main.js`: `ae2abeb4142da08f105887d6c3a17c2a5bb4973ce324b06d523e3a7224695fac`
+- `manifest.json`: `ebc30803b45d0366ea96e71932148f9eb3840260763a4eb40dabc7e0c57066bb`
+- `styles.css`: `b0ba656faa5c3449ce4824beec9ca0fe50e65dd78e7be405966271c0ca1fdc8d`
 
 ## Community Directory
 
