@@ -41,10 +41,19 @@ Environment: Obsidian 1.12.7 on macOS, isolated `Understory-UI-Smoke-Vault`.
 - [x] Legacy English and Chinese related-note headings remain recognized.
 - [x] Windows-style engine and vault paths are covered by automated tests.
 
+## Post-release Repository Hardening
+
+Added on 2026-07-17 without changing the published `1.13.0` install assets:
+
+- [x] The current vendored engine tree is locked by
+  `engine-provenance.json` and its aggregate digest.
+- [x] The unresolved historical source commit is allowed only for `1.13.0`;
+  every later release must record a full upstream core commit.
+
 ## Human/Directory Steps
 
-- [ ] Push the reviewed commit to the public repository's default branch.
-- [ ] Publish Git tag `1.13.0` and verify the attested GitHub release assets.
+- [x] Push the reviewed commit to the public repository's default branch.
+- [x] Publish Git tag `1.13.0` and verify the attested GitHub release assets.
 - [ ] Run an Obsidian Community dashboard preview scan against the release commit.
 - [ ] Set the Community pricing label to **Optional payments**.
 - [ ] Upload current light and dark product screenshots in the Community dashboard.
