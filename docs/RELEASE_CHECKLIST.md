@@ -42,14 +42,26 @@ Environment: Obsidian 1.12.7 on macOS, isolated `Understory-UI-Smoke-Vault`.
 
 ## Publish
 
-- [ ] Merge the reviewed 1.13.2 commit to the public repository default branch.
-- [ ] Push Git tag `1.13.2` from that exact merge commit.
-- [ ] Verify the GitHub release contains only the three install assets with attestations.
-- [ ] Install the final release assets and verify their digests against the local build.
+- [x] Merge the reviewed 1.13.2 commit to the public repository default branch.
+- [x] Push Git tag `1.13.2` from that exact merge commit.
+- [x] Verify the GitHub release contains only the three install assets with attestations.
+- [x] Install the final release assets and verify their digests against the local build.
+
+Release evidence:
+
+| Item | Verified result |
+| --- | --- |
+| Reviewed PR | [#4](https://github.com/fyaic/Understory-Obsidian-Plugin/pull/4), GitHub CI passed |
+| Merge commit | `ba726d1096f8c9a0f06ebe41fffe5dc272768211` |
+| Release | [1.13.2](https://github.com/fyaic/Understory-Obsidian-Plugin/releases/tag/1.13.2), published, non-draft, non-prerelease |
+| `main.js` | `df05b117fa29aab39189115988c4c0bc89c90a44e27ee85f20db136757b565fb` |
+| `manifest.json` | `23827e342b4ff31c280bbb74dc399008908863b94ae235617214189fa45d9045` |
+| `styles.css` | `69bab64f4b58c6aa65e7400cf2a62032587b5ed4ac074f31f5688a56a2ea17d6` |
+| Local install | Official assets installed in `AIC-000` and `Understory-UI-Smoke-Vault`; both existing `data.json` files remained byte-identical |
 
 ## Community Directory
 
-- [ ] Confirm the Community listing pricing remains **Optional payments**.
-- [ ] Confirm the new version's automated scorecard is satisfactory or better.
+- [x] Confirm the Community listing pricing remains **Optional payments**.
+- [x] Confirm the public automated Health score is **Excellent** after release.
 - [ ] Upload or retain current light and dark product screenshots in the Community dashboard.
 - [ ] Resolve any dashboard-only disclosure or ownership prompts that require the maintainer account.
