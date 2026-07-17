@@ -44,10 +44,10 @@ class HostedGlobalLogoutModal extends Modal {
     }
 
     onOpen() {
-        const { contentEl } = this;
+        const { contentEl, titleEl } = this;
         contentEl.empty();
         contentEl.addClass?.('understory-global-logout-modal');
-        contentEl.createEl('h2', { text: t(this.plugin, 'hosted_global_logout_confirm_title') });
+        titleEl.setText(t(this.plugin, 'hosted_global_logout_confirm_title'));
         contentEl.createEl('p', { text: t(this.plugin, 'hosted_global_logout_confirm_desc') });
         const actions = contentEl.createDiv({ cls: 'understory-consent-actions' });
         const cancel = actions.createEl('button', { text: t(this.plugin, 'hosted_global_logout_confirm_cancel') });

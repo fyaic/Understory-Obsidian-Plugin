@@ -253,6 +253,23 @@ test('advanced diagnostics stay behind one styled disclosure', () => {
     assert.match(styles, /@media \(max-width: 900px\)[\s\S]*\.understory-settings-shell/);
 });
 
+test('public UI source avoids raw heading elements while preserving heading semantics', () => {
+    const sourceFiles = [
+        'hostedClient.js',
+        'hostedDiscovery.js',
+        'sidebarView.js',
+        'graphifyViews.js',
+    ];
+    const sources = sourceFiles
+        .map((filename) => fs.readFileSync(path.join(__dirname, '..', 'src', filename), 'utf8'))
+        .join('\n');
+
+    assert.doesNotMatch(sources, /createEl\(['"]h[1-6]['"]/);
+    assert.match(sources, /role: 'heading', 'aria-level': '2'/);
+    assert.match(sources, /role: 'heading', 'aria-level': '3'/);
+    assert.equal((sources.match(/titleEl\.setText\(/g) || []).length, 2);
+});
+
 test('existing local user remains usable without a Bondie session', () => {
     const tab = createSettingsTab({
         settings: {

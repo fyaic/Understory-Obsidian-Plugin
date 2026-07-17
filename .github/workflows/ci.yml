@@ -37,5 +37,5 @@ jobs:
       - name: Verify source and release package
         run: npm run verify
 
-      - name: Confirm committed bundle is reproducible
-        run: git diff --exit-code -- main.js
+      - name: Confirm tracked source remains clean
+        run: git diff --exit-code

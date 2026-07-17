@@ -153,7 +153,9 @@ Understory is free to install and the current hosted membership is Free. It conn
 
 ## Development
 
-The reviewable source lives in `src/`; release assets live at the repository root.
+The reviewable source lives in `src/`. `main.js` is intentionally not tracked:
+the verified release workflow builds it from source and publishes it with the
+committed `manifest.json` and `styles.css`.
 The bundled local-engine snapshot is locked by `engine-provenance.json`. A patch
 release may inherit the byte-identical attested `1.13.0` snapshot; any change to
 that engine tree must identify the exact upstream core commit from
@@ -164,7 +166,7 @@ npm ci
 npm run verify
 ```
 
-`npm run verify` runs the official Obsidian lint rules, 100 automated tests, the deterministic bundle, release metadata checks, a bundle syntax check, and a local engine smoke test.
+`npm run verify` runs the official Obsidian lint rules, 101 automated tests, two independent deterministic bundle builds, release metadata checks, a bundle syntax check, and a local engine smoke test.
 
 Every release must attach exactly these install assets:
 
@@ -172,7 +174,7 @@ Every release must attach exactly these install assets:
 - `main.js`
 - `styles.css`
 
-The Git tag must exactly match the manifest version. Current release: `1.13.1`.
+The Git tag must exactly match the manifest version. Current release: `1.13.2`.
 
 ## License
 
