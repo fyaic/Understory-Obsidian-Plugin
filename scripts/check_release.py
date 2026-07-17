@@ -15,6 +15,32 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def engine_snapshot_digest(engine_dir: Path) -> tuple[int, str]:
+    excluded_names = {
+        ".cache",
+        ".env",
+        ".git",
+        ".pytest_cache",
+        ".serena",
+        "__pycache__",
+        "config.yaml",
+    }
+    excluded_suffixes = {".db", ".pyc", ".sqlite"}
+    digest = hashlib.sha256()
+    files = [
+        path
+        for path in sorted(engine_dir.rglob("*"))
+        if path.is_file()
+        and not (set(path.relative_to(engine_dir).parts) & excluded_names)
+        and path.suffix.lower() not in excluded_suffixes
+    ]
+    for path in files:
+        relative = path.relative_to(engine_dir).as_posix()
+        file_digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        digest.update(relative.encode("utf-8") + b"\0" + file_digest.encode("ascii") + b"\n")
+    return len(files), digest.hexdigest()
+
+
 def main() -> None:
     manifest_path = ROOT / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -42,7 +68,16 @@ def main() -> None:
     if not re.fullmatch(r"\d+\.\d+\.\d+", version):
         raise SystemExit(f"Version must use x.y.z format: {version}")
 
-    for filename in ["main.js", "styles.css", "README.md", "PRIVACY.md", "LICENSE", "NOTICE", "versions.json"]:
+    for filename in [
+        "main.js",
+        "styles.css",
+        "README.md",
+        "PRIVACY.md",
+        "LICENSE",
+        "NOTICE",
+        "versions.json",
+        "engine-provenance.json",
+    ]:
         if not (ROOT / filename).exists():
             raise SystemExit(f"Missing required release file: {filename}")
 
@@ -67,6 +102,23 @@ def main() -> None:
     for filename in forbidden_engine_files:
         if (ROOT / filename).exists():
             raise SystemExit(f"Forbidden local engine state must not be committed: {filename}")
+
+    provenance = json.loads((ROOT / "engine-provenance.json").read_text(encoding="utf-8"))
+    if provenance.get("plugin_release") != version:
+        raise SystemExit("engine-provenance.json plugin_release does not match manifest version")
+    if provenance.get("source_repository") != "https://github.com/fyaic/Understory-graphify-engine":
+        raise SystemExit("engine-provenance.json has an unexpected source repository")
+    source_commit = str(provenance.get("source_commit") or "")
+    if source_commit == "legacy-unresolved":
+        if version != "1.13.0":
+            raise SystemExit("Only the legacy 1.13.0 snapshot may omit its upstream core commit")
+    elif not re.fullmatch(r"[0-9a-f]{40}", source_commit):
+        raise SystemExit("engine-provenance.json source_commit must be a full Git commit SHA")
+    snapshot_file_count, snapshot_digest = engine_snapshot_digest(ROOT / "understory-graphify-engine")
+    if provenance.get("snapshot_file_count") != snapshot_file_count:
+        raise SystemExit("engine-provenance.json snapshot_file_count is stale")
+    if provenance.get("snapshot_sha256") != snapshot_digest:
+        raise SystemExit("engine-provenance.json snapshot_sha256 is stale")
 
     main_js = (ROOT / "main.js").read_text(encoding="utf-8")
     for marker in [

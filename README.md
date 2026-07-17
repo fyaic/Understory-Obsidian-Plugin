@@ -154,6 +154,9 @@ Understory is free to install and the current hosted membership is Free. It conn
 ## Development
 
 The reviewable source lives in `src/`; release assets live at the repository root.
+The bundled local-engine snapshot is locked by `engine-provenance.json`. Every
+release after `1.13.0` must identify the exact upstream core commit from
+`fyaic/Understory-graphify-engine`.
 
 ```bash
 npm ci
