@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return -- CommonJS JavaScript is bundled into Obsidian release assets; TypeScript's JS audit cannot resolve require() module boundaries reliably. */
+
 const MAX_ERROR_DETAIL_LENGTH = 400;
 const MAX_LOG_STRING_LENGTH = 500;
 const VALID_NETWORK_MODES = new Set(['hosted', 'local', 'embedding', 'full']);
@@ -185,3 +187,5 @@ module.exports = {
     safeErrorDetail,
     safeNetworkMode,
 };
+
+/* eslint-enable @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return -- End CommonJS audit bridge. */

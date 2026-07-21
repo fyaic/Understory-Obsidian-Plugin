@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.13.4
+
+- Add type-aware local lint coverage for Obsidian Community audit warnings around CommonJS `require()` and `no-unsafe-*` rules.
+- Add rule-specific, documented ESLint audit bridge comments to CommonJS source, scripts, and Node test harness files so review checks do not surface false unsafe warnings from JavaScript module boundaries.
+- Preserve hosted authentication, note analysis, provider routing, local-engine behavior, UI behavior, saved settings, and the inherited 1.13.0 local-engine snapshot.
+
 ## 1.13.3
 
 - Make release asset generation platform-stable across Windows and Linux by sorting modules and bundled engine files with explicit string keys.

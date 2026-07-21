@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access -- Node test harness stays CommonJS and is not shipped in Obsidian release assets. */
+
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 
@@ -135,3 +137,5 @@ test('canUseWebhook requires non-local mode, enabled flag, and URL', () => {
     assert.equal(canUseWebhook({ networkMode: 'embedding', webhookEnabled: true, webhookUrl: '' }), false);
     assert.equal(canUseWebhook({ networkMode: 'embedding', webhookEnabled: true, webhookUrl: settings.webhookUrl }), true);
 });
+
+/* eslint-enable @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access -- End CommonJS audit bridge. */

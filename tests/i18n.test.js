@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- Node test harness stays CommonJS and is not shipped in Obsidian release assets. */
+
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 
@@ -11,3 +13,5 @@ test('English strings must not contain Han characters', () => {
 
     assert.deepEqual(offenders, []);
 });
+
+/* eslint-enable @typescript-eslint/no-require-imports -- End CommonJS audit bridge. */

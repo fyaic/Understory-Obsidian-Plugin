@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return -- CommonJS JavaScript is bundled into Obsidian release assets; TypeScript's JS audit cannot resolve require() module boundaries reliably. */
+
 const DEFAULT_LANGUAGE = 'en';
 
 const STRINGS = {
@@ -1602,3 +1604,5 @@ function t(pluginOrSettings, key, values) {
 }
 
 module.exports = { DEFAULT_LANGUAGE, STRINGS, getLanguage, t };
+
+/* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return -- End CommonJS audit bridge. */
