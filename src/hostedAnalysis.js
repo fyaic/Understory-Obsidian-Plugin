@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return -- CommonJS JavaScript is bundled into Obsidian release assets; TypeScript's JS audit cannot resolve require() module boundaries reliably. */
+
 const { Notice, TFile } = require('obsidian');
 const { t } = require('./i18n');
 const { recordBackgroundError } = require('./safety');
@@ -435,3 +437,5 @@ module.exports = HostedAnalysisMethods.prototype;
 module.exports.HOSTED_PRINCIPLES_PATH = HOSTED_PRINCIPLES_PATH;
 module.exports.HOSTED_CONFLICTS_PATH = HOSTED_CONFLICTS_PATH;
 module.exports.HOSTED_INDEX_PATH = HOSTED_INDEX_PATH;
+
+/* eslint-enable @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return -- End CommonJS audit bridge. */

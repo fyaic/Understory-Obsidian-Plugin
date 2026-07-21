@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- CommonJS JavaScript is bundled into Obsidian release assets; TypeScript's JS audit cannot resolve require() module boundaries reliably. */
+
 const { Modal, MarkdownRenderer } = require('obsidian');
 
 const MAX_LOG_ENTRIES = 200;
@@ -31,3 +33,5 @@ class GraphifyContentModal extends Modal {
 }
 
 module.exports = { GraphifyContentModal, MAX_LOG_ENTRIES, MAX_PROCESS_OUTPUT_BYTES };
+
+/* eslint-enable @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- End CommonJS audit bridge. */

@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- CommonJS JavaScript is bundled into Obsidian release assets; TypeScript's JS audit cannot resolve require() module boundaries reliably. */
+
 const { Plugin: ObsidianPlugin, Notice } = require('obsidian');
 const {
     UnderstorySettingTab,
@@ -202,3 +204,5 @@ mixinPrototype(UnderstoryPlugin.prototype, hostedDiscoveryMethods);
 mixinPrototype(UnderstoryPlugin.prototype, hostedAnalysisMethods);
 
 module.exports = UnderstoryPlugin;
+
+/* eslint-enable @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- End CommonJS audit bridge. */

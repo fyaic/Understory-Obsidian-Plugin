@@ -1,5 +1,6 @@
 import { defineConfig } from "eslint/config";
 import obsidianmd from "eslint-plugin-obsidianmd";
+import tseslint from "typescript-eslint";
 
 export default defineConfig([
   {
@@ -15,10 +16,20 @@ export default defineConfig([
     files: ["src/**/*.js", "scripts/**/*.js", "tests/**/*.js"],
     languageOptions: {
       ecmaVersion: "latest",
+      parser: tseslint.parser,
+      parserOptions: {
+        project: "./tsconfig.json",
+        tsconfigRootDir: import.meta.dirname,
+      },
       sourceType: "commonjs",
     },
     rules: {
-      "@typescript-eslint/no-require-imports": "off",
+      "@typescript-eslint/no-require-imports": "error",
+      "@typescript-eslint/no-unsafe-argument": "error",
+      "@typescript-eslint/no-unsafe-assignment": "error",
+      "@typescript-eslint/no-unsafe-call": "error",
+      "@typescript-eslint/no-unsafe-member-access": "error",
+      "@typescript-eslint/no-unsafe-return": "error",
       "@typescript-eslint/no-unused-vars": ["error", { caughtErrors: "none" }],
       "no-implicit-globals": "off",
       // The custom multi-page UI supports Obsidian before 1.13. Returning partial

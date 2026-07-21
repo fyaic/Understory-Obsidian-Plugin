@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return -- Node test harness stays CommonJS and is not shipped in Obsidian release assets. */
+
 const assert = require('assert');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
@@ -351,3 +353,5 @@ test('MCP refresh tool can use a local engine and update the relation cache', as
     assert.equal(store.files['Notes/Source.md'].hash.length, 16);
     assert.equal(store.files['Notes/Source.md'].relations[0].source, 'fake-engine');
 });
+
+/* eslint-enable @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return -- End CommonJS audit bridge. */

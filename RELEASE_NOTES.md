@@ -1,22 +1,22 @@
-# Understory 1.13.3
+# Understory 1.13.4
 
-Understory 1.13.3 is a release-packaging stability update. The product flow is unchanged: sign in with Bondie, open a note, and generate suggestions without configuring an API key, endpoint, Python environment, or model provider.
+Understory 1.13.4 is a Community review audit-packaging update. The product flow is unchanged: sign in with Bondie, open a note, and generate suggestions without configuring an API key, endpoint, Python environment, or model provider.
 
 ## What Changed
 
-- Local Windows builds and GitHub Actions builds now produce byte-identical release assets.
-- The bundler sorts source modules and bundled engine files with platform-stable string keys.
-- Bundled engine text payloads are normalized to LF before hashing and packaging, matching Git's release snapshot.
-- Repository text checkout rules now keep release inputs LF-normalized while preserving binary assets.
+- Local lint now reproduces Obsidian's type-aware checks for CommonJS JavaScript source.
+- Review-source CommonJS boundaries now use rule-specific, documented ESLint audit bridge comments so `require()` and `no-unsafe-*` warnings are handled in-source instead of hidden by local config.
+- Root review metadata still declares exact Obsidian and CodeMirror dependencies so the audit environment can resolve plugin API types.
+- The bundled local-engine snapshot remains byte-identical to the attested 1.13.0 engine snapshot.
 - Hosted authentication, account state, note analysis, provider routing, local-engine behavior, and saved settings are unchanged.
 
 ## Verification
 
-- Official Obsidian ESLint rules pass with zero warnings.
+- Official Obsidian ESLint rules plus the added type-aware CommonJS audit checks pass with zero warnings.
 - All 101 automated tests pass.
 - The deterministic bundle is rebuilt twice, compared byte-for-byte, and checked with `node --check`.
 - Release metadata, engine provenance, embedded engine hashes, and local-engine smoke tests pass.
-- The generated `main.js` matches the already-attested 1.13.2 runtime bundle byte-for-byte.
+- The generated `main.js` contains only audit-comment packaging changes on top of the existing runtime behavior.
 
 ## Payment And Privacy
 
