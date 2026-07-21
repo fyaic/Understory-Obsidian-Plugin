@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.13.3
+
+- Make release asset generation platform-stable across Windows and Linux by sorting modules and bundled engine files with explicit string keys.
+- Normalize bundled engine text payloads to LF before hashing and packaging, so local verification matches GitHub Actions and Git blob provenance.
+- Add repository text/binary attributes to keep release inputs stable without tracking the generated `main.js`.
+- No hosted authentication, note analysis, provider routing, local-engine behavior, UI behavior, or saved settings changed.
+
 ## 1.13.2
 
 - Build `main.js` from reviewable source during CI and release publishing instead of tracking the generated bundle in the repository.
