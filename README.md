@@ -4,7 +4,7 @@
 **English** · [中文](README.zh-CN.md) — [Engineering ›](ENGINEERING.md)
 
 <p align="center">
-  <img src="assets/understory-hero.png" alt="Understory sustained memory engine banner">
+  <img src="assets/understory-logo.png" alt="Understory leaf crayon drawing" width="220">
 </p>
 
 Understory is a knowledge-maintenance loop for Obsidian. It finds likely relations, notices when old suggestions need another look, and surfaces conflicts before they become expensive to untangle.
@@ -17,7 +17,9 @@ The default experience starts with **Continue with Bondie**. Sign in once, use t
 
 Open a Markdown note and choose **Generate suggestions**. Understory looks at the current note, narrows the eligible vault notes, and returns a sidebar review queue.
 
-![Understory sidebar showing grouped related-note suggestions in a DemoVault pricing note](assets/readme/understory-sidebar-suggestions.png)
+<p align="center">
+  <img src="assets/readme/understory-sidebar-suggestions.png" alt="Understory sidebar showing grouped related-note suggestions in a DemoVault pricing note" width="760">
+</p>
 
 - It starts from the note you are reading, then considers scoped folders, existing links, backlinks, title overlap, content overlap, and recent edits.
 - Hosted mode sends only bounded note snippets after consent; advanced local mode can use the bundled graph engine.
@@ -50,7 +52,9 @@ Relation discovery is not a one-time import. Understory stores a snapshot of eac
 
 The **Risks** tab is the other half of the review loop. It is for vault maintenance work: the things that become hard to fix only after they spread across many notes.
 
-![Understory Risks tab showing a plan-limit conflict and stale billing-copy claim](assets/readme/understory-sidebar-risks.png)
+<p align="center">
+  <img src="assets/readme/understory-sidebar-risks.png" alt="Understory Risks tab showing a plan-limit conflict and stale billing-copy claim" width="760">
+</p>
 
 - **Possible conflicts** where two notes may be making incompatible claims.
 - **Stale suggestions** where stored relations predate the current note text.
