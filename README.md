@@ -1,181 +1,113 @@
 # Understory
+> Machine discovery proposes related notes; human review turns the right ones into lasting Obsidian knowledge.
+
+**English** · [中文](README.zh-CN.md) — [Engineering ›](ENGINEERING.md)
 
 <p align="center">
-  <img src="assets/understory-logo.png" alt="Understory leaf mark" width="150">
+  <img src="assets/understory-hero.png" alt="Understory sustained memory engine banner">
 </p>
 
-<p align="center">
-  Find related notes, surface conflicts, and keep a growing vault easier to navigate.
-</p>
+Understory is a knowledge-maintenance loop for Obsidian. It finds likely relations, notices when old suggestions need another look, and surfaces conflicts before they become expensive to untangle.
 
-<p align="center">
-  <a href="README.zh-CN.md">简体中文</a> ·
-  <a href="PRIVACY.md">Privacy</a> ·
-  <a href="CHANGELOG.md">Changelog</a>
-</p>
+The core rule is simple: **machine discovery is advisory; human discovery and confirmed structure have higher authority**. Understory can suggest, refresh, and warn, but your accepted links, ignored suggestions, manual wiki links, and maintained entity relationships are the durable memory.
 
-Understory is a desktop knowledge-maintenance companion. Open a note, ask Understory to analyze it, then review related-note suggestions and risks in a focused right sidebar.
+The default experience starts with **Continue with Bondie**. Sign in once, use the managed Understory service, and generate suggestions without choosing a model provider, pasting API keys, installing Python, or configuring endpoints.
 
-The standard experience is hosted-first. Sign in with a Bondie account and Understory prepares the managed AI service automatically. You do not need to choose a provider, paste a model key, install Python, or configure an endpoint.
+## Let the machine find candidate relations
 
-## Start In Three Steps
+Open a Markdown note and choose **Generate suggestions**. Understory looks at the current note, narrows the eligible vault notes, and returns a sidebar review queue.
 
-1. Enable Understory and click the leaf icon in the ribbon.
-2. Select **Continue with Bondie** and complete sign-in in your browser.
-3. Return to your note and select **Generate suggestions**.
+![Understory sidebar showing grouped related-note suggestions in a DemoVault pricing note](assets/readme/understory-sidebar-suggestions.png)
 
-The first analysis asks for permission before selected note snippets leave your device. Understory then shows suggestions and risks without changing the note body. You decide whether to accept, ignore, or insert a confirmed relation.
+- It starts from the note you are reading, then considers scoped folders, existing links, backlinks, title overlap, content overlap, and recent edits.
+- Hosted mode sends only bounded note snippets after consent; advanced local mode can use the bundled graph engine.
+- New results enter as suggestions, not truth.
+- The sidebar stays the review point; refreshing suggestions does not silently rewrite your note body.
 
-## What You Get
+## Make human decisions outrank future runs
 
-- A right sidebar organized into **Suggestions** and **Risks**.
-- Related-note matches grouped by topic or source.
-- Conflict, stale-content, orphan-note, and broken-link checks.
-- A clear account page with profile, membership, and service readiness.
-- Per-account usage totals and feature-level activity.
-- Folder scope controls for notes that should be included or ignored.
-- English and Chinese interfaces, with light and dark theme support.
-- An advanced local Agent API through JSON CLI and MCP stdio.
+Every relation has a human decision state. You can open it, accept it, ignore it, or insert it as a normal Obsidian link.
 
-## Account And Membership
+- **Accept** marks a relation as reviewed and trusted in Understory's local state.
+- **Ignore** records a deletion memory for the relation, so the same machine suggestion does not immediately reappear after the next scan.
+- **Insert** writes a plain wiki link into the note and marks the relation accepted.
+- Manual links outside generated blocks are preserved by design.
+- If you manually add a link back later, that human action clears the earlier deletion memory.
 
-Bondie manages sign-in, profile changes, account security, connected devices, and account recovery. The plugin provides direct entries to those account pages instead of duplicating identity settings.
+This is the important product behavior: Understory can discover a relation, but you decide whether it becomes part of the vault.
 
-Understory currently assigns every account the **Free** membership. The client already understands Free, Pro, and Plus membership states so future plans can be introduced without exposing billing controls before they are ready.
+## Keep relations fresh as notes change
 
-Signing out of Understory revokes this product session only. A separate, clearly confirmed action signs out of the wider Bondie account.
+Relation discovery is not a one-time import. Understory stores a snapshot of each analyzed note and can tell when suggestions were made against older content.
 
-## Hosted AI, Without Client Keys
+- Edited notes can schedule a background relation update after a quiet window.
+- Manual **Update suggestions** runs the active note immediately.
+- Weekly or monthly refresh can walk the selected vault scope one note at a time.
+- Include and exclude folders let you keep drafts, archives, private folders, and generated files out of the update loop.
+- If a target note moves or disappears, Understory flags the relation instead of silently repairing the cache.
 
-In the standard hosted mode:
+## Discover conflicts beside related notes
 
-- Model credentials are managed by the Understory service and are never returned to the plugin.
-- Each signed-in account receives server-managed provider access.
-- The service records account-linked request and processing-unit totals for quotas, reliability, and operator observability.
-- The plugin displays the account's aggregate usage without exposing provider credentials or internal routing.
+The **Risks** tab is the other half of the review loop. It is for vault maintenance work: the things that become hard to fix only after they spread across many notes.
 
-The current managed service uses server-side provider routing. Provider pools and upstream credentials can change without requiring users to reconfigure the plugin.
+![Understory Risks tab showing a plan-limit conflict and stale billing-copy claim](assets/readme/understory-sidebar-risks.png)
 
-## Privacy At A Glance
+- **Possible conflicts** where two notes may be making incompatible claims.
+- **Stale suggestions** where stored relations predate the current note text.
+- **Broken links** that no longer resolve to a note.
+- **Orphan notes** with no resolved outgoing links or backlinks.
+- **Extracted principles or claims** that can be reviewed during broader vault analysis.
 
-Understory reads Markdown notes in the current vault. Hosted analysis can send note paths, titles, and bounded text snippets to `https://understory.bondie.io` only after consent. Current limits include up to 4,000 characters for the active note and up to 2,000 characters for each selected candidate during relation discovery.
+The result is a maintenance queue, not an alert storm. Understory keeps serious items visible, sorts them by severity, and lets you refresh, open, or revise the underlying notes.
 
-The server returns relations, scores, risk summaries, and usage data. The client stores the session, settings, relation cache, and analysis reports locally. Hosted responses state that note content is not retained by the Understory service; account and usage records are retained as required to operate the service.
+## Use human-maintained structure as stronger evidence
 
-You can exclude folders, disable selected-snippet uploads, sign out, or switch an existing advanced installation to a local/self-hosted workflow. See [PRIVACY.md](PRIVACY.md) for the complete data-flow matrix.
+Understory can also use an entity-relationship layer when your vault contains maintained structure. This helps it find relations that pure text similarity can miss.
 
-## Advanced Local And Self-Hosted Workflows
+- User-defined, frontmatter, imported, and API-created relationships are treated as authoritative structure.
+- LLM extraction, name matching, and similarity are candidate discovery channels until reviewed.
+- The local engine can extend discovery through one-hop entity relationships, then merge that evidence with semantic and keyword matches.
+- When maintained structure changes, affected relation discovery can be refreshed instead of trusting old suggestions forever.
 
-Existing users who already selected local mode stay in local mode after upgrading. Advanced settings also retain local, self-hosted, and bring-your-own-key workflows for operators who intentionally need them.
+Machine discovery helps Understory notice possibilities. Human-maintained structure tells it which relationships are allowed to count as stronger evidence.
 
-Those workflows may require:
+## Let agents use the same review rules
 
-- Obsidian desktop.
-- Python and the bundled local engine.
-- A provider account and key for optional vector or reasoning services.
-- Manual endpoint, model, and privacy configuration.
+Open **Settings -> Understory -> AI agents** when Claude, ChatGPT, Codex, or another assistant should query the current vault.
 
-These controls live under **Settings -> Understory -> Advanced**. They are not part of the first-run path. Local mode blocks managed hosted discovery and does not require a Bondie session.
+- Export a vault-specific MCP server file.
+- Copy a ready-to-use MCP configuration.
+- Choose **Query-only** for search and context retrieval without writes.
+- Choose **Agent memory model** when the agent should propose durable memory updates after work.
+- Let tools accept, reject, refresh, or insert relations only through explicit write actions.
 
-## AI Agents
+Agent reads return scoped snippets, note briefs, relation metadata, graph summaries, and diagnostics by default. The agent sees the same stale flags and relation states that the sidebar sees.
 
-Understory can expose the current vault to a local agent through MCP stdio. It does not open an HTTP port. From **Settings -> Understory -> AI agents**, you can:
+## Trust, privacy, and account model
 
-- Create a vault-specific MCP server file in `.understory/agent`.
-- Copy a vault-specific MCP configuration.
-- Choose a conservative query-only prompt or an agent-memory workflow.
-- Export a local setup pack and redacted diagnostics.
+Hosted mode is account-first and managed. **Continue with Bondie** starts browser sign-in and returns to the same vault. Hosted model work uses **server-managed provider** credentials; provider keys are not returned to the plugin.
 
-Read tools return scoped snippets and relation metadata rather than full note bodies by default. Write tools modify local vault files and should be used only after user confirmation. See [docs/AGENT_API.md](docs/AGENT_API.md) for the complete contract.
+- Selected-snippet consent is required before hosted relation or vault analysis sends note snippets.
+- Hosted collection excludes hidden folders, Obsidian configuration, trash paths, and Understory working files.
+- Session state, settings, relation cache, ignored suggestions, and reports are stored locally in the vault or plugin data.
+- Existing local-mode users stay local after upgrading.
+- Self-hosted and bring-your-own-key workflows remain under **Advanced**.
 
-## Local Files
+Understory is free to install and the current hosted membership is Free. The Obsidian Community listing should show **Optional payments** because Understory connects to a managed service and advanced modes can connect to paid APIs.
 
-Understory may write these local artifacts:
+## Start from any Markdown note
 
-```text
-<vault>/.understory/                         relation cache, reports, logs, Agent files
-<vault>/.obsidian/plugins/understory/data.json
-                                             plugin settings and the product session
-<vault>/.obsidian/plugins/understory/understory-graphify-engine/
-                                             bundled engine for advanced local mode
-```
+1. Install and enable Understory in Obsidian desktop.
+2. Click the leaf icon, select **Continue with Bondie**, and complete sign-in.
+3. Open a Markdown note and select **Generate suggestions**.
+4. Review **Suggestions** and **Risks**.
+5. Accept, ignore, open, or insert only the relations you trust.
 
-Normal hosted use does not start the Python engine.
+Current release: `1.13.8`. Understory targets Obsidian `1.8.7` or newer and is desktop-only.
 
-## Installation
+## Good to know
 
-### Community Directory
-
-After the Community listing is approved:
-
-1. Open **Settings -> Community plugins -> Browse**.
-2. Search for **Understory**.
-3. Install and enable it.
-
-### Manual Release Install
-
-Download `manifest.json`, `main.js`, and `styles.css` from the same GitHub release. Place them in:
-
-```text
-<vault>/.obsidian/plugins/understory/
-```
-
-Restart Obsidian, then enable Understory under **Community plugins**. Do not mix assets from different versions.
-
-## Troubleshooting
-
-### The browser says sign-in succeeded but the plugin is still disconnected
-
-Return to the same vault, open Understory, and select **Refresh status**. If the callback was opened by another vault or profile, start sign-in again from the intended vault.
-
-### Suggestions do not run
-
-Confirm that:
-
-- The account page says **Connected** and **Service ready**.
-- A Markdown note is active.
-- Snippet upload consent is enabled.
-- The note is not inside an excluded folder.
-
-### A session expired
-
-Understory clears an invalid local session after an unauthorized server response. Sign in again; the relation cache in `.understory` remains local.
-
-### Local mode is unavailable
-
-Open **Advanced**, run the local setup check, and review Python, engine path, dependency, and permission guidance. Hosted users do not need this setup.
-
-## Payment Status
-
-Community listing: **Optional payments**.
-
-Understory is free to install and the current hosted membership is Free. It connects to a managed service and retains advanced workflows that can connect to paid APIs, so Obsidian's policy requires the Optional payments label even while checkout is disabled.
-
-## Development
-
-The reviewable source lives in `src/`. `main.js` is intentionally not tracked:
-the verified release workflow builds it from source and publishes it with the
-committed `manifest.json` and `styles.css`.
-The bundled local-engine snapshot is locked by `engine-provenance.json`. A patch
-release may inherit the byte-identical attested `1.13.0` snapshot; any change to
-that engine tree must identify the exact upstream core commit from
-`fyaic/Understory-graphify-engine`.
-
-```bash
-npm ci
-npm run verify
-```
-
-`npm run verify` runs the official Obsidian lint rules, 103 automated tests, two independent deterministic bundle builds, release metadata checks, a bundle syntax check, and a local engine smoke test.
-
-Every release must attach exactly these install assets:
-
-- `manifest.json`
-- `main.js`
-- `styles.css`
-
-The Git tag must exactly match the manifest version. Current release: `1.13.7`.
-
-## License
-
-Understory is source-available under the [PolyForm Perimeter License 1.0.0](LICENSE). See [NOTICE](NOTICE) for the required notice and commercial licensing contact.
+- Understory is not a fully automatic wiki writer; the default workflow keeps generated relations in the sidebar until you act.
+- Ignored suggestions can return later when the deletion memory expires or when the target content changes enough to deserve another look.
+- Local engine workflows are advanced and can require Python runtime health checks.
+- Read the full data-flow in **[PRIVACY.md](PRIVACY.md)**, report security issues through **[SECURITY.md](SECURITY.md)**, and see the implementation map in the **[Engineering README ›](ENGINEERING.md)**.

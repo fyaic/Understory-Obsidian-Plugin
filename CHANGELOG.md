@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.13.8
+
+- Add full-window DemoVault screenshots for the Understory Suggestions and Risks sidebar to the English and Chinese README.
+- Remove redundant fenced text demos from the README now that the screenshots provide the concrete walkthrough.
+- Preserve hosted authentication, note analysis, provider routing, local-engine behavior, UI behavior, saved settings, and the inherited 1.13.0 local-engine snapshot.
+
 ## 1.13.7
 
 - Remove unused catch bindings reported by automated review recommendations across source modules by using `catch { ... }` for intentionally ignored failures.

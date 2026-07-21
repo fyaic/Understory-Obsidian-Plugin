@@ -1,12 +1,12 @@
-# Understory 1.13.7
+# Understory 1.13.8
 
-Understory 1.13.7 is a Community review recommendation cleanup. The product flow is unchanged: sign in with Bondie, open a note, and generate suggestions without configuring an API key, endpoint, Python environment, or model provider.
+Understory 1.13.8 refreshes the public README with real DemoVault screenshots of the Suggestions and Risks sidebar. The product flow is unchanged: sign in with Bondie, open a note, and generate suggestions without configuring an API key, endpoint, Python environment, or model provider.
 
 ## What Changed
 
-- Removed unused catch bindings reported as automated review recommendations by changing intentionally ignored failures to `catch { ... }`.
-- Kept catch parameters only where the error value is logged, narrowed, returned, or used to build diagnostics.
-- Local ESLint now checks caught errors so unused catch bindings fail before a release is tagged.
+- Added full-window Obsidian screenshots showing grouped related-note suggestions and the risk review queue in a demo vault.
+- Removed redundant fenced text demos from the English and Chinese README now that the screenshots carry the walkthrough.
+- Kept the README focused on product scenes, user decisions, trust, and the first-run path.
 - The bundled local-engine snapshot remains byte-identical to the attested 1.13.0 engine snapshot.
 - Hosted authentication, account state, note analysis, provider routing, local-engine behavior, and saved settings are unchanged.
 
@@ -16,7 +16,7 @@ Understory 1.13.7 is a Community review recommendation cleanup. The product flow
 - All 103 automated tests pass.
 - The deterministic bundle is rebuilt twice, compared byte-for-byte, and checked with `node --check`.
 - Release metadata, engine provenance, embedded engine hashes, and local-engine smoke tests pass.
-- The generated `main.js` includes only unused catch-binding cleanup on top of the existing runtime behavior.
+- README screenshot links resolve to full-window Obsidian captures.
 
 ## Payment And Privacy
 
