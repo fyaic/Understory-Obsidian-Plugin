@@ -187,6 +187,39 @@ test('connected navigation separates account, usage, workflow, scope, and advanc
     assert.doesNotMatch(usageText, /Vector model key|Reasoning model key/);
 });
 
+test('settings definitions expose searchable pages for Obsidian 1.13', () => {
+    const tab = createSettingsTab({ account: connectedAccount() });
+    const definitions = tab.getSettingDefinitions();
+
+    assert.deepEqual(definitions.map((item) => item.type), Array(definitions.length).fill('page'));
+    assert.deepEqual(definitions.map((item) => item.name), [
+        'Account',
+        'Usage',
+        'Workflow',
+        'Scope',
+        'Suggestions',
+        'Activity',
+        'AI agents',
+        'Advanced / Local & self-hosted',
+    ]);
+    assert.equal(typeof definitions[1].page, 'function');
+
+    const usagePage = definitions[1].page();
+    usagePage.display();
+    assert.equal(tab._activeSettingsPage, 'usage');
+    assert.match(collectText(usagePage.containerEl).join('\n'), /Usage/);
+
+    const localDefinitions = createSettingsTab({ settings: { networkMode: 'local' } }).getSettingDefinitions();
+    assert.deepEqual(localDefinitions.map((item) => item.name), [
+        'Workflow',
+        'Scope',
+        'Suggestions',
+        'Activity',
+        'AI agents',
+        'Advanced / Local & self-hosted',
+    ]);
+});
+
 test('usage page reports managed provider readiness and per-feature activity', () => {
     const tab = createSettingsTab({
         account: connectedAccount(),
@@ -253,6 +286,9 @@ test('advanced diagnostics stay behind one styled disclosure', () => {
         assert.ok(styles.includes(selector), `missing ${selector} styles`);
     }
     assert.match(styles, /@media \(max-width: 900px\)[\s\S]*\.understory-settings-shell/);
+    assert.doesNotMatch(styles, /\bcolumn-gap\s*:/);
+    assert.doesNotMatch(styles, /\btext-decoration-thickness\s*:/);
+    assert.match(styles, /\.understory-conflict-row[\s\S]*gap: 0 12px;/);
 });
 
 test('public UI source avoids raw heading elements while preserving heading semantics', () => {
