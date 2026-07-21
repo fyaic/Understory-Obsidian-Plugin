@@ -1750,7 +1750,7 @@
 .understory-conflict-row {
     display: grid;
     grid-template-columns: minmax(84px, 0.8fr) minmax(170px, 1.35fr) minmax(220px, 2fr) minmax(180px, 1.45fr);
-    column-gap: 12px;
+    gap: 0 12px;
     align-items: start;
     padding: 8px 10px;
     border-top: 1px solid var(--background-modifier-border);
@@ -1776,7 +1776,6 @@
     color: var(--text-muted);
     cursor: not-allowed;
     text-decoration: line-through;
-    text-decoration-thickness: 1px;
 }
 .understory-conflict-missing-badge {
     border: 1px solid var(--background-modifier-border);

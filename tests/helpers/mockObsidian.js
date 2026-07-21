@@ -110,6 +110,18 @@ class PluginSettingTab {
     display() {}
 }
 
+class SettingPage {
+    constructor() {
+        this.rootEl = createElementMock();
+        this.titlebarEl = this.rootEl.createDiv();
+        this.containerEl = this.rootEl.createDiv();
+        this.title = '';
+    }
+
+    display() {}
+    hide() {}
+}
+
 class Setting {
     constructor(containerEl) {
         this.containerEl = containerEl;
@@ -209,6 +221,7 @@ const obsidianMock = {
     Plugin,
     PluginSettingTab,
     Setting,
+    SettingPage,
     setIcon,
     TFile,
 };

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.13.5
+
+- Add `PluginSettingTab#getSettingDefinitions()` support so Obsidian 1.13.0 and later can include Understory settings pages in settings search.
+- Reuse the existing settings page renderers from both the new declarative `SettingPage` path and the legacy `display()` path for older supported Obsidian builds.
+- Replace the conflict-table CSS `column-gap` usage and remove `text-decoration-thickness` to avoid Obsidian 1.7.4 browser-feature audit warnings.
+- Preserve hosted authentication, note analysis, provider routing, local-engine behavior, UI behavior, saved settings, and the inherited 1.13.0 local-engine snapshot.
+
 ## 1.13.4
 
 - Add type-aware local lint coverage for Obsidian Community audit warnings around CommonJS `require()` and `no-unsafe-*` rules.

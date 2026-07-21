@@ -1,22 +1,22 @@
-# Understory 1.13.4
+# Understory 1.13.5
 
-Understory 1.13.4 is a Community review audit-packaging update. The product flow is unchanged: sign in with Bondie, open a note, and generate suggestions without configuring an API key, endpoint, Python environment, or model provider.
+Understory 1.13.5 is a Community review polish update for Obsidian 1.13 settings search and the Obsidian 1.7.4 browser-feature audit. The product flow is unchanged: sign in with Bondie, open a note, and generate suggestions without configuring an API key, endpoint, Python environment, or model provider.
 
 ## What Changed
 
-- Local lint now reproduces Obsidian's type-aware checks for CommonJS JavaScript source.
-- Review-source CommonJS boundaries now use rule-specific, documented ESLint audit bridge comments so `require()` and `no-unsafe-*` warnings are handled in-source instead of hidden by local config.
-- Root review metadata still declares exact Obsidian and CodeMirror dependencies so the audit environment can resolve plugin API types.
+- Settings now implements `PluginSettingTab#getSettingDefinitions()` so Obsidian 1.13.0 and later can index Understory pages in settings search.
+- The declarative settings page factory reuses the existing Account, Usage, Workflow, Scope, Suggestions, Activity, AI agents, and Advanced page renderers while preserving the legacy `display()` path for older Obsidian builds.
+- CSS no longer uses `column-gap` or `text-decoration-thickness` in the conflict table, avoiding the browser-feature warnings reported against Obsidian 1.7.4.
 - The bundled local-engine snapshot remains byte-identical to the attested 1.13.0 engine snapshot.
 - Hosted authentication, account state, note analysis, provider routing, local-engine behavior, and saved settings are unchanged.
 
 ## Verification
 
 - Official Obsidian ESLint rules plus the added type-aware CommonJS audit checks pass with zero warnings.
-- All 101 automated tests pass.
+- All 102 automated tests pass.
 - The deterministic bundle is rebuilt twice, compared byte-for-byte, and checked with `node --check`.
 - Release metadata, engine provenance, embedded engine hashes, and local-engine smoke tests pass.
-- The generated `main.js` contains only audit-comment packaging changes on top of the existing runtime behavior.
+- The generated `main.js` includes only the settings-search compatibility and CSS audit-polish changes on top of the existing runtime behavior.
 
 ## Payment And Privacy
 

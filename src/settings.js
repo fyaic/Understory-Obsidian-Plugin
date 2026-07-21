@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return -- CommonJS JavaScript is bundled into Obsidian release assets; TypeScript's JS audit cannot resolve require() module boundaries reliably. */
 
-const { PluginSettingTab, Setting, Notice, setIcon } = require('obsidian');
+const { PluginSettingTab, Setting, Notice, SettingPage, setIcon } = require('obsidian');
 const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -368,8 +368,106 @@ class UnderstorySettingTab extends PluginSettingTab {
         this._advancedDiagnosticsOpen = false;
     }
 
+    getSettingDefinitions() {
+        const hostedMode = (this.plugin.settings?.networkMode || 'hosted') === 'hosted';
+        const pages = hostedMode
+            ? SETTINGS_PAGES
+            : SETTINGS_PAGES.filter(([id]) => !['account', 'usage'].includes(id));
+        return pages.map(([pageId, labelKey]) => {
+            const [titleKey, descKey] = this._settingsDefinitionTextKeys(pageId, labelKey);
+            return {
+                type: 'page',
+                name: t(this.plugin, titleKey),
+                desc: descKey ? t(this.plugin, descKey) : undefined,
+                page: () => this._createSettingsDefinitionPage(pageId),
+            };
+        });
+    }
+
+    _settingsDefinitionTextKeys(pageId, labelKey = 'settings_title') {
+        return ({
+            account: ['account_home_title', 'account_home_desc'],
+            usage: ['usage_page_title', 'usage_page_desc'],
+            workflow: ['workflow_page_title', 'workflow_page_desc'],
+            scope: ['scope_page_title', 'scope_page_desc'],
+            suggestions: ['suggestions_page_title', 'suggestions_page_desc'],
+            activity: ['activity_page_title', 'activity_page_desc'],
+            agents: ['settings_tab_agents', 'agent_choose_use_case_desc'],
+            advanced: ['advanced_index_title', 'advanced_index_desc'],
+        })[pageId] || [labelKey, null];
+    }
+
+    _settingsDefinitionPageTitle(pageId) {
+        const [titleKey] = this._settingsDefinitionTextKeys(pageId);
+        return t(this.plugin, titleKey);
+    }
+
+    _createSettingsDefinitionPage(pageId) {
+        if (!SettingPage) {
+            return { title: this._settingsDefinitionPageTitle(pageId), display() {} };
+        }
+
+        return new (class UnderstorySettingsDefinitionPage extends SettingPage {
+            constructor(settingsTab, settingPageId) {
+                super();
+                this.settingsTab = settingsTab;
+                this.settingPageId = settingPageId;
+                this.title = this.settingsTab._settingsDefinitionPageTitle(this.settingPageId);
+            }
+
+            display() {
+                this.settingsTab._activeSettingsPage = this.settingPageId;
+                this.settingsTab._activeDeclarativePageContainer = this.containerEl;
+                this.settingsTab._renderActiveSettingsPage(this.containerEl);
+            }
+
+            hide() {
+                if (this.settingsTab._activeDeclarativePageContainer === this.containerEl) {
+                    this.settingsTab._activeDeclarativePageContainer = null;
+                }
+                if (typeof super.hide === 'function') super.hide();
+            }
+        })(this, pageId);
+    }
+
+    _refreshSettingsView() {
+        if (this._activeDeclarativePageContainer) {
+            this._renderActiveSettingsPage(this._activeDeclarativePageContainer);
+            return;
+        }
+        this.display();
+    }
+
+    _renderActiveSettingsPage(containerEl) {
+        containerEl.empty();
+        if (this._activeSettingsPage === 'workflow') {
+            this._renderWorkflowPage(containerEl);
+        } else if (this._activeSettingsPage === 'usage') {
+            this._renderUsagePage(containerEl);
+        } else if (this._activeSettingsPage === 'scope') {
+            this._renderScopePage(containerEl);
+        } else if (this._activeSettingsPage === 'suggestions') {
+            this._renderSuggestionsPage(containerEl);
+        } else if (this._activeSettingsPage === 'activity') {
+            this._renderActivityPage(containerEl);
+        } else if (this._activeSettingsPage === 'agents') {
+            this._renderAgentAccessTab(containerEl);
+        } else if (this._activeSettingsPage === 'advanced') {
+            this._renderAdvancedPage(containerEl);
+        } else {
+            this._activeSettingsPage = 'account';
+            this._renderAccountPage(containerEl);
+        }
+    }
+
     display() {
+        if (this._activeDeclarativePageContainer) {
+            this._renderActiveSettingsPage(this._activeDeclarativePageContainer);
+            return;
+        }
+
         const { containerEl } = this;
+        this._activeDeclarativePageContainer = null;
         containerEl.empty();
         containerEl.addClass('understory-settings-tab');
 
@@ -389,25 +487,7 @@ class UnderstorySettingTab extends PluginSettingTab {
         });
         if (navigationEnabled) this._renderSettingsNavigation(shell, { hostedMode });
         const body = shell.createDiv({ cls: 'understory-settings-body' });
-
-        if (this._activeSettingsPage === 'workflow') {
-            this._renderWorkflowPage(body);
-        } else if (this._activeSettingsPage === 'usage') {
-            this._renderUsagePage(body);
-        } else if (this._activeSettingsPage === 'scope') {
-            this._renderScopePage(body);
-        } else if (this._activeSettingsPage === 'suggestions') {
-            this._renderSuggestionsPage(body);
-        } else if (this._activeSettingsPage === 'activity') {
-            this._renderActivityPage(body);
-        } else if (this._activeSettingsPage === 'agents') {
-            this._renderAgentAccessTab(body);
-        } else if (this._activeSettingsPage === 'advanced') {
-            this._renderAdvancedPage(body);
-        } else {
-            this._activeSettingsPage = 'account';
-            this._renderAccountPage(body);
-        }
+        this._renderActiveSettingsPage(body);
     }
 
     _renderSettingsHeader(containerEl) {

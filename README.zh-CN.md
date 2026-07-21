@@ -164,7 +164,7 @@ npm ci
 npm run verify
 ```
 
-`npm run verify` 会运行 Obsidian 官方 lint、101 项自动化测试、两次独立的确定性 bundle 构建、发布元数据检查、bundle 语法检查和本地引擎 smoke test。
+`npm run verify` 会运行 Obsidian 官方 lint、102 项自动化测试、两次独立的确定性 bundle 构建、发布元数据检查、bundle 语法检查和本地引擎 smoke test。
 
 每个 release 必须只提供同一版本的三个安装文件：
 
@@ -172,7 +172,7 @@ npm run verify
 - `main.js`
 - `styles.css`
 
-Git tag 必须与 manifest 版本完全一致。当前版本：`1.13.4`。
+Git tag 必须与 manifest 版本完全一致。当前版本：`1.13.5`。
 
 ## 许可证
 
