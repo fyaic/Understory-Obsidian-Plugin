@@ -34,8 +34,8 @@ def module_id(filename: str) -> str:
 
 def source_modules(plugin_dir: Path) -> list[Path]:
     modules = sorted(
-        path for path in plugin_dir.glob("*.js")
-        if path.name not in SOURCE_MODULE_EXCLUDES
+        (path for path in plugin_dir.glob("*.js") if path.name not in SOURCE_MODULE_EXCLUDES),
+        key=lambda path: path.name,
     )
     if not any(path.name == "main.js" for path in modules):
         raise FileNotFoundError(f"Plugin entrypoint is missing: {plugin_dir / 'main.js'}")
@@ -49,19 +49,30 @@ def include_engine_file(path: Path) -> bool:
     return path.suffix.lower() not in EXCLUDED_ENGINE_SUFFIXES
 
 
+def release_bytes(path: Path) -> bytes:
+    data = path.read_bytes()
+    if b"\0" in data:
+        return data
+    return data.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+
+
 def build_bundled_engine_payload(root_dir: Path) -> dict:
     engine_dir = root_dir / ENGINE_DIR_NAME
     if not engine_dir.exists():
         raise FileNotFoundError(f"Bundled engine directory is missing: {engine_dir}")
 
     files = []
-    for path in sorted(engine_dir.rglob("*")):
+    engine_files = sorted(
+        (path for path in engine_dir.rglob("*") if path.is_file()),
+        key=lambda path: path.relative_to(engine_dir).as_posix(),
+    )
+    for path in engine_files:
         if not path.is_file():
             continue
         relative = path.relative_to(engine_dir)
         if not include_engine_file(relative):
             continue
-        data = path.read_bytes()
+        data = release_bytes(path)
         files.append({
             "path": relative.as_posix(),
             "contentBase64": base64.b64encode(data).decode("ascii"),

@@ -17,6 +17,13 @@ LEGACY_ENGINE_ORIGIN_RELEASE = "1.13.0"
 LEGACY_ENGINE_SNAPSHOT_SHA256 = "cac720e1033b6be233b9d4b99059604654e5cdcb78d0b688464d66792eb73743"
 
 
+def release_bytes(path: Path) -> bytes:
+    data = path.read_bytes()
+    if b"\0" in data:
+        return data
+    return data.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+
+
 def engine_snapshot_digest(engine_dir: Path) -> tuple[int, str]:
     excluded_names = {
         ".cache",
@@ -31,14 +38,17 @@ def engine_snapshot_digest(engine_dir: Path) -> tuple[int, str]:
     digest = hashlib.sha256()
     files = [
         path
-        for path in sorted(engine_dir.rglob("*"))
+        for path in sorted(
+            engine_dir.rglob("*"),
+            key=lambda candidate: candidate.relative_to(engine_dir).as_posix(),
+        )
         if path.is_file()
         and not (set(path.relative_to(engine_dir).parts) & excluded_names)
         and path.suffix.lower() not in excluded_suffixes
     ]
     for path in files:
         relative = path.relative_to(engine_dir).as_posix()
-        file_digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        file_digest = hashlib.sha256(release_bytes(path)).hexdigest()
         digest.update(relative.encode("utf-8") + b"\0" + file_digest.encode("ascii") + b"\n")
     return len(files), digest.hexdigest()
 
@@ -149,7 +159,7 @@ def main() -> None:
     if '"./settingsStyles"' in main_js:
         raise SystemExit("main.js still contains the deleted settingsStyles module")
     for filename in required_engine_files:
-        digest = hashlib.sha256((ROOT / filename).read_bytes()).hexdigest()
+        digest = hashlib.sha256(release_bytes(ROOT / filename)).hexdigest()
         if digest not in main_js:
             raise SystemExit(f"main.js bundled engine payload is stale for: {filename}")
 
