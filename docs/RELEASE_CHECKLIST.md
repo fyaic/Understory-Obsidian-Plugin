@@ -42,21 +42,21 @@ Environment: Obsidian 1.12.7 on macOS, isolated `Understory-UI-Smoke-Vault`.
 
 ## Publish
 
-- [ ] Merge the reviewed 1.13.3 commit to the public repository default branch.
-- [ ] Push Git tag `1.13.3` from that exact merge commit.
-- [ ] Verify the GitHub release contains only the three install assets with attestations.
+- [x] Merge the reviewed 1.13.3 commit to the public repository default branch.
+- [x] Push Git tag `1.13.3` from that exact merge commit.
+- [x] Verify the GitHub release contains only the three install assets with attestations.
 - [ ] Install the final release assets and verify their digests against the local build.
 
 Release evidence:
 
 | Item | Verified result |
 | --- | --- |
-| Reviewed PR | Pending |
-| Merge commit | Pending |
-| Release | Pending |
-| `main.js` | Pending |
-| `manifest.json` | Pending |
-| `styles.css` | Pending |
+| Reviewed PR | [#7](https://github.com/fyaic/Understory-Obsidian-Plugin/pull/7), GitHub CI passed |
+| Merge commit | `dad8ce4cdbc51daa4977c8168c99ea95ee7efca2` |
+| Release | [1.13.3](https://github.com/fyaic/Understory-Obsidian-Plugin/releases/tag/1.13.3), published, non-draft, non-prerelease |
+| `main.js` | `df05b117fa29aab39189115988c4c0bc89c90a44e27ee85f20db136757b565fb` |
+| `manifest.json` | `a88046d7b1245d0491cddc48b8fe6142c51b8634c1a60247b9a4fab05caf6bc3` |
+| `styles.css` | `69bab64f4b58c6aa65e7400cf2a62032587b5ed4ac074f31f5688a56a2ea17d6` |
 | Local install | Pending |
 
 ## Community Directory
