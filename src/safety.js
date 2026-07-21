@@ -84,14 +84,14 @@ function parseProcessJson(stdout) {
     if (!text) return null;
     try {
         return JSON.parse(text);
-    } catch (error) {
+    } catch {
         const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
         for (let index = lines.length - 1; index >= 0; index -= 1) {
             const line = lines[index];
             if (!line.startsWith('{') || !line.endsWith('}')) continue;
             try {
                 return JSON.parse(line);
-            } catch (lineError) {
+            } catch {
                 // Keep looking for an earlier JSON line.
             }
         }

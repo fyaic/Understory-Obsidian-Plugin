@@ -113,7 +113,7 @@ function readFileIfExists(filename, fsImpl = fs) {
     try {
         if (!filename || !fsImpl.existsSync(filename)) return '';
         return String(fsImpl.readFileSync(filename, 'utf8') || '').trim();
-    } catch (error) {
+    } catch {
         return '';
     }
 }
@@ -128,7 +128,7 @@ function resolveGitDir(engineDir, fsImpl = fs, pathImpl = path) {
         const match = pointer.match(/^gitdir:\s*(.+)$/i);
         if (!match) return '';
         return pathImpl.resolve(engineDir, match[1].trim());
-    } catch (error) {
+    } catch {
         return '';
     }
 }

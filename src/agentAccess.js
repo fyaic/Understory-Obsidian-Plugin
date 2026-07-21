@@ -464,7 +464,7 @@ function stripHashbang(source) {
 function loadBundledSources() {
     try {
         return require('./agentAccessBundledSources');
-    } catch (error) {
+    } catch {
         // Source-tree fallback for tests and development builds.
     }
 
@@ -476,7 +476,7 @@ function loadBundledSources() {
             safetySource: fs.readFileSync(path.join(rootDir, 'src', 'safety.js'), 'utf8'),
             mcpServerSource: fs.readFileSync(path.join(rootDir, 'scripts', 'understory-mcp-server.js'), 'utf8'),
         };
-    } catch (error) {
+    } catch {
         return {};
     }
 }

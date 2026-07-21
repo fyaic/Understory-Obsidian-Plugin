@@ -172,7 +172,7 @@ npm run verify
 - `main.js`
 - `styles.css`
 
-Git tag 必须与 manifest 版本完全一致。当前版本：`1.13.6`。
+Git tag 必须与 manifest 版本完全一致。当前版本：`1.13.7`。
 
 ## 许可证
 

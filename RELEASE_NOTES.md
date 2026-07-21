@@ -1,12 +1,12 @@
-# Understory 1.13.6
+# Understory 1.13.7
 
-Understory 1.13.6 is a Community review build-compatibility update. The product flow is unchanged: sign in with Bondie, open a note, and generate suggestions without configuring an API key, endpoint, Python environment, or model provider.
+Understory 1.13.7 is a Community review recommendation cleanup. The product flow is unchanged: sign in with Bondie, open a note, and generate suggestions without configuring an API key, endpoint, Python environment, or model provider.
 
 ## What Changed
 
-- `npm run build` now uses a Node-based bundler, so Obsidian's clean build verification no longer depends on a `python` command being present.
-- Deterministic bundle verification now validates the same Node bundler used by the npm build entrypoint.
-- Release checks now fail if the npm build script regresses to a Python-dependent command.
+- Removed unused catch bindings reported as automated review recommendations by changing intentionally ignored failures to `catch { ... }`.
+- Kept catch parameters only where the error value is logged, narrowed, returned, or used to build diagnostics.
+- Local ESLint now checks caught errors so unused catch bindings fail before a release is tagged.
 - The bundled local-engine snapshot remains byte-identical to the attested 1.13.0 engine snapshot.
 - Hosted authentication, account state, note analysis, provider routing, local-engine behavior, and saved settings are unchanged.
 
@@ -16,7 +16,7 @@ Understory 1.13.6 is a Community review build-compatibility update. The product 
 - All 103 automated tests pass.
 - The deterministic bundle is rebuilt twice, compared byte-for-byte, and checked with `node --check`.
 - Release metadata, engine provenance, embedded engine hashes, and local-engine smoke tests pass.
-- The generated `main.js` is built by the Node bundler and includes only build-packaging compatibility changes on top of the existing runtime behavior.
+- The generated `main.js` includes only unused catch-binding cleanup on top of the existing runtime behavior.
 
 ## Payment And Privacy
 

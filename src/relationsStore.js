@@ -44,7 +44,7 @@ class RelationsStore {
         try {
             const raw = await this.app.vault.adapter.read(path);
             return raw ? JSON.parse(raw) : fallback;
-        } catch (error) {
+        } catch {
             return fallback;
         }
     }
@@ -407,7 +407,7 @@ class RelationsStore {
                 const next = current + data.toString();
                 if (next.length <= MAX_PROCESS_OUTPUT_BYTES) return next;
                 outputOverflowed = true;
-                try { proc.kill(); } catch (error) { /* ignore */ }
+                try { proc.kill(); } catch { /* ignore */ }
                 return next.slice(0, MAX_PROCESS_OUTPUT_BYTES);
             };
             proc.stdout?.on('data', (data) => { stdout = append(stdout, data); });
@@ -431,7 +431,7 @@ class RelationsStore {
                 }
                 try {
                     resolve(this._parseProcessJson(stdout));
-                } catch (error) {
+                } catch {
                     reject(new Error(`Failed to parse api.py JSON: ${safeErrorDetail({
                         stdout,
                         stderr,
@@ -454,7 +454,7 @@ class RelationsStore {
                 if (!line.startsWith('{') || !line.endsWith('}')) continue;
                 try {
                     return JSON.parse(line);
-                } catch (error) {
+                } catch {
                     // Keep looking for an earlier complete JSON line.
                 }
             }

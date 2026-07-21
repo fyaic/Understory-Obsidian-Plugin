@@ -30,7 +30,7 @@ export default defineConfig([
       "@typescript-eslint/no-unsafe-call": "error",
       "@typescript-eslint/no-unsafe-member-access": "error",
       "@typescript-eslint/no-unsafe-return": "error",
-      "@typescript-eslint/no-unused-vars": ["error", { caughtErrors: "none" }],
+      "@typescript-eslint/no-unused-vars": ["error", { caughtErrors: "all" }],
       "no-implicit-globals": "off",
       // The custom multi-page UI supports Obsidian before 1.13. Returning partial
       // declarative definitions would replace it entirely on 1.13+.
