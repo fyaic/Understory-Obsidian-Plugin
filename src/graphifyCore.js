@@ -8,7 +8,7 @@ class GraphifyCoreMethods {
     _vaultBasePath() {
         try {
             return this.app.vault.adapter.getBasePath();
-        } catch (e) {
+        } catch {
             return null;
         }
     }
@@ -260,7 +260,7 @@ class GraphifyCoreMethods {
         if (!fs.existsSync(p)) return null;
         try {
             return JSON.parse(fs.readFileSync(p, 'utf-8'));
-        } catch (e) {
+        } catch {
             return null;
         }
     }

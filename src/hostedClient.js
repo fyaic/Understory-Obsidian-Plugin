@@ -117,7 +117,7 @@ class HostedClientMethods {
         if (!text) return {};
         try {
             return JSON.parse(text);
-        } catch (error) {
+        } catch {
             return {};
         }
     }
@@ -233,7 +233,7 @@ class HostedClientMethods {
             try {
                 const parsed = new URL(picture);
                 if (parsed.protocol !== 'https:' || parsed.username || parsed.password) picture = null;
-            } catch (error) {
+            } catch {
                 picture = null;
             }
         }
@@ -690,7 +690,7 @@ class HostedClientMethods {
                 const active = summary?.active === true;
                 new Notice(t(this, active ? 'hosted_membership_active' : 'hosted_membership_pending'));
                 return { status: active ? 'billing_refreshed' : 'billing_pending' };
-            } catch (error) {
+            } catch {
                 new Notice(t(this, 'hosted_membership_refresh_failed'), 8000);
                 return { status: 'billing_refresh_failed' };
             }
@@ -699,7 +699,7 @@ class HostedClientMethods {
             try {
                 await this.hostedLogin(true);
                 return { status: 'retry_started' };
-            } catch (error) {
+            } catch {
                 new Notice(t(this, 'hosted_callback_retry_failed'), 8000);
                 return { status: 'retry_failed' };
             }

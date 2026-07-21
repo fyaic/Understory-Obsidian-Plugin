@@ -43,7 +43,7 @@ function envValue(name, env) {
         const source = env || (typeof process !== 'undefined' && process.env) || {};
         const value = source[name];
         return value == null ? '' : String(value).trim();
-    } catch (error) {
+    } catch {
         return '';
     }
 }
@@ -51,7 +51,7 @@ function envValue(name, env) {
 function safeExists(candidate, fileSystem = fs) {
     try {
         return !!candidate && fileSystem.existsSync(candidate);
-    } catch (error) {
+    } catch {
         return false;
     }
 }
@@ -73,7 +73,7 @@ function addSearchRoot(roots, rootPath, options = {}) {
     let current;
     try {
         current = pathModule.resolve(value);
-    } catch (error) {
+    } catch {
         return;
     }
     while (current) {
@@ -104,7 +104,7 @@ function processCwd() {
         return typeof process !== 'undefined' && typeof process.cwd === 'function'
             ? process.cwd()
             : '';
-    } catch (error) {
+    } catch {
         return '';
     }
 }
@@ -200,7 +200,7 @@ function isLikelyPythonExecutable(candidate, options = {}) {
             windowsHide: true,
         });
         return !result.error && result.status === 0;
-    } catch (error) {
+    } catch {
         return false;
     }
 }
@@ -1542,7 +1542,7 @@ class UnderstorySettingTab extends PluginSettingTab {
     _domainFromUrl(value) {
         try {
             return new URL(String(value || '')).host || '-';
-        } catch (error) {
+        } catch {
             return String(value || '-').replace(/^https?:\/\//, '').replace(/\/.*$/, '') || '-';
         }
     }
@@ -2429,7 +2429,7 @@ class UnderstorySettingTab extends PluginSettingTab {
                 clipboard.writeText(text);
             }
             new Notice(successMessage);
-        } catch (error) {
+        } catch {
             new Notice(t(this.plugin, 'engine_copy_failed_notice'));
         }
     }

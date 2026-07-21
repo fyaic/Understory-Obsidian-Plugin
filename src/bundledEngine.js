@@ -14,7 +14,7 @@ function vaultBasePath(app) {
         if (adapter && typeof adapter.getBasePath === 'function') {
             return String(adapter.getBasePath() || '').trim();
         }
-    } catch (error) {
+    } catch {
         return '';
     }
     return String(adapter?.basePath || '').trim();

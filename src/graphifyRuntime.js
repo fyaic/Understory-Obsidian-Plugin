@@ -156,7 +156,7 @@ class GraphifyRuntimeMethods {
             });
             let output = '';
             let timer = window.setTimeout(() => {
-                try { proc.kill(); } catch (error) { /* ignore */ }
+                try { proc.kill(); } catch { /* ignore */ }
                 reject(new Error(t(this, 'engine_python_timeout')));
             }, timeoutMs);
             proc.stdout?.on('data', (data) => { output += data.toString(); });
@@ -515,7 +515,7 @@ class GraphifyRuntimeMethods {
             let timer = null;
             if (timeoutMs > 0) {
                 timer = window.setTimeout(() => {
-                    try { proc.kill(); } catch (e) { /* ignore */ }
+                    try { proc.kill(); } catch { /* ignore */ }
                     reject(new Error(`Script timed out after ${timeoutMs}ms: ${scriptPath}`));
                 }, timeoutMs);
             }
@@ -535,14 +535,14 @@ class GraphifyRuntimeMethods {
         if (!text) return null;
         try {
             return JSON.parse(text);
-        } catch (error) {
+        } catch {
             const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
             for (let index = lines.length - 1; index >= 0; index -= 1) {
                 const line = lines[index];
                 if (!line.startsWith('{') || !line.endsWith('}')) continue;
                 try {
                     return JSON.parse(line);
-                } catch (lineError) {
+                } catch {
                     // Keep looking for an earlier JSON line.
                 }
             }
@@ -580,12 +580,12 @@ class GraphifyRuntimeMethods {
                 const next = current + data.toString();
                 if (next.length <= MAX_PROCESS_OUTPUT_BYTES) return next;
                 outputOverflowed = true;
-                try { proc.kill(); } catch (error) { /* ignore */ }
+                try { proc.kill(); } catch { /* ignore */ }
                 return next.slice(0, MAX_PROCESS_OUTPUT_BYTES);
             };
             if (timeoutMs > 0) {
                 timer = window.setTimeout(() => {
-                    try { proc.kill(); } catch (error) { /* ignore */ }
+                    try { proc.kill(); } catch { /* ignore */ }
                     finish(reject, new Error(`api.py timed out after ${timeoutMs}ms`));
                 }, timeoutMs);
             }

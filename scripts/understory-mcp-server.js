@@ -263,7 +263,7 @@ function startServer(argv = process.argv.slice(2), stdin = process.stdin, stdout
             let message;
             try {
                 message = JSON.parse(line);
-            } catch (error) {
+            } catch {
                 writeMessage(rpcError(null, -32700, 'Parse error.'), stdout);
                 continue;
             }

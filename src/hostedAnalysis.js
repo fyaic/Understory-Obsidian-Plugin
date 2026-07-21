@@ -16,7 +16,7 @@ class HostedAnalysisMethods {
         try {
             const raw = await this.app.vault.adapter.read(path);
             return raw ? JSON.parse(raw) : fallback;
-        } catch (error) {
+        } catch {
             return fallback;
         }
     }

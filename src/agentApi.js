@@ -362,7 +362,7 @@ function createFsAdapter(vaultPath) {
             try {
                 await fs.promises.access(this.resolve(relativePath));
                 return true;
-            } catch (error) {
+            } catch {
                 return false;
             }
         },
@@ -409,7 +409,7 @@ function createObsidianAdapter(app, vaultPath) {
             try {
                 await adapter.read(normalized);
                 return true;
-            } catch (error) {
+            } catch {
                 return false;
             }
         },
@@ -544,7 +544,7 @@ function parseProcessJson(stdout) {
         for (const line of lines) {
             try {
                 return JSON.parse(line);
-            } catch (lineError) {
+            } catch {
                 // Keep looking for a JSON line.
             }
         }
@@ -748,7 +748,7 @@ function createAgentApi(options = {}) {
         const apiPath = path.join(absoluteEngineDir, 'api.py');
         try {
             await fs.promises.access(apiPath);
-        } catch (error) {
+        } catch {
             throw new AgentApiError('ENGINE_NOT_READY', ERROR_MESSAGES.ENGINE_NOT_READY, `api.py not found: ${apiPath}`);
         }
 
@@ -848,7 +848,7 @@ function createAgentApi(options = {}) {
                 let entries = [];
                 try {
                     entries = await fs.promises.readdir(absoluteDir, { withFileTypes: true });
-                } catch (error) {
+                } catch {
                     return;
                 }
                 for (const entry of entries) {
@@ -924,7 +924,7 @@ function createAgentApi(options = {}) {
             try {
                 if (!(await adapter.exists(notePath))) continue;
                 content = await adapter.readText(notePath);
-            } catch (error) {
+            } catch {
                 continue;
             }
             const entry = store.files[notePath] || null;
@@ -1060,7 +1060,7 @@ function createAgentApi(options = {}) {
                     ]);
                     stale = entry.hash !== hashContent(content)
                         || Number(entry.mtime || 0) !== Number(stat.mtime || 0);
-                } catch (error) {
+                } catch {
                     stale = false;
                 }
                 const relations = annotateRelations(Array.isArray(entry.relations) ? entry.relations : [], pathIndex, { internalPrefixes });
@@ -1110,7 +1110,7 @@ function createAgentApi(options = {}) {
                             if (await adapter.exists(targetPath)) {
                                 related.push(await buildNoteBrief(targetPath, store, query || '', pathIndex));
                             }
-                        } catch (error) {
+                        } catch {
                             // Relations may point to aliases or notes that are not present locally.
                         }
                         if (related.length >= maxResults - 1) break;

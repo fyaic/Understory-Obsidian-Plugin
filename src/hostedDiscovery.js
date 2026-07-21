@@ -166,7 +166,7 @@ class HostedDiscoveryMethods {
                     title: candidate.basename || candidate.name || candidate.path,
                     snippet,
                 };
-            } catch (error) {
+            } catch {
                 return null;
             }
         }))).filter(Boolean);

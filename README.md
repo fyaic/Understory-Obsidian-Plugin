@@ -174,7 +174,7 @@ Every release must attach exactly these install assets:
 - `main.js`
 - `styles.css`
 
-The Git tag must exactly match the manifest version. Current release: `1.13.6`.
+The Git tag must exactly match the manifest version. Current release: `1.13.7`.
 
 ## License
 

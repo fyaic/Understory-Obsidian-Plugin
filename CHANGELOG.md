@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.13.7
+
+- Remove unused catch bindings reported by automated review recommendations across source modules by using `catch { ... }` for intentionally ignored failures.
+- Keep catch parameters only where the error object is used for diagnostics, logging, or returned failure details.
+- Tighten local ESLint so unused caught errors are checked before release.
+- Preserve hosted authentication, note analysis, provider routing, local-engine behavior, UI behavior, saved settings, and the inherited 1.13.0 local-engine snapshot.
+
 ## 1.13.6
 
 - Replace the npm `build` entrypoint with a Node-based bundle generator so Obsidian clean build verification no longer requires a `python` command.
