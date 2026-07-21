@@ -166,7 +166,7 @@ npm ci
 npm run verify
 ```
 
-`npm run verify` runs the official Obsidian lint rules, 102 automated tests, two independent deterministic bundle builds, release metadata checks, a bundle syntax check, and a local engine smoke test.
+`npm run verify` runs the official Obsidian lint rules, 103 automated tests, two independent deterministic bundle builds, release metadata checks, a bundle syntax check, and a local engine smoke test.
 
 Every release must attach exactly these install assets:
 
@@ -174,7 +174,7 @@ Every release must attach exactly these install assets:
 - `main.js`
 - `styles.css`
 
-The Git tag must exactly match the manifest version. Current release: `1.13.5`.
+The Git tag must exactly match the manifest version. Current release: `1.13.6`.
 
 ## License
 

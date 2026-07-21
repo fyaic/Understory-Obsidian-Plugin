@@ -179,6 +179,14 @@ def main() -> None:
     package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
     if str(package.get("version")) != version:
         raise SystemExit(f"package.json version {package.get('version')} does not match manifest version {version}")
+    scripts = package.get("scripts") or {}
+    build_script = str(scripts.get("build") or "")
+    if build_script != "node scripts/bundle_obsidian_plugin.js --plugin-dir src --out main.js":
+        raise SystemExit("package.json build script must use the Node bundler for clean review environments")
+    if "python" in build_script.lower():
+        raise SystemExit("package.json build script must not require a python command")
+    if str(scripts.get("check:bundle") or "") != "node scripts/check_deterministic_bundle.js":
+        raise SystemExit("package.json check:bundle script must validate the Node bundler")
 
     package_lock = json.loads((ROOT / "package-lock.json").read_text(encoding="utf-8"))
     lock_versions = [

@@ -1,12 +1,12 @@
 {
   "name": "understory-obsidian-plugin",
-  "version": "1.13.5",
+  "version": "1.13.6",
   "private": true,
   "description": "Official Understory release package for related-note discovery and knowledge maintenance.",
   "scripts": {
-    "build": "python scripts/bundle_obsidian_plugin.py --plugin-dir src --out main.js",
+    "build": "node scripts/bundle_obsidian_plugin.js --plugin-dir src --out main.js",
     "check": "python scripts/check_release.py",
-    "check:bundle": "python scripts/check_deterministic_bundle.py",
+    "check:bundle": "node scripts/check_deterministic_bundle.js",
     "lint": "eslint src scripts tests package.json --max-warnings=0",
     "test": "node --test tests/*.test.js",
     "verify": "npm run lint && npm test && npm run build && npm run check:bundle && npm run check"

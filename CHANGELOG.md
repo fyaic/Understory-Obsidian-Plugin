@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.13.6
+
+- Replace the npm `build` entrypoint with a Node-based bundle generator so Obsidian clean build verification no longer requires a `python` command.
+- Switch deterministic bundle verification to the same Node bundler used by `npm run build`.
+- Add release-script regression coverage and release-check guards that prevent the build script from drifting back to a Python-only command.
+- Preserve hosted authentication, note analysis, provider routing, local-engine behavior, UI behavior, saved settings, and the inherited 1.13.0 local-engine snapshot.
+
 ## 1.13.5
 
 - Add `PluginSettingTab#getSettingDefinitions()` support so Obsidian 1.13.0 and later can include Understory settings pages in settings search.
