@@ -44,7 +44,9 @@ Users control the analysis scope through included and excluded folders. Hidden f
 
 ### Service processing and retention
 
-Hosted requests go to `https://understory.bondie.io`. The service routes model work through server-managed provider credentials. Upstream provider keys are not returned to the plugin.
+Hosted requests go to `https://understory.bondie.io`. The service routes AI
+work using server-managed credentials. Upstream keys, provider names, and
+model names are not returned in plugin runtime configuration or AI responses.
 
 The current hosted runtime contract reports that submitted note content is processed without server-side content retention. The plugin therefore stores the returned relation and analysis results locally under `.understory`. This content-retention statement does not mean the service keeps no operational records: account identity, session state, request counts, processing units, timestamps, error categories, quota state, and security records may be retained as needed to operate, protect, and observe the service.
 

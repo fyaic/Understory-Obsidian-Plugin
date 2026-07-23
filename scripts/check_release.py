@@ -212,7 +212,7 @@ def main() -> None:
 
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     privacy = (ROOT / "PRIVACY.md").read_text(encoding="utf-8")
-    for marker in ["Continue with Bondie", "Optional payments", "server-managed provider"]:
+    for marker in ["Continue with Bondie", "Optional payments", "provider and model choices are not returned"]:
         if marker not in readme:
             raise SystemExit(f"README.md is missing hosted release disclosure: {marker}")
     for marker in ["Hosted mode is not local-only", "selected snippets", "processing units", "does not read clipboard contents"]:

@@ -1,6 +1,6 @@
 {
   "name": "understory-obsidian-plugin",
-  "version": "1.13.9",
+  "version": "1.13.10",
   "private": true,
   "description": "Official Understory release package for related-note discovery and knowledge maintenance.",
   "scripts": {

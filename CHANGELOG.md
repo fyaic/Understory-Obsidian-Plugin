@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.13.10
+
+- Remove provider/model metadata from sanitized hosted capability config.
+- Stop persisting server-selected model names or injecting model variables into
+  the hosted runtime; advanced local/self-hosted model settings remain intact.
+- Align hosted account copy with the login-only experience so ordinary users
+  see service readiness rather than implementation-layer routing details.
+- Add regressions proving hostile provider/model metadata is discarded and
+  hosted Python environments contain no model selection.
+- Preserve the byte-identical, attested 1.13.0 local-engine snapshot.
+
 ## 1.13.9
 
 - Show a compact current-note notice when a configured refresh scope excludes

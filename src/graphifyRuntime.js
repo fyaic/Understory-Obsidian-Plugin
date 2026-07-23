@@ -102,15 +102,10 @@ class GraphifyRuntimeMethods {
 
         if (isHosted) {
             const config = this.settings?.hostedRuntimeConfig || {};
-            const features = config.features || {};
-            const embedding = features.embedding || {};
-            const reasoning = features.reasoning || {};
             env.UNDERSTORY_EMBEDDING_PROVIDER = 'hosted';
             env.UNDERSTORY_LLM_PROVIDER = 'hosted';
             setIfPresent('UNDERSTORY_HOSTED_API_BASE_URL', this.settings?.hostedServerUrl || config.public_api_base_url);
             setIfPresent('UNDERSTORY_HOSTED_ACCESS_TOKEN', this.settings?.hostedAccessToken);
-            setIfPresent('UNDERSTORY_EMBEDDING_MODEL', embedding.model || this.settings?.embeddingModel);
-            setIfPresent('UNDERSTORY_LLM_MODEL', reasoning.model || this.settings?.llmModel);
             return env;
         }
 
