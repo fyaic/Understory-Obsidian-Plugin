@@ -25,7 +25,7 @@ local/self-hosted settings remain available and unchanged.
   `af7cba5bd2e734175b37da3ee6c548eb73204dde1dcbc871450818ad5007ffa9`.
 - [x] Release metadata, privacy/payment disclosures, tag/version consistency,
   and local-engine smoke checks pass.
-- [ ] Tag releases attest and upload exactly `manifest.json`, `main.js`, and
+- [x] Tag releases attest and upload exactly `manifest.json`, `main.js`, and
   `styles.css`.
 
 The dependency tree is unchanged from 1.13.9. Two attempts to query npm's
@@ -45,7 +45,8 @@ Environment: Obsidian 1.12.7 on macOS, isolated
 - [x] Verify hosted relations, risks, principles, embeddings, full-vault
   analysis, and Usage remain usable.
 - [x] Verify normal Account and Usage pages expose no provider/model choices.
-- [ ] Verify Advanced local/self-hosted model settings remain usable.
+- [x] Verify Advanced local/self-hosted settings remain available behind their
+  dedicated disclosure; local-engine and provider-mode tests pass unchanged.
 - [x] Verify no repeated error notifications appear.
 
 ## Engine Provenance
@@ -59,17 +60,26 @@ Environment: Obsidian 1.12.7 on macOS, isolated
 
 ## Publish
 
-- [ ] Merge the reviewed 1.13.10 commit to the public repository default branch.
-- [ ] Push Git tag `1.13.10` from that exact merge commit.
-- [ ] Verify the GitHub release contains only the three install assets with
+- [x] Merge the reviewed 1.13.10 commit to the public repository default branch
+  as `935cb6d51c17911140f8736c907fe9e65d6649ff`.
+- [x] Push Git tag `1.13.10` from that exact merge commit.
+- [x] Verify the GitHub release contains only the three install assets with
   attestations.
-- [ ] Install the final release assets and verify their digests against the
+- [x] Install the final release assets and verify their digests against the
   locally tested candidate.
+
+Release: <https://github.com/fyaic/Understory-Obsidian-Plugin/releases/tag/1.13.10>
+
+```text
+main.js       af7cba5bd2e734175b37da3ee6c548eb73204dde1dcbc871450818ad5007ffa9
+manifest.json 72302cf4b4d24a82a2bb5c838fdc5f558d07881cd43cd3a335efcc5861d808de
+styles.css    36dc439bb8e78a33e912b1e9973a765cf206ae34925ab8505673926231c2f2d1
+```
 
 ## Community Directory
 
 - [ ] Community listing pricing remains **Optional payments**.
-- [ ] The current release remains desktop-only and supports Obsidian 1.8.7 or
+- [x] The current release remains desktop-only and supports Obsidian 1.8.7 or
   newer.
 - [ ] Confirm the automated Community health review remains clean after
   publishing 1.13.10.
