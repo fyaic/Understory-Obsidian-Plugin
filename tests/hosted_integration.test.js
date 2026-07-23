@@ -123,6 +123,7 @@ async function main() {
     const { registerCoreCommands } = require('../src/commands');
     const runtimeMethods = require('../src/graphifyRuntime');
     const linkDiscoveryMethods = require('../src/linkDiscovery');
+    const hostedClientMethods = require('../src/hostedClient');
     const { DEFAULT_SETTINGS, providerPreset } = require('../src/settings');
     const { t } = require('../src/i18n');
 
@@ -157,6 +158,36 @@ async function main() {
     assert.strictEqual(migratedSettings.settings.presentationMode, 'sidebar');
     assert.strictEqual(migratedSettings.settings.settingsSchemaVersion, 2);
     assert(savedSettings);
+
+    const persistedHostedSettings = Object.create(linkDiscoveryMethods);
+    let sanitizedSavedSettings = null;
+    for (const name of Object.getOwnPropertyNames(hostedClientMethods)) {
+        if (name === 'constructor') continue;
+        Object.defineProperty(
+            persistedHostedSettings,
+            name,
+            Object.getOwnPropertyDescriptor(hostedClientMethods, name)
+        );
+    }
+    persistedHostedSettings.loadData = async () => ({
+        networkMode: 'hosted',
+        settingsSchemaVersion: 2,
+        hostedRuntimeConfig: {
+            features: {
+                embedding: {
+                    enabled: true,
+                    model: 'old-server-model',
+                    provider: 'old-server-provider',
+                    endpoint: { method: 'POST', path: '/v1/embedding' },
+                },
+            },
+        },
+    });
+    persistedHostedSettings.saveData = async (value) => { sanitizedSavedSettings = value; };
+    await persistedHostedSettings.loadSettings();
+    assert.strictEqual(persistedHostedSettings.settings.hostedRuntimeConfig.features.embedding.model, undefined);
+    assert.strictEqual(persistedHostedSettings.settings.hostedRuntimeConfig.features.embedding.provider, undefined);
+    assert(sanitizedSavedSettings);
 
     const scopedDiscovery = Object.create(linkDiscoveryMethods);
     scopedDiscovery.settings = { refreshFolders: ['Projects/Active'], excludedFolders: [] };
@@ -204,10 +235,12 @@ async function main() {
         networkMode: 'hosted',
         hostedServerUrl: 'http://127.0.0.1:8787/',
         hostedAccessToken: 'understory-session',
+        embeddingModel: 'must-not-enter-hosted-runtime',
+        llmModel: 'must-not-enter-hosted-runtime',
         hostedRuntimeConfig: {
             features: {
-                embedding: { model: 'server-embedding' },
-                reasoning: { model: 'server-reasoning' },
+                embedding: { model: 'must-be-ignored' },
+                reasoning: { model: 'must-be-ignored' },
             },
         },
     };
@@ -218,8 +251,24 @@ async function main() {
     assert.strictEqual(hostedEnv.UNDERSTORY_LLM_PROVIDER, 'hosted');
     assert.strictEqual(hostedEnv.UNDERSTORY_HOSTED_API_BASE_URL, 'http://127.0.0.1:8787/');
     assert.strictEqual(hostedEnv.UNDERSTORY_HOSTED_ACCESS_TOKEN, 'understory-session');
-    assert.strictEqual(hostedEnv.UNDERSTORY_EMBEDDING_MODEL, 'server-embedding');
-    assert.strictEqual(hostedEnv.UNDERSTORY_LLM_MODEL, 'server-reasoning');
+    assert.strictEqual(hostedEnv.UNDERSTORY_EMBEDDING_MODEL, undefined);
+    assert.strictEqual(hostedEnv.UNDERSTORY_LLM_MODEL, undefined);
+
+    const hostedClient = Object.create(hostedClientMethods);
+    const sanitizedConfig = hostedClient._sanitizeRuntimeConfig({
+        features: {
+            embedding: {
+                enabled: true,
+                model: 'must-be-ignored',
+                provider: 'must-be-ignored',
+                endpoint: { method: 'POST', path: '/v1/embedding' },
+            },
+        },
+    });
+    assert.deepStrictEqual(sanitizedConfig.features.embedding, {
+        enabled: true,
+        endpoint: { method: 'POST', path: '/v1/embedding', url: '' },
+    });
 
     const runtime = Object.create(runtimeMethods);
     runtime.settings = {};

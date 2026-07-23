@@ -360,11 +360,17 @@ class LinkDiscoveryMethods {
     async loadSettings() {
         const data = await this.loadData() || {};
         const previousSchemaVersion = Number(data.settingsSchemaVersion || 0);
+        let settingsChanged = previousSchemaVersion < 2;
         this._loadedSettingsData = data;
         this.settings = normalizeSettings(data, DEFAULT_SETTINGS);
         if ((this.settings.networkMode || 'local') === 'hosted') {
             this.settings.embeddingProvider = 'hosted';
             this.settings.llmProvider = 'hosted';
+            if (this.settings.hostedRuntimeConfig && typeof this._sanitizeRuntimeConfig === 'function') {
+                const previousRuntimeConfig = JSON.stringify(this.settings.hostedRuntimeConfig);
+                this.settings.hostedRuntimeConfig = this._sanitizeRuntimeConfig(this.settings.hostedRuntimeConfig);
+                settingsChanged = JSON.stringify(this.settings.hostedRuntimeConfig) !== previousRuntimeConfig || settingsChanged;
+            }
             if (previousSchemaVersion < 2 && (!data.presentationMode || data.presentationMode === 'body')) {
                 this.settings.presentationMode = 'sidebar';
             }
@@ -374,7 +380,7 @@ class LinkDiscoveryMethods {
             repairPythonPath(this.settings);
         }
         this.settings.settingsSchemaVersion = 2;
-        if (previousSchemaVersion < 2) await this.saveSettings();
+        if (settingsChanged) await this.saveSettings();
     }
 
     async saveSettings() {

@@ -89,7 +89,7 @@ Agent reads return scoped snippets, note briefs, relation metadata, graph summar
 
 ## Trust, privacy, and account model
 
-Hosted mode is account-first and managed. **Continue with Bondie** starts browser sign-in and returns to the same vault. Hosted model work uses **server-managed provider** credentials; provider keys are not returned to the plugin.
+Hosted mode is account-first and managed. **Continue with Bondie** starts browser sign-in and returns to the same vault. Hosted AI routing and service credentials stay on the Understory server; provider and model choices are not returned to the plugin.
 
 - Selected-snippet consent is required before hosted relation or vault analysis sends note snippets.
 - Hosted collection excludes hidden folders, Obsidian configuration, trash paths, and Understory working files.
@@ -107,7 +107,7 @@ Understory is free to install and the current hosted membership is Free. The Obs
 4. Review **Suggestions** and **Risks**.
 5. Accept, ignore, open, or insert only the relations you trust.
 
-Current release: `1.13.9`. Understory targets Obsidian `1.8.7` or newer and is desktop-only.
+Current release: `1.13.10`. Understory targets Obsidian `1.8.7` or newer and is desktop-only.
 
 ## Good to know
 

@@ -275,7 +275,6 @@ class HostedClientMethods {
             if (!feature || typeof feature !== 'object') continue;
             safe[key] = {
                 enabled: !!feature.enabled,
-                model: feature.model || null,
                 endpoint: this._sanitizeEndpoint(feature.endpoint),
             };
         }
@@ -804,14 +803,9 @@ class HostedClientMethods {
         }
         this.settings.hostedLastSync = Date.now();
         this._setHostedMode();
-        const safeConfig = this.settings.hostedRuntimeConfig || {};
-        const embedding = safeConfig.features && safeConfig.features.embedding;
-        const reasoning = safeConfig.features && safeConfig.features.reasoning;
-        if (embedding && embedding.model) this.settings.embeddingModel = embedding.model;
-        if (reasoning && reasoning.model) this.settings.llmModel = reasoning.model;
         await this.saveSettings();
         if (showNotice) new Notice(t(this, 'hosted_config_refreshed'));
-        return config;
+        return this.settings.hostedRuntimeConfig;
     }
 
     async refreshHostedUsage(showNotice = false) {

@@ -251,7 +251,8 @@ test('hosted advanced page explains managed keys without exposing key inputs', (
     const text = collectText(tab.containerEl).join('\n');
 
     assert.match(text, /Advanced \/ Local & self-hosted/);
-    assert.match(text, /Hosted accounts do not require OpenRouter, OpenAI, Zhipu, or custom provider keys/);
+    assert.match(text, /Hosted accounts do not require service URLs or credentials/);
+    assert.doesNotMatch(text, /OpenRouter|OpenAI|Zhipu/);
     assert.doesNotMatch(text, /Vector model key|Reasoning model key/);
 });
 
