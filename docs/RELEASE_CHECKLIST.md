@@ -60,12 +60,24 @@ Environment: Obsidian 1.12.7 on macOS, isolated
 
 ## Publish
 
-- [ ] Merge the reviewed 1.13.9 commit to the public repository default branch.
-- [ ] Push Git tag `1.13.9` from that exact merge commit.
-- [ ] Verify the GitHub release contains only the three install assets with
+- [x] Merge the reviewed 1.13.9 commit to the public repository default branch.
+- [x] Push Git tag `1.13.9` from that exact merge commit.
+- [x] Verify the GitHub release contains only the three install assets with
   attestations.
-- [ ] Install the final release assets and verify their digests against the
+- [x] Install the final release assets and verify their digests against the
   locally tested candidate.
+
+Release evidence:
+
+| Item | Verified result |
+| --- | --- |
+| Reviewed PR | [#13](https://github.com/fyaic/Understory-Obsidian-Plugin/pull/13), GitHub CI passed |
+| Merge commit | `5bec347c8c3aaab8c8fb488375608d636caca829` |
+| Release | [1.13.9](https://github.com/fyaic/Understory-Obsidian-Plugin/releases/tag/1.13.9), published, non-draft, non-prerelease |
+| `main.js` | `78776371f41e7f183bfbb12aded7a3218dd05b178c2661c7e5fc7a81726b0f62` |
+| `manifest.json` | `4847b527c8c8da3f5b660e7eeac226b0beec937ecf533a02491359a90a49e6ad` |
+| `styles.css` | `36dc439bb8e78a33e912b1e9973a765cf206ae34925ab8505673926231c2f2d1` |
+| Local install | Release downloads match the isolated vault and `AIC-000` installs byte for byte; existing `data.json` files were preserved |
 
 ## Community Directory
 
