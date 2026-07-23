@@ -107,7 +107,7 @@ Understory is free to install and the current hosted membership is Free. The Obs
 4. Review **Suggestions** and **Risks**.
 5. Accept, ignore, open, or insert only the relations you trust.
 
-Current release: `1.13.8`. Understory targets Obsidian `1.8.7` or newer and is desktop-only.
+Current release: `1.13.9`. Understory targets Obsidian `1.8.7` or newer and is desktop-only.
 
 ## Good to know
 

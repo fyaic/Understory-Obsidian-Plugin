@@ -1,67 +1,78 @@
-# Understory 1.13.3 Release Checklist
+# Understory 1.13.9 Release Checklist
 
-Date: 2026-07-21
+Date: 2026-07-23
 
 ## Scope
 
-This patch keeps the public repository's Obsidian Community release packaging
-stable across Windows and GitHub Actions. It changes release tooling and
-version metadata only. Hosted authentication, provider routing, account data,
-note-analysis behavior, saved settings, UI behavior, and the bundled
-local-engine snapshot remain unchanged.
+This patch makes automatic-refresh scope visible in the current-note sidebar.
+Manual analysis remains available outside the configured scope, while the
+notice explains that full-vault and scheduled refreshes skip that folder. The
+notice links directly to Scope settings.
+
+Hosted authentication, account data, analysis endpoints, saved settings, and
+the bundled local-engine snapshot are unchanged.
 
 ## Automated Gates
 
-- [x] Manifest, package, lockfile, versions, changelog, release notes, and provenance use `1.13.3`.
+- [x] Manifest, package, lockfile, versions, changelog, release notes, and
+  provenance use `1.13.9`.
 - [x] Official Obsidian ESLint rules pass with zero warnings.
-- [x] All 101 JavaScript, Python CLI, local engine, MCP, settings, sidebar, account, and hosted integration tests pass.
+- [x] All 103 JavaScript, Python CLI, local engine, MCP, settings, sidebar,
+  account, and hosted integration tests pass.
+- [x] Refresh-scope tests cover normalized folder matching, an empty whitelist,
+  and globally excluded folders.
 - [x] `main.js` is ignored and absent from tracked source files.
-- [x] Two independent clean bundle builds are byte-identical and pass `node --check`.
-- [x] Release metadata, privacy/payment disclosures, and tag/version consistency pass.
-- [x] A local-only `api.py init` smoke passes.
-- [x] No raw `h1`-`h6` elements are created from plugin source.
-- [x] Tag releases attest and upload exactly `manifest.json`, `main.js`, and `styles.css`.
+- [x] Two independent clean bundle builds are byte-identical and pass
+  `node --check`.
+- [x] Candidate bundle SHA-256:
+  `78776371f41e7f183bfbb12aded7a3218dd05b178c2661c7e5fc7a81726b0f62`.
+- [x] Release metadata, privacy/payment disclosures, tag/version consistency,
+  and local-engine smoke checks pass.
+- [x] Tag releases attest and upload exactly `manifest.json`, `main.js`, and
+  `styles.css`.
 
 ## Real Obsidian Smoke
 
-Environment: Obsidian 1.12.7 on macOS, isolated `Understory-UI-Smoke-Vault`.
+Environment: Obsidian 1.12.7 on macOS, isolated
+`Understory-UI-Smoke-Vault`.
 
-- [ ] Install the generated 1.13.3 assets without replacing `data.json`.
-- [x] Reload the plugin and verify the existing Bondie product session reconnects.
-- [x] Verify name, email, avatar, Free membership, and service readiness.
-- [x] Verify the sidebar title and conflict groups retain their visual hierarchy.
-- [x] Open the snippet-consent and global-logout confirmations and verify native modal titles.
-- [x] Generate hosted suggestions and risks without repeated error notifications.
-- [x] Verify Account, Usage, Workflow, Scope, Suggestions, Activity, AI agents, and Advanced remain usable.
+- [x] Install the final 1.13.9 candidate without replacing `data.json`.
+- [x] Reload the plugin and verify the existing Bondie product session
+  reconnects.
+- [x] Verify account identity, avatar, email, Free membership, and managed
+  service readiness.
+- [x] Verify hosted relations, risks, principles, embeddings, full-vault
+  analysis, and Usage remain usable.
+- [x] Verify an out-of-scope note shows one compact notice while retaining its
+  existing manual suggestions and risks.
+- [x] Verify **Review scope** opens Understory's Scope page.
+- [x] Verify an in-scope note does not show the notice.
+- [x] Verify no repeated error notifications appear.
 
 ## Engine Provenance
 
-- [x] The bundled engine digest remains `cac720e1033b6be233b9d4b99059604654e5cdcb78d0b688464d66792eb73743`.
-- [x] `engine-provenance.json` records that 1.13.3 inherits the byte-identical 1.13.0 snapshot.
-- [x] The release checker rejects any modified legacy snapshot and requires a full upstream core commit when engine source changes.
+- [x] The bundled engine digest remains
+  `cac720e1033b6be233b9d4b99059604654e5cdcb78d0b688464d66792eb73743`.
+- [x] `engine-provenance.json` records that 1.13.9 inherits the byte-identical,
+  attested 1.13.0 snapshot.
+- [x] The release checker rejects any modified legacy snapshot and requires a
+  full upstream core commit when engine source changes.
 
 ## Publish
 
-- [x] Merge the reviewed 1.13.3 commit to the public repository default branch.
-- [x] Push Git tag `1.13.3` from that exact merge commit.
-- [x] Verify the GitHub release contains only the three install assets with attestations.
-- [ ] Install the final release assets and verify their digests against the local build.
-
-Release evidence:
-
-| Item | Verified result |
-| --- | --- |
-| Reviewed PR | [#7](https://github.com/fyaic/Understory-Obsidian-Plugin/pull/7), GitHub CI passed |
-| Merge commit | `dad8ce4cdbc51daa4977c8168c99ea95ee7efca2` |
-| Release | [1.13.3](https://github.com/fyaic/Understory-Obsidian-Plugin/releases/tag/1.13.3), published, non-draft, non-prerelease |
-| `main.js` | `df05b117fa29aab39189115988c4c0bc89c90a44e27ee85f20db136757b565fb` |
-| `manifest.json` | `a88046d7b1245d0491cddc48b8fe6142c51b8634c1a60247b9a4fab05caf6bc3` |
-| `styles.css` | `69bab64f4b58c6aa65e7400cf2a62032587b5ed4ac074f31f5688a56a2ea17d6` |
-| Local install | Pending |
+- [ ] Merge the reviewed 1.13.9 commit to the public repository default branch.
+- [ ] Push Git tag `1.13.9` from that exact merge commit.
+- [ ] Verify the GitHub release contains only the three install assets with
+  attestations.
+- [ ] Install the final release assets and verify their digests against the
+  locally tested candidate.
 
 ## Community Directory
 
-- [x] Confirm the Community listing pricing remains **Optional payments**.
-- [x] Confirm the public automated Health score is **Excellent** after release.
-- [ ] Upload or retain current light and dark product screenshots in the Community dashboard.
-- [ ] Resolve any dashboard-only disclosure or ownership prompts that require the maintainer account.
+- [x] Community listing pricing remains **Optional payments**.
+- [x] The current release remains desktop-only and supports Obsidian 1.8.7 or
+  newer.
+- [ ] Confirm the automated Community health review remains clean after
+  publishing 1.13.9.
+- [ ] Complete any dashboard-only disclosure or ownership prompt that requires
+  the maintainer account.

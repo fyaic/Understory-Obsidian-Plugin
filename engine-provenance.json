@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "plugin_release": "1.13.8",
+  "plugin_release": "1.13.9",
   "source_repository": "https://github.com/fyaic/Understory-graphify-engine",
   "source_commit": "legacy-unresolved",
   "snapshot_origin_release": "1.13.0",
@@ -8,5 +8,5 @@
   "snapshot_public_commit": "f63c57a3dac7f77fdd212ab59bca2fe837b95541",
   "snapshot_file_count": 52,
   "snapshot_sha256": "cac720e1033b6be233b9d4b99059604654e5cdcb78d0b688464d66792eb73743",
-  "note": "Release 1.13.8 reuses the byte-identical, attested 1.13.0 engine snapshot. Any future engine snapshot change requires a full upstream core commit."
+  "note": "Release 1.13.9 reuses the byte-identical, attested 1.13.0 engine snapshot. Any future engine snapshot change requires a full upstream core commit."
 }

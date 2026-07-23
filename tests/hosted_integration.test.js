@@ -158,6 +158,15 @@ async function main() {
     assert.strictEqual(migratedSettings.settings.settingsSchemaVersion, 2);
     assert(savedSettings);
 
+    const scopedDiscovery = Object.create(linkDiscoveryMethods);
+    scopedDiscovery.settings = { refreshFolders: ['Projects/Active'], excludedFolders: [] };
+    assert.strictEqual(scopedDiscovery._isPathInRefreshScope('Projects/Active/Plan.md'), true);
+    assert.strictEqual(scopedDiscovery._isPathInRefreshScope('Projects/Archive/Plan.md'), false);
+    scopedDiscovery.settings.refreshFolders = [];
+    assert.strictEqual(scopedDiscovery._isPathInRefreshScope('Anywhere/Plan.md'), true);
+    scopedDiscovery.settings.excludedFolders = ['Anywhere/Private'];
+    assert.strictEqual(scopedDiscovery._isPathInRefreshScope('Anywhere/Private/Plan.md'), false);
+
     const envRuntime = Object.create(runtimeMethods);
     envRuntime.settings = {
         graphifyDir: 'C:/UnderstoryEngine',
@@ -357,6 +366,20 @@ async function main() {
     const missingNodes = flattenFakeEl(missingRoot);
     assert(missingNodes.some((node) => node.text === 'No suggestions yet'));
     assert(missingNodes.some((node) => node.text === 'Generate suggestions'));
+
+    const scopeRoot = makeFakeEl();
+    view._openSettings = (page) => {
+        calls.push(['openSettings', page]);
+    };
+    view._renderScopeNotice(scopeRoot);
+    const scopeNodes = flattenFakeEl(scopeRoot);
+    assert(scopeNodes.some((node) => node.text === 'Outside automatic refresh'));
+    assert(scopeNodes.some((node) => /full-vault/.test(node.text)));
+    const scopeButton = scopeNodes.find((node) => node.tag === 'button');
+    assert(scopeButton);
+    await scopeButton.listeners.click({ preventDefault() {} });
+    assert(calls.some((call) => call[0] === 'openSettings' && call[1] === 'scope'));
+    calls.length = 0;
 
     view._openRelationTarget({ target: 'Folder/Target.md', title: 'Target' });
 
