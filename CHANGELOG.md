@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.13.9
+
+- Show a compact current-note notice when a configured refresh scope excludes
+  the note's folder.
+- Explain that manual analysis remains available while full-vault and
+  scheduled refreshes skip that folder.
+- Add a direct path from the sidebar notice to Scope settings and share one
+  normalized path-matching rule with the refresh queue.
+- Preserve hosted authentication, analysis APIs, saved settings, and the
+  byte-identical attested 1.13.0 local-engine snapshot.
+
 ## 1.13.8
 
 - Add full-window DemoVault screenshots for the Understory Suggestions and Risks sidebar to the English and Chinese README.

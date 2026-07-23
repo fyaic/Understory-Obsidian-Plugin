@@ -107,7 +107,7 @@ Understory 可以免费安装，当前托管会员也是 Free。Obsidian Communi
 4. 审阅 **Suggestions** 和 **Risks**。
 5. 只采纳、忽略、打开或插入你信任的关系。
 
-当前版本：`1.13.8`。Understory 目标版本为 Obsidian `1.8.7` 或更新版本，仅支持桌面端。
+当前版本：`1.13.9`。Understory 目标版本为 Obsidian `1.8.7` 或更新版本，仅支持桌面端。
 
 ## 你需要知道
 

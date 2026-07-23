@@ -72,6 +72,9 @@ class UnderstorySidebarView extends ItemView {
             if (this.sidebarEl !== root || this.renderVersion !== renderVersion) return;
             const variant = data.status === 'missing' ? 'missing' : (data.stale ? 'stale' : 'fresh');
             this._renderNotePanel(root, file, { variant, hideAction: variant !== 'fresh' });
+            if (this.plugin._isPathInRefreshScope && !this.plugin._isPathInRefreshScope(file.path)) {
+                this._renderScopeNotice(root);
+            }
             if (data.status === 'missing') {
                 this._renderStatePanel(root, 'missing', file);
                 return;
@@ -215,6 +218,16 @@ class UnderstorySidebarView extends ItemView {
                 button.setAttribute('title', label);
             }
         });
+    }
+
+    _renderScopeNotice(root) {
+        const panel = root.createDiv({ cls: 'understory-sidebar-state understory-sidebar-state--scope' });
+        panel.createDiv({ cls: 'understory-sidebar-state-title', text: t(this.plugin, 'sidebar_scope_outside_title') });
+        panel.createDiv({ cls: 'understory-sidebar-state-body', text: t(this.plugin, 'sidebar_scope_outside_body') });
+        const actions = panel.createDiv({ cls: 'understory-sidebar-state-actions' });
+        this._accountButton(actions, t(this.plugin, 'sidebar_scope_outside_action'), async () => {
+            this._openSettings('scope');
+        }, { icon: 'folder-cog' });
     }
 
     _accountButton(parent, text, handler, options = {}) {

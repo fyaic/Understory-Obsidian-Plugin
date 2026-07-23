@@ -422,6 +422,10 @@
     border-left-color: var(--text-error);
 }
 
+.understory-sidebar-state--scope {
+    border-left-color: var(--text-muted);
+}
+
 .understory-sidebar-state-title {
     font-weight: 650;
     line-height: 1.25;

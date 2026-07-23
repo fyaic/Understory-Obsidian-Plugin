@@ -393,10 +393,7 @@ class LinkDiscoveryMethods {
     }
 
     /**
-     * AIC-2105: 获取白名单文件夹下的所有可刷新文件
-     */
-    /**
-     * 检查文件路径是否在黑名单中（或其子孙路径）
+     * AIC-2105: 检查文件路径是否在黑名单中（或其子孙路径）
      */
     _isPathExcluded(filePath) {
         const excluded = this.settings.excludedFolders || [];
@@ -409,27 +406,21 @@ class LinkDiscoveryMethods {
         });
     }
 
+    _isPathInRefreshScope(filePath) {
+        if (this._isPathExcluded(filePath)) return false;
+        const folders = this.settings.refreshFolders || [];
+        if (folders.length === 0) return true;
+        const normalizedPath = String(filePath || '').replace(/\\/g, '/').replace(/^\/+/, '');
+        return folders.some((folder) => {
+            const normalizedFolder = String(folder || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+            if (!normalizedFolder) return false;
+            return normalizedPath === normalizedFolder || normalizedPath.startsWith(`${normalizedFolder}/`);
+        });
+    }
+
     getRefreshableFiles() {
         const allFiles = this.app.vault.getMarkdownFiles();
-        const folders = this.settings.refreshFolders || [];
-
-        let candidates;
-        if (folders.length === 0) {
-            // 白名单为空 = 全部文件（向后兼容）
-            candidates = allFiles;
-        } else {
-            candidates = allFiles.filter(file => {
-                const filePath = file.path;
-                return folders.some(folder => {
-                    // 匹配逻辑：文件路径以 folder/ 开头，或文件就在 folder 根目录下
-                    if (!folder.endsWith('/')) folder += '/';
-                    return filePath.startsWith(folder);
-                });
-            });
-        }
-
-        // 再过滤掉黑名单中的文件
-        return candidates.filter(file => !this._isPathExcluded(file.path));
+        return allFiles.filter((file) => this._isPathInRefreshScope(file.path));
     }
 
     /**
